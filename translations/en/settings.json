@@ -1,0 +1,17 @@
+{
+  "title": "Settings",
+  "account": {
+    "title": "Account Information",
+    "email": "Email",
+    "userId": "User ID",
+    "created": "Account created"
+  },
+  "profile": {
+    "title": "Profile",
+    "coming": "Profile customization coming soon..."
+  },
+  "preferences": {
+    "title": "Preferences",
+    "coming": "Language and notification settings coming soon..."
+  }
+}

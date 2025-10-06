@@ -1,0 +1,22 @@
+{
+  "title": "Privacy Policy",
+  "updated": "Last updated",
+  "sections": {
+    "collect": {
+      "title": "1. Information We Collect",
+      "content": "We collect information you provide directly to us when you create an account, including your name, email address, and profile information."
+    },
+    "use": {
+      "title": "2. How We Use Your Information",
+      "content": "We use the information we collect to provide, maintain, and improve our services, to communicate with you, and to protect the security of our platform."
+    },
+    "security": {
+      "title": "3. Data Security",
+      "content": "We implement appropriate technical and organizational measures to protect your personal information against unauthorized access or disclosure."
+    },
+    "contact": {
+      "title": "4. Contact Us",
+      "content": "If you have any questions about this Privacy Policy, please contact us at privacy@hypehire.com"
+    }
+  }
+}

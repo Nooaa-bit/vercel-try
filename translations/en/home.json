@@ -1,0 +1,22 @@
+{
+  "title": "Welcome to HypeHire",
+  "subtitle": "The modern staffing platform connecting talented workers with companies that need them.",
+  "cta": {
+    "primary": "Get Started",
+    "secondary": "Learn More"
+  },
+  "features": {
+    "workers": {
+      "title": "For Workers",
+      "description": "Find flexible shifts that match your schedule and skills."
+    },
+    "companies": {
+      "title": "For Companies",
+      "description": "Access qualified staff on-demand when you need them most."
+    },
+    "matching": {
+      "title": "Instant Matching",
+      "description": "Our platform connects the right people at the right time."
+    }
+  }
+}

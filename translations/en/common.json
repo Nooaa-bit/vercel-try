@@ -1,0 +1,8 @@
+{
+  "navbar": {
+    "login": "Log in",
+    "signup": "Sign up",
+    "signout": "Sign Out",
+    "settings": "Settings"
+  }
+}
