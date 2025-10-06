@@ -1,19 +1,20 @@
-"use client";
+'use client'
 
-import Link from "next/link";
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import Link from 'next/link'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
-export default function Navbar({ user }: { user: any }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+export default function Navbar({ user }: { user: User | null }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
   }
 
   return (
@@ -31,10 +32,7 @@ export default function Navbar({ user }: { user: any }) {
           <div className="hidden md:flex md:items-center md:space-x-4">
             {user ? (
               <>
-                <Link
-                  href="/settings"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2"
-                >
+                <Link href="/settings" className="text-gray-700 hover:text-blue-600 px-3 py-2">
                   Settings
                 </Link>
                 <button
@@ -46,10 +44,7 @@ export default function Navbar({ user }: { user: any }) {
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2"
-                >
+                <Link href="/login" className="text-gray-700 hover:text-blue-600 px-3 py-2">
                   Log in
                 </Link>
                 <Link
@@ -60,7 +55,7 @@ export default function Navbar({ user }: { user: any }) {
                 </Link>
               </>
             )}
-
+            
             {/* Language Toggle Placeholder */}
             <div className="flex items-center space-x-2 ml-4 border-l pl-4">
               <button className="text-sm text-gray-600 hover:text-blue-600">
@@ -79,26 +74,11 @@ export default function Navbar({ user }: { user: any }) {
               onClick={() => setIsOpen(!isOpen)}
               className="text-gray-700 hover:text-blue-600"
             >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isOpen ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 )}
               </svg>
             </button>
@@ -119,8 +99,8 @@ export default function Navbar({ user }: { user: any }) {
                 </Link>
                 <button
                   onClick={() => {
-                    handleSignOut();
-                    setIsOpen(false);
+                    handleSignOut()
+                    setIsOpen(false)
                   }}
                   className="block w-full text-left text-gray-700 hover:text-blue-600 px-3 py-2"
                 >
@@ -154,5 +134,5 @@ export default function Navbar({ user }: { user: any }) {
         )}
       </div>
     </nav>
-  );
+  )
 }
