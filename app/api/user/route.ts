@@ -1,3 +1,4 @@
+//vercel/app/api/user/route.ts. API endpoint that Check if they're logged in and fetch their user data from the database.
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";

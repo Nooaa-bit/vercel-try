@@ -1,13 +1,8 @@
+//vercel/lib/LanguageContext.tsx
 "use client";
-
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { usePathname, useRouter } from "next/navigation";
 import "@/lib/i18n";
 
 type Language = "en" | "el";
@@ -21,27 +16,36 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined
 );
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("en");
+export function LanguageProvider({
+  children,
+  lang,
+}: {
+  children: ReactNode;
+  lang: Language;
+}) {
   const { i18n } = useTranslation();
+  const pathname = usePathname();
+  const router = useRouter();
 
+  // This effect runs whenever lang changes
   useEffect(() => {
-    // Load from localStorage on mount
-    const saved = localStorage.getItem("language") as Language | null;
-    if (saved && (saved === "en" || saved === "el")) {
-      setLanguageState(saved);
-      i18n.changeLanguage(saved);
-    }
-  }, [i18n]);
-
-  const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
+    // Immediately change i18n language
     i18n.changeLanguage(lang);
-    localStorage.setItem("language", lang);
+    // Set cookie to persist preference
+    document.cookie = `language=${lang}; path=/; max-age=31536000`;
+  }, [lang, i18n]);
+
+  const setLanguage = (newLang: Language) => {
+    // Only change if different
+    if (newLang === lang) return;
+
+    // Replace language in current path
+    const newPathname = pathname.replace(`/${lang}`, `/${newLang}`);
+    router.push(newPathname);
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage }}>
+    <LanguageContext.Provider value={{ language: lang, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );
