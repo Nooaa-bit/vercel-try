@@ -2,21 +2,20 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
-type Language = "en" | "el";
-
 export default async function LoginPage({
   params,
 }: {
-  params: Promise<{ lang: Language }>;
+  params: Promise<{ lang: string }>;
 }) {
   const { lang } = await params;
+  const validLang = (lang === 'en' || lang === 'el') ? lang : 'en';
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect(`/${lang}/dashboard`);
+    redirect(`/${validLang}/dashboard`);
   }
 
   async function signInWithGoogle() {
@@ -29,7 +28,7 @@ export default async function LoginPage({
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback?next=/${lang}/dashboard`,
+        redirectTo: `${origin}/auth/callback?next=/${validLang}/dashboard`,
       },
     });
 

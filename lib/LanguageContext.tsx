@@ -1,4 +1,4 @@
-//vercel/lib/LanguageContext.tsx
+// vercel/lib/LanguageContext.tsx
 "use client";
 import { createContext, useContext, useEffect, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,36 +16,39 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined
 );
 
+// Type guard to narrow string -> Language
+function isLanguage(lang: string): lang is Language {
+  return lang === "en" || lang === "el";
+}
+
 export function LanguageProvider({
   children,
-  lang,
+  lang, // now accepts string from server/layout
 }: {
   children: ReactNode;
-  lang: Language;
+  lang: string; // changed from Language to string
 }) {
   const { i18n } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
 
-  // This effect runs whenever lang changes
+  // Normalize to a valid Language (default to 'en')
+  const normalizedLang: Language = isLanguage(lang) ? lang : "en";
+
   useEffect(() => {
-    // Immediately change i18n language
-    i18n.changeLanguage(lang);
-    // Set cookie to persist preference
-    document.cookie = `language=${lang}; path=/; max-age=31536000`;
-  }, [lang, i18n]);
+    i18n.changeLanguage(normalizedLang);
+    document.cookie = `language=${normalizedLang}; path=/; max-age=31536000`;
+  }, [normalizedLang, i18n]);
 
   const setLanguage = (newLang: Language) => {
-    // Only change if different
-    if (newLang === lang) return;
-
-    // Replace language in current path
-    const newPathname = pathname.replace(`/${lang}`, `/${newLang}`);
+    if (newLang === normalizedLang) return;
+    // Replace only the first segment /en or /el
+    const newPathname = pathname.replace(/^\/(en|el)(?=\/|$)/, `/${newLang}`);
     router.push(newPathname);
   };
 
   return (
-    <LanguageContext.Provider value={{ language: lang, setLanguage }}>
+    <LanguageContext.Provider value={{ language: normalizedLang, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );

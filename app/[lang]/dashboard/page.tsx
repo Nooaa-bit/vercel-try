@@ -1,14 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-type Language = "en" | "el";
-
 export default async function DashboardPage({
   params,
 }: {
-  params: Promise<{ lang: Language }>;
+  params: Promise<{ lang: string }>;
 }) {
   const { lang } = await params;
+  const validLang = (lang === 'en' || lang === 'el') ? lang : 'en';
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,14 +15,14 @@ export default async function DashboardPage({
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    redirect(`/${lang}/login`);
+    redirect(`/${validLang}/login`);
   }
 
   async function signOut() {
     "use server";
     const supabase = await createClient();
     await supabase.auth.signOut();
-    redirect(`/${lang}/login`);
+    redirect(`/${validLang}/login`);
   }
 
   return (

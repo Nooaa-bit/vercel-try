@@ -20,16 +20,15 @@ export const metadata: Metadata = {
   description: "Staffing on-demand platform",
 };
 
-type Language = "en" | "el";
-
 export default async function RootLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ lang: Language }>;
+  params: Promise<{ lang: string }>; // Changed from Language to string
 }) {
   const { lang } = await params;
+  const validLang = (lang === 'en' || lang === 'el') ? lang : 'en'; // Default to 'en' if invalid
 
   const supabase = await createClient();
   const {
@@ -37,11 +36,11 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <html lang={lang}>
+    <html lang={validLang}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LanguageProvider lang={lang}>
+        <LanguageProvider lang={validLang}>
           <Navbar user={user} />
           {children}
         </LanguageProvider>
