@@ -1,0 +1,28 @@
+{
+  "title": "Terms of Service",
+  "acceptance": {
+    "title": "Acceptance of Terms",
+    "content": "By using HypeHire, you agree to these terms of service."
+  },
+  "services": {
+    "title": "Our Services",
+    "content": "HypeHire provides on-demand staffing solutions connecting companies with qualified workers."
+  },
+  "responsibilities": {
+    "title": "User Responsibilities",
+    "item1": "Provide accurate information during registration",
+    "item2": "Maintain confidentiality of account credentials",
+    "item3": "Comply with all assigned duties and schedules",
+    "item4": "Report issues promptly to supervisors"
+  },
+  "termination": {
+    "title": "Account Termination",
+    "content": "Either party may terminate the relationship at any time. Data deletion follows our privacy policy."
+  },
+  "contact": {
+    "title": "Contact",
+    "email": "For questions: legal@hypehire.com",
+    "updated": "Last updated:",
+    "date": "September 22, 2025"
+  }
+}

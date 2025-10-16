@@ -7,10 +7,8 @@ import { Menu, X, LogOut, User, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useRouter, usePathname } from "next/navigation";
-import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import Image from "next/image";
-
 
 // Import custom hooks
 import { useAuth } from "@/app/hooks/useAuth";
@@ -19,7 +17,7 @@ import { useScrollPosition } from "@/app/hooks/useScrollPosition";
 import { useMobileMenu } from "@/app/hooks/useMobileMenu";
 
 const Navbar = () => {
-  // Custom hooks
+  const { t, i18n, ready } = useTranslation("nav");
   const { user, loading: authLoading, signIn, signOut } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const isScrolled = useScrollPosition(10);
@@ -29,31 +27,39 @@ const Navbar = () => {
     close: closeMenu,
     scrollToTop,
   } = useMobileMenu();
-  const { t, loading: translationsLoading } = useLanguage();
-  
-  // Derived state
-  const darkMode = theme === "dark";
-
-  // Next.js hooks
   const router = useRouter();
   const pathname = usePathname();
 
-  // Page checks
-  const isHomePage = pathname === "/";
-  const isDashboardPage = pathname.startsWith("/dashboard");
+  const darkMode = theme === "dark";
+  const isHomePage =
+    pathname === "/" || pathname === "/en" || pathname === "/el";
+  const isDashboardPage = pathname.includes("/dashboard");
 
-  // Navigation helpers
-  const goHome = () => {
-    router.push("/");
-  };
+  // Navigation items
+  const navItems = isHomePage
+    ? [
+        {
+          label: t("home"),
+          href: "#",
+          onClick: (e: React.MouseEvent) => {
+            e.preventDefault();
+            scrollToTop();
+          },
+        },
+        { label: t("about"), href: "#features" },
+        { label: t("contact"), href: "#details" },
+      ]
+    : [];
 
+  // Handlers
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (isHomePage) {
-      scrollToTop();
-    } else {
-      goHome();
-    }
+    isHomePage ? scrollToTop() : router.push(`/${i18n.language || "en"}`);
+  };
+
+  const handleDashboardClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(`/${i18n.language || "en"}/dashboard`);
   };
 
   const handleNavClick = (action: () => void) => {
@@ -61,14 +67,115 @@ const Navbar = () => {
     closeMenu();
   };
 
-  // Show loading state if translations are loading
-  if (translationsLoading) {
+  // Render auth section (reusable for desktop/mobile)
+  const renderAuthSection = (isMobile = false) => {
+    if (authLoading) {
+      return (
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+          {isMobile && (
+            <span className="text-sm text-gray-600">{t("loading")}</span>
+          )}
+        </div>
+      );
+    }
+
+    if (user) {
+      return (
+        <div
+          className={cn(
+            "flex items-center",
+            isMobile ? "flex-col space-y-4 w-full" : "gap-1.5 lg:gap-2 xl:gap-3"
+          )}
+        >
+          {isMobile && (
+            <div className="flex items-center space-x-3 justify-center">
+              <div className="relative">
+                <div className="w-10 h-10 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                  {user.user_metadata?.first_name?.[0]?.toUpperCase() ||
+                    user.email?.[0]?.toUpperCase()}
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">
+                  {user.user_metadata?.first_name}{" "}
+                  {user.user_metadata?.last_name}
+                </div>
+                <div className="text-xs text-gray-500">{user.email}</div>
+              </div>
+            </div>
+          )}
+
+          {!isMobile && (
+            <>
+              <div className="relative">
+                <div className="w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-xs shadow-md">
+                  {user.user_metadata?.first_name?.[0]?.toUpperCase() ||
+                    user.email?.[0]?.toUpperCase()}
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 lg:w-2.5 lg:h-2.5 bg-green-500 rounded-full border-2 border-white shadow-sm" />
+              </div>
+              <div className="hidden xl:block">
+                <div className="text-sm font-medium text-gray-900">
+                  {user.user_metadata?.first_name}{" "}
+                  {user.user_metadata?.last_name}
+                </div>
+              </div>
+            </>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={isMobile ? () => handleNavClick(signOut) : signOut}
+            className={cn(
+              "border-red-300 text-red-600 hover:bg-red-50 hover:border-red-300",
+              isMobile
+                ? "w-full"
+                : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
+            )}
+          >
+            <LogOut
+              className={cn("w-3 h-3 lg:w-4 lg:h-4", !isMobile && "lg:mr-2")}
+            />
+            <span className={isMobile ? "" : "hidden lg:inline"}>
+              {t("signOut")}
+            </span>
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={isMobile ? () => handleNavClick(signIn) : signIn}
+        className={cn(
+          "border-pulse-500 text-pulse-500 hover:bg-pulse-500 hover:text-white transition-all duration-300",
+          isMobile
+            ? "w-full bg-pulse-500 text-white"
+            : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
+        )}
+      >
+        <User className={cn("w-3 h-3 lg:w-4 lg:h-4", !isMobile && "lg:mr-2")} />
+        <span className={isMobile ? "" : "hidden lg:inline"}>{t("login")}</span>
+      </Button>
+    );
+  };
+
+  if (!ready) {
     return (
       <header className="fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 bg-white/80 backdrop-blur-md">
         <div className="container flex items-center justify-between px-4 sm:px-6 lg:px-8">
-          <img src="/logo.png" alt="Hype Hire Logo" className="h-10 sm:h-12" />
+          <img
+            src="/logo.png"
+            alt="Hype Hire Logo"
+            className="h-8 sm:h-9 md:h-10 lg:h-12 flex-shrink-0"
+          />
           <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
           </div>
         </div>
       </header>
@@ -76,62 +183,148 @@ const Navbar = () => {
   }
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
-        isScrolled ? "bg-white/20 backdrop-blur-lg shadow-sm" : "bg-transparent"
-      )}
-    >
-      <div className="container flex items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <a
-          href="#"
-          className="flex items-center space-x-2 cursor-pointer"
-          onClick={handleLogoClick}
-          aria-label="Hype Hire"
-        >
-          <img src="/logo.png" alt="Hype Hire Logo" className="h-10 sm:h-12" />
-        </a>
+    <>
+      <header
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
+          isScrolled
+            ? "bg-white/60 backdrop-blur-lg shadow-sm"
+            : "bg-transparent"
+        )}
+      >
+        <div className="container flex items-center justify-between gap-2 md:gap-4 px-4 sm:px-6 lg:px-8">
+          {/* Logo */}
+          <a
+            href="#"
+            className="flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            onClick={handleLogoClick}
+            aria-label="Hype Hire"
+          >
+            <img
+              src="/logo.png"
+              alt="Hype Hire Logo"
+              className="h-8 sm:h-9 md:h-10 lg:h-12"
+            />
+          </a>
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-8">
-          {/* Navigation links - only on homepage */}
-          {isHomePage && (
-            <nav className="flex items-center space-x-8">
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-2 lg:gap-4 xl:gap-6">
+            {/* Nav Links */}
+            {navItems.length > 0 && (
+              <nav className="flex items-center gap-3 lg:gap-5 xl:gap-6">
+                {navItems.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    className="nav-link text-xs lg:text-sm xl:text-base whitespace-nowrap"
+                    onClick={item.onClick}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </nav>
+            )}
+
+            {/* Dashboard Link */}
+            {user && !isDashboardPage && (
               <a
                 href="#"
-                className="nav-link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  scrollToTop();
-                }}
+                className="nav-link text-xs lg:text-sm xl:text-base whitespace-nowrap flex items-center gap-1"
+                onClick={handleDashboardClick}
               >
-                {t("nav.home")}
+                <span className="text-sm lg:text-base">📊</span>
+                <span>{t("Dashboard")}</span>
               </a>
-              <a href="#features" className="nav-link">
-                {t("nav.about")}
-              </a>
-              <a href="#details" className="nav-link">
-                {t("nav.contact")}
-              </a>
-            </nav>
-          )}
+            )}
 
-          {/* Dashboard button - only if logged in AND not on dashboard */}
-          {user && !isDashboardPage && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/dashboard")}
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-pulse-600 dark:hover:text-pulse-400"
+            {/* Dark Mode Toggle */}
+            {!isHomePage && (
+              <div className="flex items-center gap-1.5 lg:gap-2">
+                <Switch
+                  checked={darkMode}
+                  onCheckedChange={toggleTheme}
+                  className="scale-75 lg:scale-100"
+                />
+                {darkMode ? (
+                  <Moon className="h-3 w-3 lg:h-4 lg:w-4" />
+                ) : (
+                  <Sun className="h-3 w-3 lg:h-4 lg:w-4" />
+                )}
+              </div>
+            )}
+
+            {/* Language Switcher */}
+            <div className="scale-90 lg:scale-100">
+              <LanguageSwitcher />
+            </div>
+
+            {/* Auth Section */}
+            {renderAuthSection()}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden text-gray-700 p-2 focus:outline-none"
+            onClick={toggleMenu}
+            aria-label={isMenuOpen ? t("closeMenu") : t("openMenu")}
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Navigation */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[60] bg-muted flex flex-col pt-16 px-6 md:hidden transition-all duration-300 ease-in-out",
+          isMenuOpen
+            ? "opacity-100 translate-x-0"
+            : "opacity-0 translate-x-full pointer-events-none"
+        )}
+        style={{ backgroundColor: "hsl(30 23% 93%)" }}
+      >
+        <button
+          className="absolute top-4 right-4 text-gray-700 p-2 focus:outline-none hover:bg-white/50 rounded-lg transition-colors"
+          onClick={closeMenu}
+          aria-label={t("closeMenu")}
+        >
+          <X size={28} />
+        </button>
+
+        <nav className="flex flex-col space-y-6 items-center mt-8">
+          {/* Nav Links */}
+          {navItems.map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              className="text-xl font-medium py-3 px-6 w-full text-center rounded-lg hover:bg-white/50 transition-colors"
+              onClick={(e) => {
+                item.onClick?.(e);
+                closeMenu();
+              }}
             >
-              📊 Dashboard
-            </Button>
+              {item.label}
+            </a>
+          ))}
+
+          {/* Dashboard Link */}
+          {user && !isDashboardPage && (
+            <a
+              href="#"
+              className="text-xl font-medium py-3 px-6 w-full text-center rounded-lg hover:bg-white/50 transition-colors flex items-center justify-center gap-2"
+              onClick={(e) => {
+                handleDashboardClick(e);
+                closeMenu();
+              }}
+            >
+              📊 {t("Dashboard")}
+            </a>
           )}
 
-          {/* Dark Mode Toggle - only on non-homepage */}
+          {/* Dark Mode Toggle */}
           {!isHomePage && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 py-3 px-6 w-full justify-center rounded-lg hover:bg-white/50 transition-colors">
+              <span className="text-sm font-medium">{t("darkMode")}</span>
               <Switch checked={darkMode} onCheckedChange={toggleTheme} />
               {darkMode ? (
                 <Moon className="h-4 w-4" />
@@ -142,180 +335,22 @@ const Navbar = () => {
           )}
 
           {/* Language Switcher */}
-          <LanguageSwitcher />
-
-          {/* Auth section */}
-          {authLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : user ? (
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-xs shadow-md">
-                  {user.user_metadata?.first_name?.[0]?.toUpperCase() ||
-                    user.email?.[0]?.toUpperCase()}
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
-              </div>
-
-              <div className="hidden lg:block">
-                <div className="text-sm font-medium text-gray-900">
-                  {user.user_metadata?.first_name}{" "}
-                  {user.user_metadata?.last_name}
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={signOut}
-                className="bg-transparent border-gray-300 text-gray-600 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                {t("nav.signOut")}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={signIn}
-              className="bg-transparent border-pulse-500 text-pulse-500 hover:bg-pulse-500 hover:text-white transition-all duration-300"
-            >
-              <User className="w-4 h-4 mr-2" />
-              {t("nav.login")}
-            </Button>
-          )}
-        </div>
-
-        {/* Mobile menu button */}
-        <button
-          className="md:hidden text-gray-700 p-3 focus:outline-none"
-          onClick={toggleMenu}
-          aria-label={
-            isMenuOpen
-              ? t("nav.closeMenu") || "Close menu"
-              : t("nav.openMenu") || "Open menu"
-          }
-        >
-          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      {/* Mobile Navigation */}
-      <div
-        className={cn(
-          "fixed inset-0 z-40 bg-white flex flex-col pt-16 px-6 md:hidden transition-all duration-300 ease-in-out",
-          isMenuOpen
-            ? "opacity-100 translate-x-0"
-            : "opacity-0 translate-x-full pointer-events-none"
-        )}
-      >
-        <nav className="flex flex-col space-y-6 items-center mt-8">
-          {/* Navigation links - only on homepage */}
-          {isHomePage && (
-            <>
-              <a
-                href="#"
-                className="text-xl font-medium py-3 px-6 w-full text-center rounded-lg hover:bg-gray-100"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavClick(scrollToTop);
-                }}
-              >
-                {t("nav.home")}
-              </a>
-              <a
-                href="#features"
-                className="text-xl font-medium py-3 px-6 w-full text-center rounded-lg hover:bg-gray-100"
-                onClick={() => closeMenu()}
-              >
-                {t("nav.about")}
-              </a>
-              <a
-                href="#details"
-                className="text-xl font-medium py-3 px-6 w-full text-center rounded-lg hover:bg-gray-100"
-                onClick={() => closeMenu()}
-              >
-                {t("nav.contact")}
-              </a>
-            </>
-          )}
-
-          {/* Mobile Dark Mode Toggle - only on non-homepage */}
-          {!isHomePage && (
-            <div className="flex items-center gap-3 py-3 px-6 w-full justify-center rounded-lg hover:bg-gray-100">
-              <span className="text-sm font-medium">Dark Mode</span>
-              <Switch checked={darkMode} onCheckedChange={toggleTheme} />
-              {darkMode ? (
-                <Moon className="h-4 w-4" />
-              ) : (
-                <Sun className="h-4 w-4" />
-              )}
-            </div>
-          )}
-
-          {/* Mobile Language Switcher */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-gray-300/50">
             <LanguageSwitcher />
           </div>
 
-          {/* Mobile Auth Section */}
+          {/* Auth Section */}
           <div
             className={cn(
               "w-full",
-              isHomePage ? "mt-6 pt-6 border-t border-gray-200" : "mt-6"
+              isHomePage ? "mt-6 pt-6 border-t border-gray-300/50" : "mt-6"
             )}
           >
-            {authLoading ? (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm text-gray-600">
-                  {t("common.loading")}
-                </span>
-              </div>
-            ) : user ? (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 justify-center">
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                      {user.user_metadata?.first_name?.[0]?.toUpperCase() ||
-                        user.email?.[0]?.toUpperCase()}
-                    </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {user.user_metadata?.first_name}{" "}
-                      {user.user_metadata?.last_name}
-                    </div>
-                    <div className="text-xs text-gray-500">{user.email}</div>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  className="w-full border-red-300 text-red-600 hover:bg-red-50"
-                  onClick={() => handleNavClick(signOut)}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  {t("nav.signOut")}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                className="w-full bg-pulse-500 hover:bg-pulse-600 text-white"
-                onClick={() => handleNavClick(signIn)}
-              >
-                <User className="w-4 h-4 mr-2" />
-                {t("nav.login")}
-              </Button>
-            )}
+            {renderAuthSection(true)}
           </div>
         </nav>
       </div>
-    </header>
+    </>
   );
 };
 

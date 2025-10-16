@@ -27,19 +27,7 @@ export default function LanguageSwitcher({
 
   const switchLanguage = (newLocale: "en" | "el") => {
     if (newLocale === language) return;
-
-    // Preserve the current hash
-    const currentHash = window.location.hash;
-
-    // Switch language (this will save to localStorage and load translations)
     setLanguage(newLocale);
-
-    // Restore hash after language switch
-    if (currentHash) {
-      setTimeout(() => {
-        window.location.hash = currentHash;
-      }, 100);
-    }
   };
 
   const currentLocale = locales.find((l) => l.code === language);

@@ -1,34 +1,41 @@
-//hype-hire/vercel/app/hooks/useTheme.tsx
 "use client";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "system";
-type Ctx = { theme: Theme; setTheme: (t: Theme) => void; toggle: () => void };
+type Theme = "light" | "dark";
+type ThemeContext = {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggle: () => void;
+};
 
-const ThemeCtx = createContext<Ctx | null>(null);
+const ThemeContext = createContext<ThemeContext | null>(null);
+
 export function useTheme() {
-  const ctx = useContext(ThemeCtx);
-  if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
-  return ctx;
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error("useTheme must be used within ThemeProvider");
+  return context;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("system");
-  const apply = (t: Theme) => {
-    const root = document.documentElement;
-    const resolved =
-      t === "system"
-        ? window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light"
-        : t;
-    root.classList.toggle("dark", resolved === "dark");
-  };
-  useEffect(() => apply(theme), [theme]);
-  const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("theme") as Theme | null;
+    if (stored === "dark" || stored === "light") {
+      setTheme(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggle = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+
   return (
-    <ThemeCtx.Provider value={{ theme, setTheme, toggle }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggle }}>
       {children}
-    </ThemeCtx.Provider>
+    </ThemeContext.Provider>
   );
 }
