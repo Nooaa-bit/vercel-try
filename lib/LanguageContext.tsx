@@ -1,6 +1,6 @@
 // vercel/lib/LanguageContext.tsx
 "use client";
-import { createContext, useContext, useEffect, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { usePathname, useRouter } from "next/navigation";
 import "@/lib/i18n";
@@ -10,6 +10,8 @@ type Language = "en" | "el";
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
+  loading: boolean;
+  t: (key: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
@@ -28,9 +30,10 @@ export function LanguageProvider({
   children: ReactNode;
   lang: string; // changed from Language to string
 }) {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   // Normalize to a valid Language (default to 'en')
   const normalizedLang: Language = isLanguage(lang) ? lang : "en";
@@ -42,13 +45,16 @@ export function LanguageProvider({
 
   const setLanguage = (newLang: Language) => {
     if (newLang === normalizedLang) return;
+    setLoading(true);
     // Replace only the first segment /en or /el
     const newPathname = pathname.replace(/^\/(en|el)(?=\/|$)/, `/${newLang}`);
     router.push(newPathname);
+    // Reset loading after navigation starts
+    setTimeout(() => setLoading(false), 500);
   };
 
   return (
-    <LanguageContext.Provider value={{ language: normalizedLang, setLanguage }}>
+    <LanguageContext.Provider value={{ language: normalizedLang, setLanguage, loading, t }}>
       {children}
     </LanguageContext.Provider>
   );

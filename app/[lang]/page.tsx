@@ -4,75 +4,73 @@
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/lib/LanguageContext";
+import React, { useEffect } from "react";
+import Hero from "@/components/Hero";
+import HypeSection from "@/components/HypeSection";
+import DetailsSection from "@/components/DetailsSection";
+import Footer from "@/components/Footer";
+
+ 
 
 export default function Home() {
-  const { t } = useTranslation("home");
-  const { language } = useLanguage();
+   const { t } = useTranslation("home");
+   const { language } = useLanguage();
+  // Initialize intersection observer to detect when elements enter viewport
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("animate-fade-in");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    const elements = document.querySelectorAll(".animate-on-scroll");
+    elements.forEach((el) => observer.observe(el));
+
+    return () => {
+      elements.forEach((el) => observer.unobserve(el));
+    };
+  }, []);
+
+  useEffect(() => {
+    // This helps ensure smooth scrolling for the anchor links
+    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+      anchor.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        const targetId = (e.currentTarget as HTMLAnchorElement)
+          .getAttribute("href")
+          ?.substring(1);
+        if (!targetId) return;
+
+        const targetElement = document.getElementById(targetId);
+        if (!targetElement) return;
+
+        // Increased offset to account for mobile nav
+        const offset = window.innerWidth < 768 ? 100 : 80;
+
+        window.scrollTo({
+          top: targetElement.offsetTop - offset,
+          behavior: "smooth",
+        });
+      });
+    });
+  }, []);
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            {t("title")}
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            {t("subtitle")}
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Link
-              href={`/${language}/login`}
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-500 transition"
-            >
-              {t("cta.primary")}
-            </Link>
-            <Link
-              href="#features"
-              className="bg-white text-blue-600 px-8 py-3 rounded-lg text-lg font-semibold border-2 border-blue-600 hover:bg-blue-50 transition"
-            >
-              {t("cta.secondary")}
-            </Link>
-          </div>
-
-          <div id="features" className="grid md:grid-cols-3 gap-8 mt-20">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold mb-3">
-                {t("features.workers.title")}
-              </h3>
-              <p className="text-gray-600">
-                {t("features.workers.description")}
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold mb-3">
-                {t("features.companies.title")}
-              </h3>
-              <p className="text-gray-600">
-                {t("features.companies.description")}
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold mb-3">
-                {t("features.matching.title")}
-              </h3>
-              <p className="text-gray-600">
-                {t("features.matching.description")}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-16 text-sm text-gray-500">
-            <Link
-              href={`/${language}/privacy`}
-              className="hover:text-blue-600 underline"
-            >
-              Privacy Policy
-            </Link>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen">
+      <main className="space-y-4 sm:space-y-8">
+        <Hero />
+        <HypeSection />
+        <DetailsSection />
+      </main>
+      <Footer />
     </div>
   );
 }
-
