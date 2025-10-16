@@ -20,7 +20,6 @@ const HypeSection = () => {
 
   useEffect(() => {
     // Create intersection observer to detect when section is in view
-    const element = sectionRef.current; 
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
@@ -29,31 +28,28 @@ const HypeSection = () => {
       { threshold: 0.1 } // Start observing when 10% of element is visible
     );
 
-    if (element) {
-      observer.observe(element);
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
     }
-
+    
     // Optimized scroll handler using requestAnimationFrame
     const handleScroll = () => {
       if (!ticking.current) {
         lastScrollY.current = window.scrollY;
-
+        
         window.requestAnimationFrame(() => {
-          if (!element) return;
-
-          const sectionRect = element.getBoundingClientRect();
+          if (!sectionRef.current) return;
+          
+          const sectionRect = sectionRef.current.getBoundingClientRect();
           const viewportHeight = window.innerHeight;
           const totalScrollDistance = viewportHeight * 2;
-
+          
           // Calculate the scroll progress
           let progress = 0;
           if (sectionRect.top <= 0) {
-            progress = Math.min(
-              1,
-              Math.max(0, Math.abs(sectionRect.top) / totalScrollDistance)
-            );
+            progress = Math.min(1, Math.max(0, Math.abs(sectionRect.top) / totalScrollDistance));
           }
-
+          
           // Determine which card should be visible based on progress
           if (progress >= 0.66) {
             setActiveCardIndex(2);
@@ -62,21 +58,21 @@ const HypeSection = () => {
           } else {
             setActiveCardIndex(0);
           }
-
+          
           ticking.current = false;
         });
-
+        
         ticking.current = true;
       }
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Initial calculation
-
+    
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (element) {
-        observer.unobserve(element);
+      window.removeEventListener('scroll', handleScroll);
+      if (sectionRef.current) {
+        observer.unobserve(sectionRef.current);
       }
     };
   }, []);
