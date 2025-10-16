@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { useRouter, usePathname } from "next/navigation";
 import { useLanguage } from "@/lib/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import Image from "next/image";
+
 
 // Import custom hooks
 import { useAuth } from "@/app/hooks/useAuth";
