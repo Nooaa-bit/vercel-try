@@ -1,0 +1,23 @@
+{
+  "left": {
+    "title": "What we offer",
+    "subtitle": "Staffing at the click of a button",
+    "bullets": {
+      "b1": { "label": "Flexibility", "text": "Rapid scale up or down" },
+      "b2": { "label": "Security", "text": "Pre‑vetted workforce" },
+      "b3": { "label": "Payroll", "text": "Fully managed payouts" }
+    }
+  },
+  "right": {
+    "badge": "Request a demo",
+    "title": "See it for yourself",
+    "form": {
+      "fullName": "Full name",
+      "email": "Email address",
+      "company": "Company",
+      "submit": "Send request ",
+      "requiredError": "Please fill in all required fields",
+      "success": "Request submitted successfully!"
+    }
+  }
+}

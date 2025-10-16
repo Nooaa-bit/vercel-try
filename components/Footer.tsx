@@ -1,39 +1,32 @@
+// hype-hire/vercel/components/Footer.tsx
 "use client";
 
 import React from "react";
-import { useLanguage } from "@/lib/LanguageContext";
-
-const translations = {
-  en: {
-    privacyPolicy: "Privacy Policy",
-    termsOfService: "Terms of Service",
-    copyright: "© 2025 HypeHire",
-  },
-  el: {
-    privacyPolicy: "Πολιτική Απορρήτου",
-    termsOfService: "Όροι Χρήσης",
-    copyright: "© 2025 HypeHire",
-  },
-};
+import { useTranslation } from "react-i18next";
+import { usePathname } from "next/navigation";
 
 const Footer = () => {
-  const { language } = useLanguage();
+  const { t } = useTranslation("footer");
+  const pathname = usePathname();
 
-  const t =
-    translations[language as keyof typeof translations] || translations.en;
+  // Extract "/en" or "/el" from the current path; default to "/en" if missing
+  const localePrefix = (() => {
+    const match = pathname?.match(/^\/(en|el)(?=\/|$)/);
+    return match ? `/${match[1]}` : "/en";
+  })();
 
   return (
     <footer className="border-t mt-8 pt-4 pb-8">
       <div className="max-w-6xl mx-auto px-4 text-center text-sm text-gray-600">
-        <a href={`/${language}/privacy`} className="hover:text-blue-600">
-          {t.privacyPolicy}
+        <a href={`${localePrefix}/privacy`} className="hover:text-blue-600">
+          {t("privacyPolicy")}
         </a>
         {" • "}
-        <a href={`/${language}/terms`} className="hover:text-blue-600">
-          {t.termsOfService}
+        <a href={`${localePrefix}/terms`} className="hover:text-blue-600">
+          {t("termsOfService")}
         </a>
         {" • "}
-        <span>{t.copyright}</span>
+        <span>{t("copyright")}</span>
       </div>
     </footer>
   );

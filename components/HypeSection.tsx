@@ -87,7 +87,7 @@ const HypeSection = () => {
   return (
     <div ref={sectionRef} className="relative" style={{ height: "300vh" }}>
       <section
-        className="w-full h-screen py-10 md:py-16 sticky top-0 overflow-hidden bg-white"
+        className="w-full h-screen py-10 md:py-16 sticky top-0 overflow-hidden" //bg-white
         id="why-HypeHire"
       >
         <div className="container px-6 lg:px-8 mx-auto h-full flex flex-col">

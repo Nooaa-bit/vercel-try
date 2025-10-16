@@ -1,4 +1,4 @@
-//hype-hire/web/components/Navbar.tsx
+// /web/components/Navbar.tsx
 "use client";
 
 import React from "react";
@@ -27,39 +27,90 @@ const Navbar = () => {
     close: closeMenu,
     scrollToTop,
   } = useMobileMenu();
+
   const router = useRouter();
   const pathname = usePathname();
 
-  const darkMode = theme === "dark";
+  const lang = i18n.language || "en";
+  const homePath = `/${lang}`;
   const isHomePage =
-    pathname === "/" || pathname === "/en" || pathname === "/el";
-  const isDashboardPage = pathname.includes("/dashboard");
+    pathname === "/" || pathname === homePath || pathname === `${homePath}/`;
 
-  // Navigation items
-  const navItems = isHomePage
-    ? [
+  const darkMode = theme === "dark";
+
+  // Hide nav buttons anywhere "dashboard" appears in the pathname
+  const isDashboardPage =
+    typeof pathname === "string" &&
+    pathname.toLowerCase().includes("dashboard");
+
+  // Smooth scroll to an element id (same-page case)
+  const scrollToId = (id: string) => {
+    const el =
+      typeof document !== "undefined" ? document.getElementById(id) : null;
+    if (el) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      });
+      if (typeof window !== "undefined") {
+        const url = `${homePath}#${id}`;
+        if (window.location.hash !== `#${id}`) {
+          window.history.replaceState(null, "", url);
+        }
+      }
+    }
+  };
+
+  // Click handler factory for hash links
+  const handleHashNav =
+    (id: "features" | "details") =>
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (isHomePage) {
+        e.preventDefault();
+        closeMenu();
+        requestAnimationFrame(() => scrollToId(id));
+      }
+    };
+
+  // Home click behaves like scroll-to-top when on the homepage
+  const handleHomeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isHomePage) {
+      e.preventDefault();
+      closeMenu();
+      requestAnimationFrame(() => scrollToTop());
+    }
+  };
+
+  // Build nav items only if NOT on any dashboard page
+  const navItems = isDashboardPage
+    ? []
+    : [
+        { label: t("home"), href: homePath, onClick: handleHomeClick },
         {
-          label: t("home"),
-          href: "#",
-          onClick: (e: React.MouseEvent) => {
-            e.preventDefault();
-            scrollToTop();
-          },
+          label: t("about"),
+          href: `${homePath}#features`,
+          onClick: handleHashNav("features"),
         },
-        { label: t("about"), href: "#features" },
-        { label: t("contact"), href: "#details" },
-      ]
-    : [];
+        {
+          label: t("contact"),
+          href: `${homePath}#details`,
+          onClick: handleHashNav("details"),
+        },
+      ];
 
-  // Handlers
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    isHomePage ? scrollToTop() : router.push(`/${i18n.language || "en"}`);
+    if (isHomePage) {
+      scrollToTop();
+    } else {
+      router.push(homePath);
+    }
   };
 
   const handleDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    router.push(`/${i18n.language || "en"}/dashboard`);
+    router.push(`/${lang}/dashboard`);
   };
 
   const handleNavClick = (action: () => void) => {
@@ -67,7 +118,6 @@ const Navbar = () => {
     closeMenu();
   };
 
-  // Render auth section (reusable for desktop/mobile)
   const renderAuthSection = (isMobile = false) => {
     if (authLoading) {
       return (
@@ -195,7 +245,7 @@ const Navbar = () => {
         <div className="container flex items-center justify-between gap-2 md:gap-4 px-4 sm:px-6 lg:px-8">
           {/* Logo */}
           <a
-            href="#"
+            href={homePath}
             className="flex items-center space-x-2 cursor-pointer flex-shrink-0"
             onClick={handleLogoClick}
             aria-label="Hype Hire"
@@ -209,21 +259,19 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-2 lg:gap-4 xl:gap-6">
-            {/* Nav Links */}
-            {navItems.length > 0 && (
-              <nav className="flex items-center gap-3 lg:gap-5 xl:gap-6">
-                {navItems.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    className="nav-link text-xs lg:text-sm xl:text-base whitespace-nowrap"
-                    onClick={item.onClick}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-            )}
+            {/* Nav Links (hidden on dashboard pages) */}
+            <nav className="flex items-center gap-3 lg:gap-5 xl:gap-6">
+              {navItems.map((item) => (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  className="nav-link text-xs lg:text-sm xl:text-base whitespace-nowrap"
+                  onClick={item.onClick}
+                >
+                  {item.label}
+                </a>
+              ))}
+            </nav>
 
             {/* Dashboard Link */}
             {user && !isDashboardPage && (
@@ -292,7 +340,7 @@ const Navbar = () => {
         </button>
 
         <nav className="flex flex-col space-y-6 items-center mt-8">
-          {/* Nav Links */}
+          {/* Nav Links (hidden on dashboard pages via empty navItems) */}
           {navItems.map((item) => (
             <a
               key={item.label}
