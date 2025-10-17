@@ -1,0 +1,15 @@
+{
+  "title": "Set New Password",
+  "validatingSession": "Validating session...",
+  "newPassword": "New Password",
+  "newPasswordPlaceholder": "Enter new password (min 4 characters)",
+  "confirmPassword": "Confirm Password",
+  "confirmPasswordPlaceholder": "Confirm new password",
+  "updating": "Updating...",
+  "updatePassword": "Update Password",
+  "backToDashboard": "Back to Dashboard",
+  "errorPasswordMismatch": "Passwords don't match!",
+  "errorPasswordTooShort": "Password must be at least 4 characters long!",
+  "successPasswordUpdated": "Password updated successfully!",
+  "errorUpdatingPassword": "Error updating password: "
+}

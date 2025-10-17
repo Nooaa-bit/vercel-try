@@ -1,4 +1,4 @@
-// hype-hire/vercel/app/[lang]/dashboard/page.tsx
+// hype-hire/web/app/dashboard2/page.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,6 @@ import {
   Building2,
 } from "lucide-react";
 import { useActiveRole } from "../../hooks/useActiveRole";
-import { useTranslation } from "react-i18next";
 
 const MetricCard = ({
   title,
@@ -59,7 +58,6 @@ const MetricCard = ({
 );
 
 export default function Dashboard2Page() {
-  const { t } = useTranslation("dashboard");
   const { activeRole, activeCompanyId, hasPermission, loading } =
     useActiveRole();
 
@@ -67,7 +65,6 @@ export default function Dashboard2Page() {
     return (
       <div className="min-h-screen bg-background pt-20 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
-        <span className="ml-3 text-muted-foreground">{t("loading")}</span>
       </div>
     );
   }
@@ -75,21 +72,186 @@ export default function Dashboard2Page() {
   return (
     <div className="min-h-screen bg-background pt-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {/*  I deleted a lot of stuff which are in actual_page. Although its all front end without any functionality*/}
+        <div className="space-y-6 py-8">
+          {/* Page Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-display font-bold">Dashboard</h1>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  {activeRole.companyName}
+                </Badge>
+                <Badge variant="secondary" className="capitalize">
+                  {activeRole.role}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground">
+                Monitor your key metrics and performance
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              {/* Only show Add Document for supervisors and above */}
+              {hasPermission("supervisor") && (
+                <Button className="bg-pulse-500 hover:bg-pulse-600">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Document
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Admin-only notice */}
+          {hasPermission("company_admin") && (
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium text-blue-900">Admin Access</p>
+                    <p className="text-sm text-blue-700">
+                      You have full access to company settings and data for{" "}
+                      {activeRole.companyName}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" className="ml-auto">
+                    Manage Company
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Metrics Grid - Data filtered by activeCompanyId */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <MetricCard
+              title="Total Revenue"
+              value="$12,450"
+              change="+12.5%"
+              trend="up"
+              description="from last month"
+              icon={DollarSign}
+            />
+            <MetricCard
+              title="Active Users"
+              value="1,429"
+              change="+8.2%"
+              trend="up"
+              description="from last week"
+              icon={Users}
+            />
+            <MetricCard
+              title="Documents"
+              value="342"
+              change="-2.4%"
+              trend="down"
+              description="from last month"
+              icon={FileText}
+            />
+            <MetricCard
+              title="Activity"
+              value="89.3%"
+              change="+4.1%"
+              trend="up"
+              description="engagement rate"
+              icon={Activity}
+            />
+          </div>
+
+          {/* Quick Actions - Role-based */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Everyone can see reports */}
+                <Button
+                  variant="outline"
+                  className="h-24 flex flex-col items-center justify-center gap-2"
+                >
+                  <BarChart3 className="h-6 w-6" />
+                  <span>View Reports</span>
+                </Button>
+
+                {/* Supervisors and above can invite */}
+                {hasPermission("supervisor") && (
+                  <Button
+                    variant="outline"
+                    className="h-24 flex flex-col items-center justify-center gap-2"
+                  >
+                    <UserPlus className="h-6 w-6" />
+                    <span>Invite User</span>
+                  </Button>
+                )}
+
+                {/* Admins only */}
+                {hasPermission("company_admin") && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="h-24 flex flex-col items-center justify-center gap-2"
+                    >
+                      <Settings className="h-6 w-6" />
+                      <span>Settings</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-24 flex flex-col items-center justify-center gap-2"
+                    >
+                      <Building2 className="h-6 w-6" />
+                      <span>Manage Company</span>
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Debug Info (remove in production) */}
+          <Card className="bg-gray-50">
+            <CardHeader>
+              <CardTitle className="text-sm">Active Context (Debug)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Company ID:</span>{" "}
+                  {activeCompanyId}
+                </div>
+                <div>
+                  <span className="font-medium">Company Name:</span>{" "}
+                  {activeRole.companyName}
+                </div>
+                <div>
+                  <span className="font-medium">Role:</span> {activeRole.role}
+                </div>
+                <div>
+                  <span className="font-medium">Role ID:</span> {activeRole.id}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
 }
- 
+
+{
+  /*
 
 
+  
+*/
+}
 
-
-
-
-
-
-             {/*    <MetricCard
+{
+  /*    <MetricCard
               title="New Customers"
               value="1,234"
               change="-5.2%"
@@ -114,7 +276,8 @@ export default function Dashboard2Page() {
               icon={TrendingUp}      */
 }
 
-          {/* Chart Section 
+{
+  /* Chart Section 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -186,9 +349,11 @@ export default function Dashboard2Page() {
                 </Button>
               </CardContent>
             </Card>
-          </div> */}
+          </div> */
+}
 
-          {/* Table Section 
+{
+  /* Table Section 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Activity</CardTitle>
@@ -321,5 +486,5 @@ export default function Dashboard2Page() {
                 </table>
               </div>
             </CardContent>
-          </Card>  */}
-
+          </Card>  */
+}

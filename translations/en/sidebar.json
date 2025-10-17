@@ -1,0 +1,16 @@
+{
+  "main": "Main",
+  "documents": "Documents",
+  "dashboard": "Dashboard",
+  "analytics": "Analytics",
+  "projects": "Projects",
+  "team": "Team",
+  "calendar": "Calendar",
+  "invitations": "Invitations",
+  "reports": "Reports",
+  "wordAssistant": "Word Assistant",
+  "settings": "Settings",
+  "getHelp": "Get Help",
+  "search": "Search",
+  "quickCreate": "Quick Create"
+}

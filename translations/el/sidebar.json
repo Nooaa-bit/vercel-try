@@ -1,0 +1,16 @@
+{
+  "main": "Κύριο",
+  "documents": "Έγγραφα",
+  "dashboard": "Πίνακας Ελέγχου",
+  "analytics": "Αναλύσεις",
+  "projects": "Έργα",
+  "team": "Ομάδα",
+  "calendar": "Ημερολόγιο",
+  "invitations": "Προσκλήσεις",
+  "reports": "Αναφορές",
+  "wordAssistant": "Βοηθός Λέξεων",
+  "settings": "Ρυθμίσεις",
+  "getHelp": "Λήψη Βοήθειας",
+  "search": "Αναζήτηση",
+  "quickCreate": "Γρήγορη Δημιουργία"
+}
