@@ -1,9 +1,9 @@
-// hype-hire/vercel/components/DetailsSection.tsx
 "use client";
 
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { Textarea } from "@/components/ui/textarea";
 
 const DetailsSection = () => {
   const { t } = useTranslation("details");
@@ -11,15 +11,19 @@ const DetailsSection = () => {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
-    company: "",
+    message: "",
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.fullName || !formData.email) {
@@ -27,14 +31,39 @@ const DetailsSection = () => {
       return;
     }
 
-    toast.success(t("right.form.success"));
+    if (!formData.message || formData.message.length < 10) {
+      toast.error(t("right.form.messageError"));
+      return;
+    }
 
-    setFormData({ fullName: "", email: "", company: "" });
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || t("right.form.errorGeneric"));
+        return;
+      }
+
+      toast.success(t("right.form.success"));
+      setFormData({ fullName: "", email: "", message: "" });
+    } catch (error) {
+      toast.error(t("right.form.errorGeneric"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    // If you also want the whole section backdrop white, add bg-white here:
-    // <section id="details" className="w-full py-0 bg-white">
     <section id="details" className="w-full py-0">
       <div className="container px-4 sm:px-6 lg:px-8 mx-auto">
         <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-2">
@@ -134,6 +163,7 @@ const DetailsSection = () => {
                     placeholder={t("right.form.fullName")}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent"
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -146,26 +176,33 @@ const DetailsSection = () => {
                     placeholder={t("right.form.email")}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent"
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
 
                 <div>
-                  <input
-                    type="text"
-                    name="company"
-                    value={formData.company}
+                  <Textarea
+                    name="message"
+                    value={formData.message}
                     onChange={handleChange}
-                    placeholder={t("right.form.company")}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent"
+                    placeholder={t("right.form.message")}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent min-h-[120px]"
+                    minLength={10}
+                    maxLength={1000}
+                    required
+                    disabled={isSubmitting}
                   />
                 </div>
 
                 <div>
                   <button
                     type="submit"
-                    className="w-full px-6 py-3 bg-pulse-500 hover:bg-pulse-600 text-white font-medium rounded-full transition-colors duration-300"
+                    disabled={isSubmitting}
+                    className="w-full px-6 py-3 bg-pulse-500 hover:bg-pulse-600 text-white font-medium rounded-full transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {t("right.form.submit")}
+                    {isSubmitting
+                      ? t("right.form.submitting")
+                      : t("right.form.submit")}
                   </button>
                 </div>
               </form>

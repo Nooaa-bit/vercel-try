@@ -14,8 +14,9 @@
     "form": {
       "fullName": "Full name",
       "email": "Email address",
-      "company": "Company",
+      "message": "Message",
       "submit": "Send request ",
+      "submitting": " Sending... ",
       "requiredError": "Please fill in all required fields",
       "success": "Request submitted successfully!"
     }

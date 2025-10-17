@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/[lang]/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "../globals.css";
@@ -6,7 +5,7 @@ import Navbar from "@/components/navbar";
 import { createClient } from "@/lib/supabase/server";
 import { LanguageProvider } from "@/lib/LanguageContext";
 import { ThemeProvider } from "@/app/hooks/useTheme";
-
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin", "greek"],
@@ -29,9 +28,8 @@ export default async function RootLayout({
   params: Promise<{ lang: string }>; // Changed from Language to string
 }) {
   const { lang } = await params;
-  const validLang = (lang === 'en' || lang === 'el') ? lang : 'en'; // Default to 'en' if invalid
+  const validLang = lang === "en" || lang === "el" ? lang : "en"; // Default to 'en' if invalid
 
-  
   return (
     <html lang={validLang}>
       <body className={`${inter.variable} antialiased`}>
@@ -39,6 +37,7 @@ export default async function RootLayout({
           <LanguageProvider lang={validLang}>
             <Navbar />
             {children}
+            <Toaster richColors closeButton position="bottom-right" />
           </LanguageProvider>
         </ThemeProvider>
       </body>
