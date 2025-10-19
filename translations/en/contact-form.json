@@ -1,0 +1,21 @@
+{
+  "title": "I'd like access to Hype hire",
+  "fullName": "Full Name",
+  "fullNamePlaceholder": "Your name",
+  "email": "Email Address",
+  "emailPlaceholder": "Your email",
+  "message": "Your Message",
+  "messagePlaceholder": "Tell us about your experience and what you're looking for...",
+  "cancel": "Cancel",
+  "submit": "Send Request",
+  "submitting": "Sending...",
+  "fullNameRequired": "Please enter your full name",
+  "emailRequired": "Please enter your email address",
+  "emailInvalid": "Please include an '@' in the email address",
+  "messageRequired": "Please enter your message",
+  "messageTooShort": "Please provide more details (at least 10 characters)",
+  "requiredError": "Please fill in all required fields",
+  "messageError": "Message must be at least 10 characters",
+  "success": "Message sent successfully! We'll contact you soon.",
+  "errorGeneric": "Failed to send message. Please try again."
+}
