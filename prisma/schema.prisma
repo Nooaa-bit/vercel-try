@@ -3,14 +3,14 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-    relationMode = "foreignKeys"      //relationMode = "prisma"
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_URL")
+  relationMode = "foreignKeys"
 }
 
-model User {
-  id          Int       @id @default(autoincrement())
+model user {
+  id               Int                 @id @default(autoincrement()) @map("id")
   authUserId  String    @unique @map("auth_user_id")
   email       String    @unique
   firstName   String?   @map("first_name")
@@ -22,11 +22,10 @@ model User {
 
   // Relations
   userCompanyRoles user_company_role[]
-
-    // Back-references for user_company_role
+  // Back-references for user_company_role
   revokedRoles     user_company_role[] @relation("UserCompanyRoleRevokedBy")
   
-    // Back-references for invitation
+  // Back-references for invitation
   invitationsSent     invitation[] @relation("InvitationInvitedBy")
   invitationsDeleted  invitation[] @relation("InvitationDeletedBy")
 
@@ -55,21 +54,12 @@ model user_company_role {
   companyId Int      @map("company_id")
   
   // Relations with explicit foreign key names
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "user_company_role_user_fkey")
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "user_company_role_user_fkey")
   company   company  @relation(fields: [companyId], references: [id], onDelete: Cascade, map: "user_company_role_company_fkey")
-  revokedByUser User? @relation("UserCompanyRoleRevokedBy", fields: [revokedBy], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_company_role_revoked_by_fkey")
+  revokedByUser user? @relation("UserCompanyRoleRevokedBy", fields: [revokedBy], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_company_role_revoked_by_fkey")
   
   @@unique([userId, companyId, role], map: "user_company_unique")
   @@map("user_company_role")
-}
-model ContactMessage {
-  id         Int   @id @default(autoincrement()) 
-  fullName   String   @map("full_name")
-  email      String
-  message    String   @db.Text
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  @@map("contact_messages")
 }
 
 model invitation {
@@ -87,8 +77,8 @@ model invitation {
 
   // Relations with unique constraint names
   company    company   @relation(fields: [companyId], references: [id], map: "invitation_company_fkey")
-  inviter    User      @relation("InvitationInvitedBy", fields: [invitedBy], references: [id], map: "invitation_inviter_fkey")
-  deleter    User?     @relation("InvitationDeletedBy", fields: [deletedBy], references: [id], map: "invitation_deleter_fkey")
+  inviter    user      @relation("InvitationInvitedBy", fields: [invitedBy], references: [id], map: "invitation_inviter_fkey")
+  deleter    user?     @relation("InvitationDeletedBy", fields: [deletedBy], references: [id], map: "invitation_deleter_fkey")
 
   @@index([email])
   @@index([companyId])
@@ -111,4 +101,14 @@ enum invitation_status {
   revoked
   draft
   @@map("invitation_status")
+}
+
+model ContactMessage {
+  id        Int      @id @default(autoincrement())
+  fullName  String   @map("full_name")
+  email     String
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_messages")
 }
