@@ -63,6 +63,38 @@ const DetailsSection = () => {
     }
   };
 
+  // Handle custom validation messages
+  const handleInvalidFullName = (e: React.FormEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    if (input.validity.valueMissing) {
+      input.setCustomValidity(t("right.form.fullNameRequired"));
+    }
+  };
+
+  const handleInvalidEmail = (e: React.FormEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    if (input.validity.valueMissing) {
+      input.setCustomValidity(t("right.form.emailRequired"));
+    } else if (input.validity.typeMismatch) {
+      input.setCustomValidity(t("right.form.emailInvalid"));
+    }
+  };
+
+  const handleInvalidMessage = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    const input = e.currentTarget;
+    if (input.validity.valueMissing) {
+      input.setCustomValidity(t("right.form.messageRequired"));
+    } else if (input.validity.tooShort) {
+      input.setCustomValidity(t("right.form.messageTooShort"));
+    }
+  };
+
+  const clearValidity = (
+    e: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    e.currentTarget.setCustomValidity("");
+  };
+
   return (
     <section id="details" className="w-full py-0">
       <div className="container px-4 sm:px-6 lg:px-8 mx-auto">
@@ -160,6 +192,8 @@ const DetailsSection = () => {
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
+                    onInvalid={handleInvalidFullName}
+                    onInput={clearValidity}
                     placeholder={t("right.form.fullName")}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent"
                     required
@@ -173,6 +207,8 @@ const DetailsSection = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
+                    onInvalid={handleInvalidEmail}
+                    onInput={clearValidity}
                     placeholder={t("right.form.email")}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent"
                     required
@@ -185,6 +221,8 @@ const DetailsSection = () => {
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
+                    onInvalid={handleInvalidMessage}
+                    onInput={clearValidity}
                     placeholder={t("right.form.message")}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:border-transparent min-h-[120px]"
                     minLength={10}

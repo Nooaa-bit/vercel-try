@@ -18,7 +18,13 @@
       "submit": "Send request ",
       "submitting": " Sending... ",
       "requiredError": "Please fill in all required fields",
-      "success": "Request submitted successfully!"
+      "emailRequired": "Please fill out this field",
+      "emailInvalid": "Please include an '@' in the email address",
+      "messageRequired": "Please fill out this field",
+      "messageTooShort": "Please lengthen this text to 10 characters or more",
+      "messageError": "Message must be at least 10 characters",
+      "success": "Message sent successfully!",
+      "errorGeneric": "Failed to send message. Please try again."
     }
   }
 }
