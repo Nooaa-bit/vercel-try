@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/hooks/useAuth.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -97,7 +98,7 @@ export function useAuth() {
 
       // Immediate redirect after sign out
       if (isOnProtectedPath) {
-        router.replace(`/${lang}`);
+        window.location.href = `/${lang}`;
       }
     } catch (error) {
       console.error("Sign out error:", error);
