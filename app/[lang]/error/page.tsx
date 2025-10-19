@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function ErrorPage() {
   const searchParams = useSearchParams();
@@ -10,7 +11,7 @@ export default function ErrorPage() {
     <div style={{ padding: "2rem", textAlign: "center" }}>
       <h1>❌ Oops!</h1>
       <p>{message}</p>
-      <a href="/">Go Home</a>
+      <Link href="/">Go Home</Link>
     </div>
   );
 }
