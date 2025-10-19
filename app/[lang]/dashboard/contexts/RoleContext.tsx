@@ -1,3 +1,4 @@
+//hype-hire/web/app/dashboard2/contexts/RoleContext.tsx
 "use client";
 
 import {
@@ -16,10 +17,10 @@ interface ActiveRole {
 
 interface UserCompanyRole {
   role: string;
-  company: Array<{
+  company: {
     id: number;
     name: string;
-  }> | null;
+  };
 }
 
 interface RoleContextType {
@@ -48,13 +49,13 @@ export function RoleProvider({
 
       if (savedRoleId) {
         const savedRole = userCompanyRoles.find(
-          (r) => r.company?.[0]?.id === parseInt(savedRoleId)
+          (r) => r.company.id === parseInt(savedRoleId)
         );
-        if (savedRole && savedRole.company?.[0]) {
+        if (savedRole) {
           setActiveRoleState({
             role: savedRole.role,
-            companyId: savedRole.company[0].id,
-            companyName: savedRole.company[0].name,
+            companyId: savedRole.company.id,
+            companyName: savedRole.company.name,
           });
           return;
         }
@@ -62,13 +63,11 @@ export function RoleProvider({
 
       // Default to first role (highest priority)
       const firstRole = userCompanyRoles[0];
-      if (firstRole.company?.[0]) {
-        setActiveRoleState({
-          role: firstRole.role,
-          companyId: firstRole.company[0].id,
-          companyName: firstRole.company[0].name,
-        });
-      }
+      setActiveRoleState({
+        role: firstRole.role,
+        companyId: firstRole.company.id,
+        companyName: firstRole.company.name,
+      });
     }
   }, [userCompanyRoles]);
 
@@ -78,14 +77,12 @@ export function RoleProvider({
   };
 
   const switchRole = (companyId: number) => {
-    const newRole = userCompanyRoles.find(
-      (r) => r.company?.[0]?.id === companyId
-    );
-    if (newRole && newRole.company?.[0]) {
+    const newRole = userCompanyRoles.find((r) => r.company.id === companyId);
+    if (newRole) {
       setActiveRole({
         role: newRole.role,
-        companyId: newRole.company[0].id,
-        companyName: newRole.company[0].name,
+        companyId: newRole.company.id,
+        companyName: newRole.company.name,
       });
     }
   };

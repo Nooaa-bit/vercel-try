@@ -1,4 +1,3 @@
-//hype-hire/web/app/hooks/useActiveRole.tsx
 "use client";
 
 import {
@@ -41,9 +40,7 @@ interface RoleQueryResult {
   id: number;
   role: Role;
   company_id: number;
-  company: {
-    name: string;
-  } | null;
+  company: Array<{ name: string }> | null;
 }
 
 const DEFAULT_ROLE: UserCompanyRole = {
@@ -96,7 +93,7 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
           id: r.id,
           role: r.role as Role,
           companyId: r.company_id,
-          companyName: r.company?.name || "Hype Hire",
+          companyName: r.company?.[0]?.name || "Hype Hire",
         }));
 
         setAvailableRoles(formatted);
@@ -149,24 +146,3 @@ export function useActiveRole() {
     throw new Error("useActiveRole must be used within ActiveRoleProvider");
   return context;
 }
-
-
-
-
-
-/*Lines of Code Count
-Current version: ~80 lines
-With role weights: ~85 lines
-With permission helpers: ~100+ lines*/
-
-/*const ROLE_WEIGHT = {
-  superadmin: 4,
-  company_admin: 3,
-  supervisor: 2,
-  worker: 1,
-} as const;
-
-//Then add to context:
-hasMinimumRole: (minRole: Role) =>
-  ROLE_WEIGHT[activeRole?.role || "worker"] >= ROLE_WEIGHT[minRole];*/
-   
