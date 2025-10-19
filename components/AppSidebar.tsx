@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Building2,
   Plus,
+  MapPinIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -55,24 +56,15 @@ export function AppSidebar({ user }: AppSidebarProps) {
   // Define navigation items with translation keys
   const mainItems = [
     { titleKey: "dashboard", url: "/dashboard", icon: LayoutDashboard },
-    { titleKey: "analytics", url: "/dashboard/analytics", icon: BarChart3 },
-    { titleKey: "projects", url: "/dashboard/projects", icon: FileText },
-    { titleKey: "team", url: "/dashboard/team", icon: Users },
     { titleKey: "calendar", url: "/dashboard/calendar", icon: CalendarIcon },
+    { titleKey: "locations", url: "/dashboard/locations", icon: MapPinIcon },
+    { titleKey: "team", url: "/dashboard/team", icon: Users },
   ];
 
   const documentItems = [
-    {
-      titleKey: "invitations",
-      url: "/dashboard/invitations",
-      icon: UserRoundPlus,
-    },
-    { titleKey: "reports", url: "/dashboard/reports", icon: BarChart3 },
-    {
-      titleKey: "wordAssistant",
-      url: "/dashboard/word-assistant",
-      icon: FileText,
-    },
+    {titleKey: "invitations",url: "/dashboard/invitations",icon: UserRoundPlus,},
+    { titleKey: "analytics", url: "/dashboard/analytics", icon: BarChart3 },
+    {titleKey: "contracts",url: "/dashboard/contracts",icon: FileText,},
   ];
 
   const bottomItems = [
@@ -83,10 +75,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
   const isActive = (path: string) => {
     if (path === "/dashboard" && pathname === "/dashboard") return true;
-    if (path === "/dashboard2" && pathname === "/dashboard2") return true;
     if (
       path !== "/dashboard" &&
-      path !== "/dashboard2" &&
       pathname.startsWith(path)
     )
       return true;

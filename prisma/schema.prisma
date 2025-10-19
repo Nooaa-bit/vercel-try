@@ -89,7 +89,7 @@ enum role {
   superadmin
   company_admin
   supervisor
-  worker
+  talent
   @@map("role")
 }
 

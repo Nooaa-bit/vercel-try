@@ -1,6 +1,8 @@
+//hype-hire/vercel/app/[lang]/dashboard/layout.tsx
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -27,6 +29,7 @@ interface Profile {
 }
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation("dash-layout");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,7 +103,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-16 z-30">
               <div className="flex items-center gap-2">
                 <SidebarTrigger className="mr-2" />
-                <h1 className="text-lg font-semibold">Dashboard</h1>
+                <h1 className="text-lg font-semibold">{t("title")}</h1>
                 <span className="text-lg text-muted-foreground hidden sm:block">
                   {activeRole.companyName}
                 </span>
@@ -112,11 +115,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     className="flex items-center gap-2 p-2"
                   >
                     <span className="text-sm font-medium hidden sm:block">
-                      {`Welcome back, ${
-                        profile?.first_Name ||
+                      {t("welcome")}
+                      {profile?.first_Name ||
                         user.user_metadata?.first_name ||
-                        user.email
-                      }`}
+                        user.email}
                     </span>
                   </Button>
                 </PopoverTrigger>
@@ -127,7 +129,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
+                    {t("signOut")}
                   </Button>
                 </PopoverContent>
               </Popover>
