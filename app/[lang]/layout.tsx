@@ -36,7 +36,7 @@ export default async function RootLayout({
         <ThemeProvider>
           <LanguageProvider lang={validLang}>
             <Navbar />
-            {children}
+         {children}
             <Toaster richColors closeButton position="bottom-right" />
           </LanguageProvider>
         </ThemeProvider>

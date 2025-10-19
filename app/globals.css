@@ -107,6 +107,17 @@
   }
 }
 
+/* 3.5. Hide content until i18next is ready */
+body {
+  opacity: 0;
+  animation: fadeInBody 0.3s ease-in 0.1s forwards;
+}
+
+@keyframes fadeInBody {
+  to { opacity: 1; }
+}
+
+
 /* 4. Re-usable component utilities */
 @layer components {
   .text-mask-image {

@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type Theme = "light" | "dark";
 type ThemeContext = {
@@ -16,20 +17,33 @@ export function useTheme() {
   return context;
 }
 
+// Helper to get initial theme
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  const stored = localStorage.getItem("theme");
+  return stored === "dark" ? "dark" : "light";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
+  const pathname = usePathname();
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+
+  // Check if current page is homepage
+  const isHomePage =
+    pathname === "/" ||
+    pathname === "/en" ||
+    pathname === "/el" ||
+    pathname === "/en/" ||
+    pathname === "/el/";
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme") as Theme | null;
-    if (stored === "dark" || stored === "light") {
-      setTheme(stored);
-    }
-  }, []);
+    // Apply dark mode ONLY if theme is dark AND not on homepage
+    const shouldApplyDark = theme === "dark" && !isHomePage;
+    document.documentElement.classList.toggle("dark", shouldApplyDark);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    // Always save theme preference (so it persists when leaving homepage)
     localStorage.setItem("theme", theme);
-  }, [theme]);
+  }, [theme, isHomePage]);
 
   const toggle = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
