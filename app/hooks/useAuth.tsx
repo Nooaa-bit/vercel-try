@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/hooks/useAuth.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,7 +8,6 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 export function useAuth() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [signOutCounter, setSignOutCounter] = useState(0);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -66,39 +64,45 @@ export function useAuth() {
       } else if (event === "SIGNED_OUT") {
         console.log("🚪 User signed out detected");
         setUser(null);
-        setSignOutCounter((c) => c + 1);
+
+        // Immediate redirect on sign out
+        const protectedPaths = ["/dashboard", "/profile", "/dashboard2"];
+        const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
+        const isOnProtectedPath = protectedPaths.some((path) =>
+          pathnameWithoutLang.startsWith(path)
+        );
+
+        if (isOnProtectedPath) {
+          console.log("🔄 Redirecting to homepage after sign out...");
+          router.replace(`/${lang}`);
+        }
       }
     });
 
     handleAuthState();
     return () => subscription.unsubscribe();
-  }, [router, pathname, supabase.auth]);
-
-  // Auto-redirect on sign out from protected pages
-  useEffect(() => {
-    const protectedPaths = ["/dashboard", "/profile", "/dashboard2"];
-    const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
-    const isOnProtectedPath = protectedPaths.some((path) =>
-      pathnameWithoutLang.startsWith(path)
-    );
-
-    if (user === null && signOutCounter > 0 && isOnProtectedPath) {
-      console.log("🔄 Redirecting after sign out...");
-      router.push(`/${lang}?message=You have been signed out`);
-      router.refresh();
-    }
-  }, [user, signOutCounter, pathname, router, lang]);
+  }, [router, pathname, supabase.auth, lang]);
 
   // Sign out function
   const signOut = async () => {
     try {
       console.log("🚪 Client-side sign out initiated...");
+      const protectedPaths = ["/dashboard", "/profile", "/dashboard2"];
+      const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
+      const isOnProtectedPath = protectedPaths.some((path) =>
+        pathnameWithoutLang.startsWith(path)
+      );
+
       await supabase.auth.signOut();
+
+      // Immediate redirect after sign out
+      if (isOnProtectedPath) {
+        router.replace(`/${lang}`);
+      }
     } catch (error) {
       console.error("Sign out error:", error);
       setUser(null);
-      router.push(`/${lang}?message=You have been signed out`);
-      router.refresh();
+      router.replace(`/${lang}`);
     }
   };
 
