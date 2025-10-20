@@ -11,6 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Send, Trash2, Plus, AlertCircle, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -29,14 +35,31 @@ interface User {
   role: Role;
 }
 
+interface Company {
+  id: number;
+  name: string;
+}
+
 interface Draft {
   id: string;
   email: string;
   role: Role;
+  companyId?: number;
   warning?: string;
   conflictType?: "member" | "pending" | "expired";
   userId?: number;
   existingRole?: Role;
+}
+
+interface SentInvitation {
+  id: number;
+  email: string;
+  role: Role;
+  status: string;
+  expires_at: string;
+  invited_by: number;
+  deleted_at: string | null;
+  deleted_by: number | null;
 }
 
 const ROLE_HIERARCHY: Record<Role, Role[]> = {
@@ -57,9 +80,13 @@ export default function InvitationsPage() {
 
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sending, setSending] = useState(false);
+  const [activeView, setActiveView] = useState<"draft" | "sent">("draft");
+  const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
+  const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
 
   // ============================================================
   // USER AUTHENTICATION & DATA LOADING
@@ -92,6 +119,17 @@ export default function InvitationsPage() {
         companyId: roleRow!.company_id,
         role: roleRow!.role,
       });
+
+      // Load all companies for superadmin
+      if (roleRow!.role === "superadmin") {
+        const { data: companiesData } = await supabase
+          .from("company")
+          .select("id, name")
+          .order("name");
+        
+        setCompanies(companiesData || []);
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -101,15 +139,90 @@ export default function InvitationsPage() {
   // ============================================================
 
   const allowedRoles = user ? ROLE_HIERARCHY[user.role] : [];
-  const isCompanyAdmin =
-    user?.role === "superadmin" || user?.role === "company_admin";
+  const isSuperAdmin = user?.role === "superadmin";
+  const isCompanyAdmin = user?.role === "company_admin";
+  const isSupervisor = user?.role === "supervisor";
+  const isRegularUser = user?.role === "talent" || user?.role === "supervisor";
+  const canManageInvitations = isSuperAdmin || isCompanyAdmin;
   const problematicDrafts = drafts.filter((d) => d.conflictType);
+
+  // ============================================================
+  // HELPER FUNCTIONS
+  // ============================================================
+
+  // Remove duplicates based on email + role (and companyId for superadmin)
+  const removeDuplicateDrafts = (draftArray: Draft[]): Draft[] => {
+    const seen = new Set<string>();
+    return draftArray.filter((draft) => {
+      const key = isSuperAdmin
+        ? `${draft.email.toLowerCase()}-${draft.role}-${draft.companyId}`
+        : `${draft.email.toLowerCase()}-${draft.role}`;
+      
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  };
+
+  // Fetch sent invitations for the company
+  const fetchSentInvitations = async () => {
+    if (!user) return;
+    
+    setLoadingSentInvitations(true);
+    const { data, error } = await supabase
+      .from("invitation")
+      .select("id, email, role, status, expires_at, invited_by, deleted_at, deleted_by")
+      .eq("company_id", user.companyId)
+      .is("deleted_at", null)
+      .in("status", ["pending", "expired"])
+      .order("expires_at", { ascending: false });
+
+    if (error) {
+      toast.error("Failed to load invitations", { description: error.message });
+    } else {
+      setSentInvitations(data || []);
+    }
+    setLoadingSentInvitations(false);
+  };
+
+  // Load sent invitations when switching to sent view
+  useEffect(() => {
+    if (activeView === "sent" && canManageInvitations) {
+      fetchSentInvitations();
+    }
+  }, [activeView, user]);
+
+  // Delete/revoke a sent invitation
+  const revokeSentInvitation = async (invitationId: number) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("invitation")
+      .update({ 
+        deleted_at: new Date().toISOString(),
+        deleted_by: user.id 
+      })
+      .eq("id", invitationId);
+
+    if (error) {
+      toast.error("Failed to revoke invitation", { description: error.message });
+    } else {
+      toast.success("Invitation revoked");
+      setSentInvitations((prev) => prev.filter((inv) => inv.id !== invitationId));
+    }
+  };
 
   // ============================================================
   // DRAFT MANAGEMENT FUNCTIONS
   // ============================================================
 
-  const updateDraft = (id: string, field: "email" | "role", value: string) => {
+  const updateDraft = (
+    id: string,
+    field: "email" | "role" | "companyId",
+    value: string | number
+  ) => {
     setDrafts((d) =>
       d.map((dr) =>
         dr.id === id
@@ -125,60 +238,66 @@ export default function InvitationsPage() {
   };
 
   // ============================================================
-  // CONFLICT DETECTION LOGIC
+  // CONFLICT DETECTION LOGIC (Company Admin Only)
   // ============================================================
 
   const scanDraft = async (draft: Draft): Promise<Draft> => {
     if (!user || !draft.email.includes("@")) return draft;
 
-    // Check if user exists and is already a company member
-    const { data: u } = await supabase
+    // Regular users don't need conflict detection
+    if (isRegularUser) {
+      return draft;
+    }
+
+    const targetCompanyId = isSuperAdmin
+      ? draft.companyId || user.companyId
+      : user.companyId;
+
+    // Check if user exists and is a member of the target company
+    const { data: existingUser } = await supabase
       .from("user")
       .select("id")
       .eq("email", draft.email.trim())
       .maybeSingle();
 
-    if (u) {
-      const { data: member } = await supabase
+    if (existingUser) {
+      const { data: companyMember } = await supabase
         .from("user_company_role")
         .select("role")
-        .eq("user_id", u.id)
-        .eq("company_id", user.companyId)
+        .eq("user_id", existingUser.id)
+        .eq("company_id", targetCompanyId)
         .is("revoked_at", null)
         .maybeSingle();
 
-      if (member) {
+      if (companyMember) {
         return {
           ...draft,
-          warning: isCompanyAdmin
-            ? `Already company member with role: ${member.role}`
-            : "Already company member",
+          warning: `Already company member with role: ${companyMember.role}`,
           conflictType: "member",
-          userId: u.id,
-          existingRole: member.role as Role,
+          userId: existingUser.id,
+          existingRole: companyMember.role as Role,
         };
       }
     }
 
-    // Check for pending or expired invitations
-    const { data: invs } = await supabase
+    // Check for existing invitations
+    const { data: existingInvitations } = await supabase
       .from("invitation")
       .select("role, status, expires_at")
-      .eq("company_id", user.companyId)
+      .eq("company_id", targetCompanyId)
       .eq("email", draft.email.trim())
+      .is("deleted_at", null)
       .in("status", ["pending", "expired"])
       .order("expires_at", { ascending: false })
       .limit(1);
 
-    if (invs?.[0]) {
-      const inv = invs[0];
+    if (existingInvitations?.[0]) {
+      const inv = existingInvitations[0];
       const isPending = inv.status === "pending";
       const dateStr = new Date(inv.expires_at).toLocaleDateString();
-      const warning = isCompanyAdmin
-        ? `${isPending ? "Pending" : "Expired"} invitation (${inv.role}) ${
-            isPending ? "expires" : "on"
-          } ${dateStr}`
-        : `${isPending ? "Pending" : "Expired"} invitation`;
+      const warning = `${isPending ? "Pending" : "Expired"} invitation (${
+        inv.role
+      }) ${isPending ? "expires" : "on"} ${dateStr}`;
 
       return {
         ...draft,
@@ -192,12 +311,25 @@ export default function InvitationsPage() {
 
   const scanAll = async () => {
     setSending(true);
-    const scanned = await Promise.all(drafts.map(scanDraft));
+    
+    // First remove duplicates
+    const uniqueDrafts = removeDuplicateDrafts(drafts);
+    if (uniqueDrafts.length < drafts.length) {
+      const removed = drafts.length - uniqueDrafts.length;
+      toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
+    }
+    
+    const scanned = await Promise.all(uniqueDrafts.map(scanDraft));
     setDrafts(scanned);
+    
     const conflicts = scanned.filter((d) => d.conflictType);
     if (conflicts.length > 0) {
       toast.warning("Conflicts detected", {
         description: `${conflicts.length} invitation(s) require attention in Problematic Invitations.`,
+      });
+    } else {
+      toast.success("All clear", {
+        description: "No conflicts detected. Ready to send.",
       });
     }
     setSending(false);
@@ -210,31 +342,65 @@ export default function InvitationsPage() {
   const sendSingle = async (draft: Draft, force: boolean = false) => {
     if (!user || !draft.email.includes("@")) return;
 
-    // Scan for conflicts if not forcing
-    if (!force) {
+    const targetCompanyId = isSuperAdmin
+      ? draft.companyId || user.companyId
+      : user.companyId;
+
+    // For company admins: scan for conflicts if not forcing
+    if (!isRegularUser && !force) {
       const scanned = await scanDraft(draft);
       if (scanned.conflictType) {
         setDrafts((d) => d.map((dr) => (dr.id === draft.id ? scanned : dr)));
         toast.warning("Conflict detected", {
-          description: "Use the button in Problematic Invitations to override.",
+          description:
+            "Use the button in Problematic Invitations to override.",
         });
         return;
       }
     }
 
+    // For regular users: check if already a member, provide feedback
+    if (isRegularUser) {
+      const { data: existingUser } = await supabase
+        .from("user")
+        .select("id")
+        .eq("email", draft.email.trim())
+        .maybeSingle();
+
+      if (existingUser) {
+        const { data: companyMember } = await supabase
+          .from("user_company_role")
+          .select("role")
+          .eq("user_id", existingUser.id)
+          .eq("company_id", targetCompanyId)
+          .is("revoked_at", null)
+          .maybeSingle();
+
+        if (companyMember) {
+          // Remove draft and provide feedback
+          setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
+          toast.info("Already a member", {
+            description: `${draft.email} is already part of this company.`,
+          });
+          return;
+        }
+      }
+    }
+
     setSending(true);
 
-    // Handle role update for existing members
+    // Handle role update for existing members (admin only)
     if (
       draft.conflictType === "member" &&
-      isCompanyAdmin &&
-      draft.existingRole !== "superadmin"
+      !isRegularUser &&
+      draft.existingRole !== "superadmin" &&
+      force
     ) {
       const { error } = await supabase
         .from("user_company_role")
         .update({ role: draft.role })
         .eq("user_id", draft.userId!)
-        .eq("company_id", user.companyId)
+        .eq("company_id", targetCompanyId)
         .is("revoked_at", null);
 
       if (error) {
@@ -251,7 +417,7 @@ export default function InvitationsPage() {
       const { error } = await supabase.from("invitation").insert({
         email: draft.email.trim(),
         role: draft.role,
-        company_id: user.companyId,
+        company_id: targetCompanyId,
         invited_by: user.id,
         expires_at: new Date(
           Date.now() + 30 * 24 * 60 * 60 * 1000
@@ -276,61 +442,150 @@ export default function InvitationsPage() {
   const sendAll = async () => {
     if (!user) return;
     setSending(true);
-    let sent = 0,
-      updated = 0,
-      skipped = 0;
 
-    // Process all valid drafts
-    for (const draft of drafts.filter(
+    // Remove duplicates first
+    const uniqueDrafts = removeDuplicateDrafts(drafts);
+    if (uniqueDrafts.length < drafts.length) {
+      const removed = drafts.length - uniqueDrafts.length;
+      toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
+      setDrafts(uniqueDrafts);
+    }
+
+    const validDrafts = uniqueDrafts.filter(
       (d) => d.email.includes("@") && allowedRoles.includes(d.role)
-    )) {
-      const scanned = await scanDraft(draft);
+    );
 
-      if (
-        scanned.conflictType === "member" &&
-        isCompanyAdmin &&
-        scanned.existingRole !== "superadmin"
-      ) {
-        // Update existing member role
-        await supabase
-          .from("user_company_role")
-          .update({ role: draft.role })
-          .eq("user_id", scanned.userId!)
-          .eq("company_id", user.companyId)
-          .is("revoked_at", null);
-        updated++;
-        setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
-      } else if (!scanned.conflictType) {
-        // Create new invitation
-        await supabase.from("invitation").insert({
+    // Regular users: simple flow without conflict detection UI
+    if (isRegularUser) {
+      let sent = 0;
+      let skipped = 0;
+
+      for (const draft of validDrafts) {
+        const targetCompanyId = user.companyId;
+
+        // Check if already a member
+        const { data: existingUser } = await supabase
+          .from("user")
+          .select("id")
+          .eq("email", draft.email.trim())
+          .maybeSingle();
+
+        if (existingUser) {
+          const { data: companyMember } = await supabase
+            .from("user_company_role")
+            .select("role")
+            .eq("user_id", existingUser.id)
+            .eq("company_id", targetCompanyId)
+            .is("revoked_at", null)
+            .maybeSingle();
+
+          if (companyMember) {
+            skipped++;
+            continue;
+          }
+        }
+
+        // Send invitation
+        const { error } = await supabase.from("invitation").insert({
           email: draft.email.trim(),
           role: draft.role,
-          company_id: user.companyId,
+          company_id: targetCompanyId,
           invited_by: user.id,
           expires_at: new Date(
             Date.now() + 30 * 24 * 60 * 60 * 1000
           ).toISOString(),
           status: "pending",
         });
+
+        if (!error) {
+          sent++;
+        }
+      }
+
+      setDrafts([]);
+      setSending(false);
+      
+      const messages = [];
+      if (sent > 0) {
+        messages.push(`Sent ${sent} invitation${sent > 1 ? "s" : ""}`);
+      }
+      if (skipped > 0) {
+        messages.push(`${skipped} already member${skipped > 1 ? "s" : ""}`);
+      }
+      
+      if (messages.length > 0) {
+        toast.success("Invitations processed", {
+          description: messages.join(". "),
+        });
+      } else {
+        toast.info("No invitations to send");
+      }
+      return;
+    }
+
+    // Company admins and superadmins: scan first, then separate
+    const scannedDrafts = await Promise.all(validDrafts.map(scanDraft));
+    const cleanDrafts = scannedDrafts.filter((d) => !d.conflictType);
+    const problematicFound = scannedDrafts.filter((d) => d.conflictType);
+
+    // Update state to show problematic invitations
+    if (problematicFound.length > 0) {
+      setDrafts((currentDrafts) =>
+        currentDrafts.map((draft) => {
+          const scanned = scannedDrafts.find((s) => s.id === draft.id);
+          return scanned || draft;
+        })
+      );
+    }
+
+    let sent = 0;
+
+    // Send clean invitations
+    for (const draft of cleanDrafts) {
+      const targetCompanyId = isSuperAdmin
+        ? draft.companyId || user.companyId
+        : user.companyId;
+
+      const { error } = await supabase.from("invitation").insert({
+        email: draft.email.trim(),
+        role: draft.role,
+        company_id: targetCompanyId,
+        invited_by: user.id,
+        expires_at: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        status: "pending",
+      });
+
+      if (!error) {
         sent++;
         setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
-      } else {
-        skipped++;
       }
     }
 
-    // Show results
-    const msgs = [];
-    if (sent > 0) msgs.push(`Sent ${sent}`);
-    if (updated > 0) msgs.push(`Updated ${updated}`);
-    if (msgs.length > 0)
-      toast.success("Invitations processed", { description: msgs.join(", ") });
-    if (skipped > 0)
-      toast.warning(
-        `${skipped} skipped - use Problematic Invitations buttons to override`
-      );
-
     setSending(false);
+
+    if (sent > 0 && problematicFound.length === 0) {
+      toast.success("All invitations sent", {
+        description: `Successfully sent ${sent} invitation${
+          sent > 1 ? "s" : ""
+        }`,
+      });
+    } else if (sent > 0 && problematicFound.length > 0) {
+      toast.success("Partial success", {
+        description: `Sent ${sent} invitation${sent > 1 ? "s" : ""}. ${
+          problematicFound.length
+        } moved to Problematic Invitations.`,
+      });
+    } else if (problematicFound.length > 0 && sent === 0) {
+      toast.warning("Conflicts detected", {
+        description: `${problematicFound.length} invitation${
+          problematicFound.length > 1 ? "s" : ""
+        } moved to Problematic Invitations. Use the buttons there to override.`,
+      });
+    } else {
+      toast.info("No invitations to send");
+    }
   };
 
   // ============================================================
@@ -351,29 +606,12 @@ export default function InvitationsPage() {
   // ============================================================
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* ============================================================
-          PAGE HEADER
-          ============================================================ */}
-
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">New Invitations</h1>
-        {/*  <div className="text-sm text-muted-foreground">
-          Logged in as:{" "}
-          <span className="font-medium text-foreground">{user.email}</span> |
-          Company:{" "}
-          <span className="font-medium text-foreground">{user.companyId}</span>
-        </div> */}
-      </div>
-
-      {/* ============================================================
-          PROBLEMATIC INVITATIONS CARD
-          ============================================================ */}
-
-      {problematicDrafts.length > 0 && (
-        <Card className="mb-4 border-secondary bg-secondary/60">
+    <div className="max-w-4xl mx-auto p-6 mt-14">
+      {/* Problematic invitations - Only for company admins and superadmins */}
+      {!isRegularUser && problematicDrafts.length > 0 && activeView === "draft" && (
+        <Card className="mb-4 border-destructive bg-destructive/10">
           <CardHeader>
-            <h3 className="font-semibold text-destructive dark:text-destructive-foreground">
+            <h3 className="font-semibold text-destructive">
               Problematic Invitations ({problematicDrafts.length})
             </h3>
           </CardHeader>
@@ -394,7 +632,7 @@ export default function InvitationsPage() {
                   </div>
                   <div className="flex gap-2">
                     {draft.conflictType === "member" ? (
-                      draft.existingRole !== "superadmin" && isCompanyAdmin ? (
+                      draft.existingRole !== "superadmin" ? (
                         <Button
                           onClick={() => sendSingle(draft, true)}
                           disabled={sending}
@@ -403,11 +641,11 @@ export default function InvitationsPage() {
                         >
                           <RefreshCw className="w-3 h-3 mr-1" /> Update Role
                         </Button>
-                      ) : isCompanyAdmin ? (
-                        <p className="text-sm text-destructive dark:text-destructive-foreground">
+                      ) : (
+                        <p className="text-sm text-destructive">
                           Cannot update superadmin
                         </p>
-                      ) : null
+                      )
                     ) : (
                       <Button
                         onClick={() => sendSingle(draft, true)}
@@ -436,113 +674,275 @@ export default function InvitationsPage() {
         </Card>
       )}
 
-      {/* ============================================================
-          DRAFTS CARD
-          ============================================================ */}
-
       <Card>
-        {/* Card Header - Action Buttons */}
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div className="flex gap-2">
-              <Button
-                onClick={() =>
-                  setDrafts((d) => [
-                    ...d,
-                    { id: crypto.randomUUID(), email: "", role: "talent" },
-                  ])
-                }
-                size="sm"
-              >
-                <Plus className="w-4 h-4 mr-1" /> Add Draft
-              </Button>
-              <Button
-                onClick={scanAll}
-                size="sm"
-                variant="outline"
-                disabled={sending || drafts.length === 0}
-              >
-                Scan All
-              </Button>
-              <Button
-                onClick={sendAll}
-                disabled={sending || drafts.length === 0}
-                size="sm"
-              >
-                <Send className="w-4 h-4 mr-1" /> Send All
-              </Button>
-            </div>
-            <Button
-              onClick={() => {
-                setDrafts([]);
-                toast.success(`Deleted ${drafts.length} draft(s)`);
-              }}
-              disabled={drafts.length === 0}
-              size="sm"
-              variant="destructive"
-            >
-              <Trash2 className="w-3 h-3 mr-1" /> Delete All
-            </Button>
-          </div>
-        </CardHeader>
+          {/* Shadcn Tabs - Only for company admins and superadmins */}
+          {canManageInvitations ? (
+            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "draft" | "sent")}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="draft">Drafts</TabsTrigger>
+                <TabsTrigger value="sent">Sent</TabsTrigger>
+              </TabsList>
 
-        {/* Card Content - Draft List */}
-        <CardContent className="space-y-4">
-          {drafts.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              No drafts. Click Add Draft to start.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {drafts.map((draft) => (
-                <div key={draft.id} className="border rounded p-3">
+              {/* DRAFT TAB CONTENT */}
+              <TabsContent value="draft" className="mt-0">
+                <div className="flex justify-between items-center mb-4">
                   <div className="flex gap-2">
-                    <Input
-                      placeholder="Email"
-                      value={draft.email}
-                      onChange={(e) =>
-                        updateDraft(draft.id, "email", e.target.value)
-                      }
-                      className="flex-1"
-                    />
-                    <Select
-                      value={draft.role}
-                      onValueChange={(v: Role) =>
-                        updateDraft(draft.id, "role", v)
-                      }
-                    >
-                      <SelectTrigger className="w-48">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allowedRoles.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r.replace("_", " ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      onClick={() => sendSingle(draft)}
-                      disabled={sending || !draft.email.includes("@")}
-                      size="icon"
-                      variant="outline"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
                     <Button
                       onClick={() =>
-                        setDrafts((d) => d.filter((dr) => dr.id !== draft.id))
+                        setDrafts((d) => [
+                          ...d,
+                          {
+                            id: crypto.randomUUID(),
+                            email: "",
+                            role: "talent",
+                            companyId: isSuperAdmin ? companies[0]?.id : user.companyId,
+                          },
+                        ])
                       }
-                      size="icon"
-                      variant="outline"
+                      size="sm"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Plus className="w-4 h-4 mr-1" /> Add Draft
+                    </Button>
+                    {!isRegularUser && (
+                      <Button
+                        onClick={scanAll}
+                        size="sm"
+                        variant="outline"
+                        disabled={sending || drafts.length === 0}
+                      >
+                        Scan All
+                      </Button>
+                    )}
+                    <Button
+                      onClick={sendAll}
+                      disabled={sending || drafts.length === 0}
+                      size="sm"
+                    >
+                      <Send className="w-4 h-4 mr-1" /> Send All
                     </Button>
                   </div>
+                  <Button
+                    onClick={() => {
+                      const count = drafts.length;
+                      setDrafts([]);
+                      if (count > 0) {
+                        toast.success(`Deleted ${count} draft${count > 1 ? "s" : ""}`);
+                      }
+                    }}
+                    disabled={drafts.length === 0}
+                    size="sm"
+                    variant="destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" /> Delete All
+                  </Button>
                 </div>
-              ))}
+              </TabsContent>
+
+              {/* SENT TAB CONTENT */}
+              <TabsContent value="sent" className="mt-0">
+                <div className="mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    View and manage sent invitations
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            // Regular users don't see tabs - just action buttons
+            <div className="flex justify-between items-center">
+              <div className="flex gap-2">
+                <Button
+                  onClick={() =>
+                    setDrafts((d) => [
+                      ...d,
+                      {
+                        id: crypto.randomUUID(),
+                        email: "",
+                        role: "talent",
+                        companyId: user.companyId,
+                      },
+                    ])
+                  }
+                  size="sm"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Add Draft
+                </Button>
+                <Button
+                  onClick={sendAll}
+                  disabled={sending || drafts.length === 0}
+                  size="sm"
+                >
+                  <Send className="w-4 h-4 mr-1" /> Send All
+                </Button>
+              </div>
+              <Button
+                onClick={() => {
+                  const count = drafts.length;
+                  setDrafts([]);
+                  if (count > 0) {
+                    toast.success(`Deleted ${count} draft${count > 1 ? "s" : ""}`);
+                  }
+                }}
+                disabled={drafts.length === 0}
+                size="sm"
+                variant="destructive"
+              >
+                <Trash2 className="w-3 h-3 mr-1" /> Delete All
+              </Button>
             </div>
+          )}
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* DRAFT VIEW */}
+          {activeView === "draft" && (
+            <>
+              {drafts.filter((d) => !d.conflictType).length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No drafts. Click Add Draft to start.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {drafts
+                    .filter((d) => !d.conflictType)
+                    .map((draft) => (
+                      <div key={draft.id} className="border rounded p-3">
+                        <div className="flex gap-2">
+                          {/* Company Selector for Superadmin */}
+                          {isSuperAdmin && (
+                            <Select
+                              value={draft.companyId?.toString() || companies[0]?.id.toString()}
+                              onValueChange={(v) =>
+                                updateDraft(draft.id, "companyId", parseInt(v))
+                              }
+                            >
+                              <SelectTrigger className="w-48">
+                                <SelectValue placeholder="Select company" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {companies.map((company) => (
+                                  <SelectItem key={company.id} value={company.id.toString()}>
+                                    {company.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          <Input
+                            placeholder="Email"
+                            value={draft.email}
+                            onChange={(e) =>
+                              updateDraft(draft.id, "email", e.target.value)
+                            }
+                            className="flex-1"
+                          />
+                          <Select
+                            value={draft.role}
+                            onValueChange={(v: Role) =>
+                              updateDraft(draft.id, "role", v)
+                            }
+                          >
+                            <SelectTrigger className="w-48">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allowedRoles.map((r) => (
+                                <SelectItem key={r} value={r}>
+                                  {r.replace("_", " ")}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={() => sendSingle(draft)}
+                            disabled={sending || !draft.email.includes("@")}
+                            size="icon"
+                            variant="outline"
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() =>
+                              setDrafts((d) =>
+                                d.filter((dr) => dr.id !== draft.id)
+                              )
+                            }
+                            size="icon"
+                            variant="outline"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* SENT VIEW - Only for company admins and superadmins */}
+          {activeView === "sent" && canManageInvitations && (
+            <>
+              {loadingSentInvitations ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Loading invitations...
+                </p>
+              ) : sentInvitations.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No pending or expired invitations
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {sentInvitations.map((invitation) => (
+                    <div
+                      key={invitation.id}
+                      className="border rounded p-3"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-medium text-card-foreground">
+                            {invitation.email}
+                          </p>
+                          <div className="flex gap-4 text-xs text-muted-foreground mt-1">
+                            <span className="capitalize">
+                              Role: {invitation.role.replace("_", " ")}
+                            </span>
+                            <span className="capitalize">
+                              Status:{" "}
+                              <span
+                                className={
+                                  invitation.status === "pending"
+                                    ? "text-blue-600"
+                                    : "text-orange-600"
+                                }
+                              >
+                                {invitation.status}
+                              </span>
+                            </span>
+                            <span>
+                              Expires:{" "}
+                              {new Date(
+                                invitation.expires_at
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => revokeSentInvitation(invitation.id)}
+                          size="sm"
+                          variant="destructive"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Revoke
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

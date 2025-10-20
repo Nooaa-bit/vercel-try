@@ -238,8 +238,10 @@ const Navbar = () => {
         className={cn(
           "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
           isDashboardPage
-            ? "bg-transparent"
-            : isScrolled
+            ? // Solid, themed bar on any dashboard URL
+              "bg-background shadow-sm"
+            : // Keep existing behavior elsewhere
+            isScrolled
             ? "bg-white/60 backdrop-blur-lg shadow-sm"
             : "bg-transparent"
         )}
