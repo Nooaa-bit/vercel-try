@@ -237,7 +237,9 @@ const Navbar = () => {
       <header
         className={cn(
           "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
-          isScrolled
+          isDashboardPage
+            ? "bg-transparent"
+            : isScrolled
             ? "bg-white/60 backdrop-blur-lg shadow-sm"
             : "bg-transparent"
         )}

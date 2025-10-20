@@ -9,14 +9,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { ActiveRoleProvider, useActiveRole } from "../../hooks/useActiveRole";
@@ -30,12 +23,43 @@ interface Profile {
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation("dash-layout");
+  const { t: tSidebar } = useTranslation("sidebar");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const { activeRole } = useActiveRole();
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
+
+  // Navigation items matching AppSidebar structure
+  const allNavItems = [
+    { titleKey: "dashboard", url: "/dashboard" },
+    { titleKey: "calendar", url: "/dashboard/calendar" },
+    { titleKey: "locations", url: "/dashboard/locations" },
+    { titleKey: "team", url: "/dashboard/team" },
+    { titleKey: "invitations", url: "/dashboard/invitations" },
+    { titleKey: "analytics", url: "/dashboard/analytics" },
+    { titleKey: "contracts", url: "/dashboard/contracts" },
+    { titleKey: "settings", url: "/dashboard/settings" },
+    { titleKey: "getHelp", url: "/dashboard/help" },
+    { titleKey: "search", url: "/dashboard/search" },
+  ];
+
+  // Find the current page title based on pathname
+  const getCurrentTitle = () => {
+    // Remove language prefix from pathname (e.g., /en/dashboard -> /dashboard)
+    const pathWithoutLang = pathname?.replace(/^\/[^/]+/, "") || "";
+
+    const currentItem = allNavItems.find((item) => {
+      if (item.url === "/dashboard" && pathWithoutLang === "/dashboard")
+        return true;
+      if (item.url !== "/dashboard" && pathWithoutLang.startsWith(item.url))
+        return true;
+      return false;
+    });
+    return currentItem ? tSidebar(currentItem.titleKey) : tSidebar("dashboard");
+  };
 
   useEffect(() => {
     const getUser = async () => {
@@ -76,11 +100,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [supabase.auth, router]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -95,44 +114,27 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="pt-20">
+    <div>
       <SidebarProvider>
         <div className="min-h-screen flex w-full bg-background">
           <AppSidebar user={user} />
           <SidebarInset className="flex-1">
-            <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-16 z-30">
+            <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-20 z-30">
               <div className="flex items-center gap-2">
                 <SidebarTrigger className="mr-2" />
-                <h1 className="text-lg font-semibold">{t("title")}</h1>
+                <h1 className="text-lg font-semibold">{getCurrentTitle()}</h1>
                 <span className="text-lg text-muted-foreground hidden sm:block">
                   {activeRole.companyName}
                 </span>
               </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center gap-2 p-2"
-                  >
-                    <span className="text-sm font-medium hidden sm:block">
-                      {t("welcome")}
-                      {profile?.first_Name ||
-                        user.user_metadata?.first_name ||
-                        user.email}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-48" align="end">
-                  <Button
-                    variant="ghost"
-                    onClick={handleSignOut}
-                    className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t("signOut")}
-                  </Button>
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-2 p-2">
+                <span className="text-sm font-medium hidden sm:block">
+                  {t("welcome")}
+                  {profile?.first_Name ||
+                    user.user_metadata?.first_name ||
+                    user.email}
+                </span>
+              </div>
             </header>
             <main className="flex-1 p-6">{children}</main>
           </SidebarInset>
