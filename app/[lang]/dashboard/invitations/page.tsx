@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/invitations/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
