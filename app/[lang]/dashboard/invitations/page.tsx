@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/[lang]/dashboard/invitations/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -12,14 +11,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Send, Trash2, Plus, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  Send,
+  Trash2,
+  Plus,
+  AlertCircle,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -28,6 +30,7 @@ import { toast } from "sonner";
 // ============================================================
 
 type Role = "talent" | "supervisor" | "company_admin" | "superadmin";
+type InvitationStatus = "pending" | "expired" | "all";
 
 interface User {
   id: number;
@@ -89,6 +92,11 @@ export default function InvitationsPage() {
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
   const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
 
+  // Search/Filter state
+  const [searchEmail, setSearchEmail] = useState("");
+  const [filterRole, setFilterRole] = useState<Role | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<InvitationStatus>("all");
+
   // ============================================================
   // USER AUTHENTICATION & DATA LOADING
   // ============================================================
@@ -127,7 +135,7 @@ export default function InvitationsPage() {
           .from("company")
           .select("id, name")
           .order("name");
-        
+
         setCompanies(companiesData || []);
       }
 
@@ -147,6 +155,17 @@ export default function InvitationsPage() {
   const canManageInvitations = isSuperAdmin || isCompanyAdmin;
   const problematicDrafts = drafts.filter((d) => d.conflictType);
 
+  // Filtered sent invitations based on search/filters
+  const filteredSentInvitations = sentInvitations.filter((inv) => {
+    const matchesEmail =
+      searchEmail === "" ||
+      inv.email.toLowerCase().includes(searchEmail.toLowerCase());
+    const matchesRole = filterRole === "all" || inv.role === filterRole;
+    const matchesStatus = filterStatus === "all" || inv.status === filterStatus;
+
+    return matchesEmail && matchesRole && matchesStatus;
+  });
+
   // ============================================================
   // HELPER FUNCTIONS
   // ============================================================
@@ -158,7 +177,7 @@ export default function InvitationsPage() {
       const key = isSuperAdmin
         ? `${draft.email.toLowerCase()}-${draft.role}-${draft.companyId}`
         : `${draft.email.toLowerCase()}-${draft.role}`;
-      
+
       if (seen.has(key)) {
         return false;
       }
@@ -167,14 +186,26 @@ export default function InvitationsPage() {
     });
   };
 
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchEmail("");
+    setFilterRole("all");
+    setFilterStatus("all");
+  };
+
+  const hasActiveFilters =
+    searchEmail !== "" || filterRole !== "all" || filterStatus !== "all";
+
   // Fetch sent invitations for the company
   const fetchSentInvitations = async () => {
     if (!user) return;
-    
+
     setLoadingSentInvitations(true);
     const { data, error } = await supabase
       .from("invitation")
-      .select("id, email, role, status, expires_at, invited_by, deleted_at, deleted_by")
+      .select(
+        "id, email, role, status, expires_at, invited_by, deleted_at, deleted_by"
+      )
       .eq("company_id", user.companyId)
       .is("deleted_at", null)
       .in("status", ["pending", "expired"])
@@ -201,17 +232,21 @@ export default function InvitationsPage() {
 
     const { error } = await supabase
       .from("invitation")
-      .update({ 
+      .update({
         deleted_at: new Date().toISOString(),
-        deleted_by: user.id 
+        deleted_by: user.id,
       })
       .eq("id", invitationId);
 
     if (error) {
-      toast.error("Failed to revoke invitation", { description: error.message });
+      toast.error("Failed to revoke invitation", {
+        description: error.message,
+      });
     } else {
       toast.success("Invitation revoked");
-      setSentInvitations((prev) => prev.filter((inv) => inv.id !== invitationId));
+      setSentInvitations((prev) =>
+        prev.filter((inv) => inv.id !== invitationId)
+      );
     }
   };
 
@@ -312,17 +347,17 @@ export default function InvitationsPage() {
 
   const scanAll = async () => {
     setSending(true);
-    
+
     // First remove duplicates
     const uniqueDrafts = removeDuplicateDrafts(drafts);
     if (uniqueDrafts.length < drafts.length) {
       const removed = drafts.length - uniqueDrafts.length;
       toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
     }
-    
+
     const scanned = await Promise.all(uniqueDrafts.map(scanDraft));
     setDrafts(scanned);
-    
+
     const conflicts = scanned.filter((d) => d.conflictType);
     if (conflicts.length > 0) {
       toast.warning("Conflicts detected", {
@@ -353,8 +388,7 @@ export default function InvitationsPage() {
       if (scanned.conflictType) {
         setDrafts((d) => d.map((dr) => (dr.id === draft.id ? scanned : dr)));
         toast.warning("Conflict detected", {
-          description:
-            "Use the button in Problematic Invitations to override.",
+          description: "Use the button in Problematic Invitations to override.",
         });
         return;
       }
@@ -505,7 +539,7 @@ export default function InvitationsPage() {
 
       setDrafts([]);
       setSending(false);
-      
+
       const messages = [];
       if (sent > 0) {
         messages.push(`Sent ${sent} invitation${sent > 1 ? "s" : ""}`);
@@ -513,7 +547,7 @@ export default function InvitationsPage() {
       if (skipped > 0) {
         messages.push(`${skipped} already member${skipped > 1 ? "s" : ""}`);
       }
-      
+
       if (messages.length > 0) {
         toast.success("Invitations processed", {
           description: messages.join(". "),
@@ -609,77 +643,82 @@ export default function InvitationsPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 mt-14">
       {/* Problematic invitations - Only for company admins and superadmins */}
-      {!isRegularUser && problematicDrafts.length > 0 && activeView === "draft" && (
-        <Card className="mb-4 border-destructive bg-destructive/10">
-          <CardHeader>
-            <h3 className="font-semibold text-destructive">
-              Problematic Invitations ({problematicDrafts.length})
-            </h3>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {problematicDrafts.map((draft) => (
-              <div
-                key={draft.id}
-                className="bg-card border border-border rounded p-3"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-medium text-card-foreground">
-                      {draft.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {draft.warning}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {draft.conflictType === "member" ? (
-                      draft.existingRole !== "superadmin" ? (
+      {!isRegularUser &&
+        problematicDrafts.length > 0 &&
+        activeView === "draft" && (
+          <Card className="mb-4 border-destructive bg-destructive/10">
+            <CardHeader>
+              <h3 className="font-semibold text-destructive">
+                Problematic Invitations ({problematicDrafts.length})
+              </h3>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {problematicDrafts.map((draft) => (
+                <div
+                  key={draft.id}
+                  className="bg-card border border-border rounded p-3"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-card-foreground">
+                        {draft.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {draft.warning}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {draft.conflictType === "member" ? (
+                        draft.existingRole !== "superadmin" ? (
+                          <Button
+                            onClick={() => sendSingle(draft, true)}
+                            disabled={sending}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" /> Update Role
+                          </Button>
+                        ) : (
+                          <p className="text-sm text-destructive">
+                            Cannot update superadmin
+                          </p>
+                        )
+                      ) : (
                         <Button
                           onClick={() => sendSingle(draft, true)}
                           disabled={sending}
                           size="sm"
                           variant="outline"
                         >
-                          <RefreshCw className="w-3 h-3 mr-1" /> Update Role
+                          <Send className="w-3 h-3 mr-1" /> Send Anyway
                         </Button>
-                      ) : (
-                        <p className="text-sm text-destructive">
-                          Cannot update superadmin
-                        </p>
-                      )
-                    ) : (
+                      )}
                       <Button
-                        onClick={() => sendSingle(draft, true)}
+                        onClick={() =>
+                          setDrafts((d) => d.filter((dr) => dr.id !== draft.id))
+                        }
                         disabled={sending}
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                       >
-                        <Send className="w-3 h-3 mr-1" /> Send Anyway
+                        <Trash2 className="w-3 h-3" />
                       </Button>
-                    )}
-                    <Button
-                      onClick={() =>
-                        setDrafts((d) => d.filter((dr) => dr.id !== draft.id))
-                      }
-                      disabled={sending}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
       <Card>
         <CardHeader>
           {/* Shadcn Tabs - Only for company admins and superadmins */}
           {canManageInvitations ? (
-            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "draft" | "sent")}>
+            <Tabs
+              value={activeView}
+              onValueChange={(v) => setActiveView(v as "draft" | "sent")}
+            >
               <TabsList className="mb-4">
                 <TabsTrigger value="draft">Drafts</TabsTrigger>
                 <TabsTrigger value="sent">Sent</TabsTrigger>
@@ -697,7 +736,9 @@ export default function InvitationsPage() {
                             id: crypto.randomUUID(),
                             email: "",
                             role: "talent",
-                            companyId: isSuperAdmin ? companies[0]?.id : user.companyId,
+                            companyId: isSuperAdmin
+                              ? companies[0]?.id
+                              : user.companyId,
                           },
                         ])
                       }
@@ -728,7 +769,9 @@ export default function InvitationsPage() {
                       const count = drafts.length;
                       setDrafts([]);
                       if (count > 0) {
-                        toast.success(`Deleted ${count} draft${count > 1 ? "s" : ""}`);
+                        toast.success(
+                          `Deleted ${count} draft${count > 1 ? "s" : ""}`
+                        );
                       }
                     }}
                     disabled={drafts.length === 0}
@@ -742,9 +785,59 @@ export default function InvitationsPage() {
 
               {/* SENT TAB CONTENT */}
               <TabsContent value="sent" className="mt-0">
-                <div className="mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    View and manage sent invitations
+                {/* Search/Filter Section */}
+                <div className="mb-4 space-y-3">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by email..."
+                        value={searchEmail}
+                        onChange={(e) => setSearchEmail(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Select
+                      value={filterRole}
+                      onValueChange={(v) => setFilterRole(v as Role | "all")}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="All roles" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All roles</SelectItem>
+                        {allowedRoles.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r.replace("_", " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={filterStatus}
+                      onValueChange={(v) =>
+                        setFilterStatus(v as InvitationStatus)
+                      }
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {hasActiveFilters && (
+                      <Button onClick={clearFilters} variant="ghost" size="sm">
+                        <X className="w-4 h-4 mr-1" />
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filteredSentInvitations.length} of{" "}
+                    {sentInvitations.length} invitations
                   </p>
                 </div>
               </TabsContent>
@@ -782,7 +875,9 @@ export default function InvitationsPage() {
                   const count = drafts.length;
                   setDrafts([]);
                   if (count > 0) {
-                    toast.success(`Deleted ${count} draft${count > 1 ? "s" : ""}`);
+                    toast.success(
+                      `Deleted ${count} draft${count > 1 ? "s" : ""}`
+                    );
                   }
                 }}
                 disabled={drafts.length === 0}
@@ -813,7 +908,10 @@ export default function InvitationsPage() {
                           {/* Company Selector for Superadmin */}
                           {isSuperAdmin && (
                             <Select
-                              value={draft.companyId?.toString() || companies[0]?.id.toString()}
+                              value={
+                                draft.companyId?.toString() ||
+                                companies[0]?.id.toString()
+                              }
                               onValueChange={(v) =>
                                 updateDraft(draft.id, "companyId", parseInt(v))
                               }
@@ -823,7 +921,10 @@ export default function InvitationsPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 {companies.map((company) => (
-                                  <SelectItem key={company.id} value={company.id.toString()}>
+                                  <SelectItem
+                                    key={company.id}
+                                    value={company.id.toString()}
+                                  >
                                     {company.name}
                                   </SelectItem>
                                 ))}
@@ -890,17 +991,16 @@ export default function InvitationsPage() {
                 <p className="text-center text-muted-foreground py-8">
                   Loading invitations...
                 </p>
-              ) : sentInvitations.length === 0 ? (
+              ) : filteredSentInvitations.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  No pending or expired invitations
+                  {hasActiveFilters
+                    ? "No invitations match your filters"
+                    : "No pending or expired invitations"}
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {sentInvitations.map((invitation) => (
-                    <div
-                      key={invitation.id}
-                      className="border rounded p-3"
-                    >
+                  {filteredSentInvitations.map((invitation) => (
+                    <div key={invitation.id} className="border rounded p-3">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <p className="font-medium text-card-foreground">
