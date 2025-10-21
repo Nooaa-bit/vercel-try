@@ -1,0 +1,22 @@
+{
+  "subject": "🎉 You're invited to join {{companyName}}",
+  "headerTitle": "You're Invited!",
+  "headerSubtitle": "Join {{companyName}} on our platform",
+  "greeting": "Hello!",
+  "invitedBy": "{{inviterName}} has invited you to join {{companyName}} as {{role}}.",
+  "clickButton": "To accept this invitation and set up your account, click the button below:",
+  "buttonText": "Accept Invitation",
+  "securityTitle": "Security Information:",
+  "securityExpires": "This invitation expires on {{expirationDate}}",
+  "securityOneTime": "This link can only be used once",
+  "securityIgnore": "If you didn't expect this invitation, you can safely ignore this email",
+  "afterClicking": "After clicking the button above, you'll be able to:",
+  "feature1": "Create your secure account",
+  "feature2": "Access your personalized dashboard",
+  "feature3": "Manage your schedule and availability",
+  "feature4": "Connect with your team and start working",
+  "linkNotWorking": "If the button doesn't work, copy and paste this link into your browser:",
+  "footerTitle": "Important Information",
+  "footerSentTo": "This invitation was sent to {{email}}",
+  "footerQuestions": "Questions? Contact your administrator or reply to this email for assistance."
+}

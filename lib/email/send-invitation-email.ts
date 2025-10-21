@@ -1,8 +1,6 @@
-//vercel/lib/email/send-invitation-email.ts
 import nodemailer, { SentMessageInfo } from "nodemailer";
 import fs from "fs";
 import path from "path";
-
 
 const createTransporter = () => {
   return nodemailer.createTransport({
@@ -21,14 +19,12 @@ const createTransporter = () => {
   });
 };
 
-
 function replaceTemplateVars(
   text: string,
   vars: Record<string, string>
 ): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || "");
 }
-
 
 function loadTranslations(language: "en" | "el") {
   const translationsPath = path.join(
@@ -41,7 +37,6 @@ function loadTranslations(language: "en" | "el") {
   return JSON.parse(fileContent);
 }
 
-
 interface SendInvitationEmailParams {
   to: string;
   invitationToken: string;
@@ -52,6 +47,12 @@ interface SendInvitationEmailParams {
   language: "en" | "el";
 }
 
+interface NodemailerError extends Error {
+  code?: string;
+  command?: string;
+  response?: string;
+  responseCode?: number;
+}
 
 export async function sendInvitationEmail({
   to,
@@ -62,13 +63,13 @@ export async function sendInvitationEmail({
   inviterName,
   language,
 }: SendInvitationEmailParams) {
+  console.log("📧 Preparing invitation email for:", to);
+
   const translations = loadTranslations(language);
   const transporter = createTransporter();
 
-
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const invitationLink = `${baseUrl}/${language}/accept-invitation?token=${invitationToken}`;
-
 
   const expirationDate = new Date(expiresAt);
   const locale = language === "el" ? "el-GR" : "en-US";
@@ -80,7 +81,6 @@ export async function sendInvitationEmail({
     hour: "2-digit",
     minute: "2-digit",
   });
-
 
   const roleTranslations: Record<string, Record<string, string>> = {
     en: {
@@ -97,7 +97,6 @@ export async function sendInvitationEmail({
     },
   };
 
-
   const translatedRole = roleTranslations[language][role] || role;
   const vars = {
     companyName,
@@ -109,7 +108,6 @@ export async function sendInvitationEmail({
   const t = (key: string) =>
     replaceTemplateVars(translations[key] || key, vars);
 
-
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="${language}">
@@ -119,11 +117,12 @@ export async function sendInvitationEmail({
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8f9fa; }
         .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header { background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%); color: white; padding: 30px; text-align: center; }
         .content { padding: 30px; }
-        .button { display: inline-block; background: #007bff; color: white !important; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+        .button { display: inline-block; background: #b91c1c; color: white !important; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+        .button:hover { background: #991b1b; }
         .footer { background: #f8f9fa; padding: 20px 30px; border-top: 1px solid #e9ecef; font-size: 14px; color: #6c757d; }
-        .security-note { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 20px 0; font-size: 14px; }
+        .security-note { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 4px; padding: 15px; margin: 20px 0; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -142,7 +141,7 @@ export async function sendInvitationEmail({
   )}</a>
             </div>
             <div class="security-note">
-                <strong>${t("securityTitle")}</strong>
+                <strong style="color: #991b1b;">${t("securityTitle")}</strong>
                 <ul style="margin: 10px 0; padding-left: 20px;">
                     <li>${t("securityExpires")}</li>
                     <li>${t("securityOneTime")}</li>
@@ -170,7 +169,6 @@ export async function sendInvitationEmail({
 </body>
 </html>`;
 
-
   const textContent = `${t("headerTitle")}\n\n${t("greeting")}\n\n${t(
     "invitedBy"
   )}\n\n${invitationLink}\n\n${t("securityTitle")}\n- ${t(
@@ -181,8 +179,7 @@ export async function sendInvitationEmail({
     "feature4"
   )}`;
 
-
-  await transporter.sendMail({
+  const mailOptions = {
     from: {
       name: process.env.GMAIL_FROM_NAME || companyName,
       address: process.env.GMAIL_USER!,
@@ -191,5 +188,51 @@ export async function sendInvitationEmail({
     subject: t("subject"),
     text: textContent,
     html: htmlContent,
-  });
-} 
+    headers: {
+      "x-priority": "3",
+      "x-msmail-priority": "Normal",
+      importance: "Normal",
+      "message-id": `<${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}@${process.env.GMAIL_USER?.split("@")[1]}>`,
+      "list-unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=Unsubscribe>`,
+      "reply-to": process.env.GMAIL_USER || "",
+    },
+    envelope: {
+      from: process.env.GMAIL_USER!,
+      to,
+    },
+  };
+
+  try {
+    console.log("📤 Sending email...");
+    const info = (await transporter.sendMail(mailOptions)) as SentMessageInfo;
+    console.log("✅ Email sent successfully!");
+    console.log("📧 Message ID:", info.messageId);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+    };
+  } catch (error) {
+    console.error("❌ Email sending failed:", error);
+
+    if (error instanceof Error) {
+      const nodemailerError = error as NodemailerError;
+      console.error("Error details:", {
+        message: nodemailerError.message,
+        code: nodemailerError.code,
+        command: nodemailerError.command,
+        response: nodemailerError.response,
+      });
+    }
+
+    throw new Error(
+      `Failed to send email: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
