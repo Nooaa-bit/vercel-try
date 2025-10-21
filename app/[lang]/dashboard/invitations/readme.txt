@@ -1,45 +1,72 @@
-You can split in 3 files
+User Invitations Logic 
+Superuser - Invites to all companies and roles
+Company Adimn - Invites only to his company id. Admins, supervisors, talent
+These two get a 'report' for problematic invitations. i.e. invitations where the user already exists in the company id (so we essentially change their role). Problematic invitations are also the ones that refer to an email which is already invited.
+Supervisors and talent can only invite talent and only to their company. They are not notified. The system just gets their invitations and sends out the ones that are valid. "All invitations that are not tied to an email with an existing row at the usercompanyrole table will be sent out."
+Draft button. Sent button.
+Superadmins and company admins can see these buttons and switch to the sent invitations view (i.e. the list of all invitations where they can revoke them. 
+Draft page contains search section (email role status)
+for users and supervisors we can just accept all their invitations, and then at another step check the validity and only send out the ones possible.
+process to make test users
 
-Option A: Logic → UI Split (Recommended)
-File 1: hooks/useInvitationDrafts.ts
 
-All state (drafts, loading, sending)
 
-All functions (scanDraft, sendSingle, sendAll, updateDraft)
+File 1: types.ts - The Rulebook
+What it does: Defines all the "shapes" of your data and constants.
+File 2: useInvitations.ts - The Brain
+What it does: Contains ALL the business logic - the "how things work."
+Why separate: If you need to change how invitations are sent or how conflicts are detected, you edit this file. The UI components don't care about the details
+File 3: InvitationComponents.tsx - The Face
+What it does: Contains the three "dumb" UI components that just display stuff.
+Why separate: When your designer wants to change how draft rows look, you only touch this file. The business logic stays untouched. Or if you want to use DraftRow in another page, you can import just that component
+File 4: page.tsx - The Orchestra Conductor
+What it does: Orchestrates everything - connects the brain (hook) to the face (components).
+Why separate: This is the only file that knows about the page structure. If you want to reorganize the layout (move problematic invitations to a modal instead of a card), you edit here.
 
-Supabase calls inline
+Quick Decision Guide
+Need to add a new field to drafts? → Edit types.ts and InvitationComponents.tsx
+Need to change how invitations are sent? → Edit useInvitations.ts
+Need to redesign how a draft row looks? → Edit InvitationComponents.tsx
+Need to add a new tab or section? → Edit page.tsx
 
-Return: { drafts, user, loading, sending, allowedRoles, isCompanyAdmin, scanDraft, scanAll, sendSingle, sendAll, updateDraft, addDraft, deleteDraft, deleteAllDrafts }
 
-File 2: InvitationsPage.tsx
+vercel/
+├── app/
+│   ├── api/
+│   │   └── invitations/
+│   │       └── send-email/
+│   │           └── route.ts         
+│   └── [lang]/
+│       ├── accept-invitation/
+│       │   └── route.ts
+│       └── dashboard/
+│           └── invitations/
+│               ├── types.ts
+│               ├── useInvitations.ts
+│               ├── InvitationComponents.tsx
+│               └── page.tsx
+├── lib/
+│   └── email/
+│       └── send-invitation-email.ts
+└── translations/
+    ├── en/
+    │   ├── invitations.json
+    │   └── invitation-email.json
+    └── el/
+        ├── invitations.json
+        └── invitation-email.json
 
-Imports the hook
 
-Pure UI rendering
 
-No logic, just calls hook functions
 
-~80 lines
 
-File 3: types/invitation.ts
 
-Role type
 
-User interface
 
-Draft interface
 
-ROLE_HIERARCHY constant
 
-Why this works:
 
-Hook is testable in isolation
 
-Page is dead simple (just UI)
-
-Types are shared/reusable
-
-Clear responsibility per file
 
 
 "use client";
