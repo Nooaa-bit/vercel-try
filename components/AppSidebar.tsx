@@ -1,4 +1,3 @@
-//hype-hire/vercel/components/AppSidebar.tsx
 "use client";
 
 import {
@@ -45,41 +44,68 @@ interface AppSidebarProps {
   } | null;
 }
 
+type Role = "superadmin" | "company_admin" | "supervisor" | "worker";
+
+interface NavItem {
+  titleKey: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  requiredRole?: Role;
+}
+
 export function AppSidebar({ user }: AppSidebarProps) {
   const { t } = useTranslation("sidebar");
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = usePathname();
-  const { activeRole, availableRoles, setActiveRole } = useActiveRole();
+  const { activeRole, availableRoles, setActiveRole, hasPermission } =
+    useActiveRole();
   const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
 
   // Define navigation items with translation keys
-  const mainItems = [
+  const mainItems: NavItem[] = [
     { titleKey: "dashboard", url: "/dashboard", icon: LayoutDashboard },
     { titleKey: "calendar", url: "/dashboard/calendar", icon: CalendarIcon },
-    { titleKey: "locations", url: "/dashboard/locations", icon: MapPinIcon },
+    {
+      titleKey: "locations",
+      url: "/dashboard/locations",
+      icon: MapPinIcon,
+      requiredRole: "company_admin",
+    },
     { titleKey: "team", url: "/dashboard/team", icon: Users },
   ];
 
-  const documentItems = [
-    {titleKey: "invitations",url: "/dashboard/invitations",icon: UserRoundPlus,},
+  const documentItems: NavItem[] = [
+    {
+      titleKey: "invitations",
+      url: "/dashboard/invitations",
+      icon: UserRoundPlus,
+    },
     { titleKey: "analytics", url: "/dashboard/analytics", icon: BarChart3 },
-    {titleKey: "contracts",url: "/dashboard/contracts",icon: FileText,},
+    { titleKey: "contracts", url: "/dashboard/contracts", icon: FileText },
   ];
 
-  const bottomItems = [
+  const bottomItems: NavItem[] = [
     { titleKey: "settings", url: "/dashboard/settings", icon: Settings },
     { titleKey: "getHelp", url: "/dashboard/help", icon: HelpCircle },
     { titleKey: "search", url: "/dashboard/search", icon: Search },
   ];
 
+  // Filter navigation items based on user permissions
+  const filterByPermission = (items: NavItem[]) => {
+    return items.filter((item) => {
+      if (!item.requiredRole) return true;
+      return hasPermission(item.requiredRole);
+    });
+  };
+
+  const visibleMainItems = filterByPermission(mainItems);
+  const visibleDocumentItems = filterByPermission(documentItems);
+  const visibleBottomItems = filterByPermission(bottomItems);
+
   const isActive = (path: string) => {
     if (path === "/dashboard" && pathname === "/dashboard") return true;
-    if (
-      path !== "/dashboard" &&
-      pathname.startsWith(path)
-    )
-      return true;
+    if (path !== "/dashboard" && pathname.startsWith(path)) return true;
     return false;
   };
 
@@ -177,7 +203,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           {!collapsed && <SidebarGroupLabel>{t("main")}</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {visibleMainItems.map((item) => (
                 <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className={getNavClass(item.url)}>
@@ -198,7 +224,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {documentItems.map((item) => (
+              {visibleDocumentItems.map((item) => (
                 <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className={getNavClass(item.url)}>
@@ -217,7 +243,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {bottomItems.map((item) => (
+                {visibleBottomItems.map((item) => (
                   <SidebarMenuItem key={item.titleKey}>
                     <SidebarMenuButton asChild>
                       <Link href={item.url} className={getNavClass(item.url)}>
