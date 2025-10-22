@@ -323,9 +323,9 @@ export default function InvitationsPage() {
     }
 
     const targetCompanyId = isSuperAdmin
-      ? draft.companyId || selectedCompanyId || user.companyId
+      ? selectedCompanyId! // Use selected company
       : user.companyId;
-
+      
     // Check if user exists and is a member of the target company
     const { data: existingUser } = await supabase
       .from("user")
@@ -663,8 +663,13 @@ export default function InvitationsPage() {
     // Send clean invitations
     for (const draft of cleanDrafts) {
       const targetCompanyId = isSuperAdmin
-        ? draft.companyId || selectedCompanyId || user.companyId
+        ? selectedCompanyId! // Use selected company
         : user.companyId;
+
+      if (isSuperAdmin && !selectedCompanyId) {
+        toast.error("Please select a company first");
+        continue;
+      }
 
       const { data: invitation, error } = await supabase
         .from("invitation")
