@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/settings/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import { PrismaClient } from "@prisma/client";
 import { redirect } from "next/navigation";

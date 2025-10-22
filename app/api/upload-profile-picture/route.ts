@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/api/upload-profile-picture/route.ts 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PrismaClient } from "@prisma/client";
