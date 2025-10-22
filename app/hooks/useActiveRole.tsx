@@ -11,13 +11,13 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
 
-type Role = "superadmin" | "company_admin" | "supervisor" | "worker";
+type Role = "superadmin" | "company_admin" | "supervisor" | "talent";
 
 const ROLE_WEIGHT: Record<Role, number> = {
   superadmin: 4,
   company_admin: 3,
   supervisor: 2,
-  worker: 1,
+  talent: 1,
 };
 
 interface UserCompanyRole {
@@ -46,7 +46,7 @@ interface RoleQueryResult {
 
 const DEFAULT_ROLE: UserCompanyRole = {
   id: 0,
-  role: "worker",
+  role: "talent",
   companyId: 0,
   companyName: "Hype Hire",
 };

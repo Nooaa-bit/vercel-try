@@ -131,18 +131,11 @@ export default function LocationsPage() {
   const [userLocation] = useState({ lat: 37.9838, lng: 23.7275 });
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // FIXED: Same redirect logic as test page
   useEffect(() => {
     if (roleLoading) return;
 
-    // Redirect supervisor and talent
     if (activeRole.role === "supervisor" || activeRole.role === "talent") {
-      console.log(
-        "🚫 Redirecting: supervisor/talent not allowed on locations page"
-      );
       router.push("/dashboard");
-    } else {
-      console.log("✅ Access granted to locations page:", activeRole.role);
     }
   }, [roleLoading, activeRole.role, router]);
 
@@ -210,6 +203,7 @@ export default function LocationsPage() {
     setTimeout(checkAndCreate, 300);
   }, [dialogOpen, userLocation]);
 
+  // FIXED: Same logic as test page
   useEffect(() => {
     if (addressSearch.length < 3) {
       setShowDropdown(false);
@@ -286,7 +280,9 @@ export default function LocationsPage() {
     setSearchingAddress(false);
   };
 
+  // FIXED: Same as test page
   const handleAddressSelect = (address: AddressSuggestion) => {
+    console.log("✅ Selected:", address.formatted);
     setSelectedAddress(address);
     setAddressSearch(address.formatted);
     setShowDropdown(false);
@@ -332,10 +328,9 @@ export default function LocationsPage() {
     });
 
     if (error) {
-      console.error("❌ Supabase error:", error);
+      console.error("❌ Save error:", error);
       toast.error(`Failed: ${error.message}`);
     } else {
-      console.log("✅ Saved successfully");
       toast.success("Location created successfully");
       setDialogOpen(false);
       resetForm();
@@ -356,7 +351,6 @@ export default function LocationsPage() {
     setMarkerPosition(null);
   };
 
-  // Show loading while checking role
   if (roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -365,7 +359,6 @@ export default function LocationsPage() {
     );
   }
 
-  // Don't render if not allowed
   if (activeRole.role === "supervisor" || activeRole.role === "talent") {
     return null;
   }
@@ -435,6 +428,7 @@ export default function LocationsPage() {
                     </div>
                   </div>
 
+                  {/* FIXED: Same as test page */}
                   <div className="space-y-2">
                     <Label>Address *</Label>
                     <div className="relative">
@@ -462,8 +456,9 @@ export default function LocationsPage() {
                       )}
                     </div>
 
+                    {/* FIXED: Only show when showDropdown is true */}
                     {showDropdown && suggestions.length > 0 && (
-                      <div className="border rounded-md max-h-48 overflow-y-auto bg-background shadow-lg mt-1">
+                      <div className="border rounded-md max-h-48 overflow-y-auto bg-background shadow-lg">
                         {suggestions.map((suggestion, index) => (
                           <button
                             key={index}
@@ -490,22 +485,10 @@ export default function LocationsPage() {
                       </div>
                     )}
 
-                    {selectedAddress && (
-                      <div className="border rounded-md p-3 bg-muted/50 mt-2">
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-4 h-4 mt-0.5 text-pulse-500" />
-                          <div className="text-sm">
-                            <div className="font-medium">
-                              {selectedAddress.address_line1}
-                            </div>
-                            <div className="text-muted-foreground">
-                              {selectedAddress.city}
-                              {selectedAddress.state &&
-                                `, ${selectedAddress.state}`}{" "}
-                              {selectedAddress.postcode}
-                            </div>
-                          </div>
-                        </div>
+                    {/* Show selected address confirmation */}
+                    {selectedAddress && !showDropdown && (
+                      <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        ✓ {selectedAddress.formatted}
                       </div>
                     )}
                   </div>
