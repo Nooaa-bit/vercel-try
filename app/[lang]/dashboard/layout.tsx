@@ -58,8 +58,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   // Display name priority: profile.firstName > user_metadata > email
-  const displayName =
-    profile?.firstName || user.user_metadata?.first_name || user.email;
+  const displayName = profile?.firstName || 
+                     user.user_metadata?.first_name || 
+                     user.email;
 
   return (
     <div>
