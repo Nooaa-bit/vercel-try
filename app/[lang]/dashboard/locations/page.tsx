@@ -105,12 +105,11 @@ const LOCATION_TYPES = [
 
 export default function LocationsPage() {
   const router = useRouter();
-  const { activeRole, hasPermission, loading: roleLoading } = useActiveRole();
+  const { activeRole, loading: roleLoading } = useActiveRole();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [hasCheckedPermission, setHasCheckedPermission] = useState(false);
   const supabase = createClient();
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -132,35 +131,29 @@ export default function LocationsPage() {
   const [userLocation] = useState({ lat: 37.9838, lng: 23.7275 });
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // FIXED: Only check permission ONCE after loading completes
+  // FIXED: Same redirect logic as test page
   useEffect(() => {
-    if (roleLoading || hasCheckedPermission) return;
+    if (roleLoading) return;
 
-    console.log("Checking permission...", {
-      roleLoading,
-      hasPermission: hasPermission("company_admin"),
-      companyId: activeRole.companyId,
-    });
-
-    setHasCheckedPermission(true);
-
-    if (!hasPermission("company_admin")) {
-      console.log("Redirecting: no permission");
+    // Redirect supervisor and talent
+    if (activeRole.role === "supervisor" || activeRole.role === "talent") {
+      console.log(
+        "🚫 Redirecting: supervisor/talent not allowed on locations page"
+      );
       router.push("/dashboard");
+    } else {
+      console.log("✅ Access granted to locations page:", activeRole.role);
     }
-  }, [
-    roleLoading,
-    hasPermission,
-    router,
-    hasCheckedPermission,
-    activeRole.companyId,
-  ]);
+  }, [roleLoading, activeRole.role, router]);
 
   useEffect(() => {
-    if (hasPermission("company_admin") && activeRole.companyId > 0) {
+    if (roleLoading) return;
+    if (activeRole.role === "supervisor" || activeRole.role === "talent")
+      return;
+    if (activeRole.companyId > 0) {
       fetchLocations();
     }
-  }, [hasPermission, activeRole.companyId]);
+  }, [roleLoading, activeRole.role, activeRole.companyId]);
 
   useEffect(() => {
     if (!dialogOpen) {
@@ -335,7 +328,7 @@ export default function LocationsPage() {
       access_instructions: accessInstructions || null,
       is_active: true,
       created_at: now,
-      updated_at: now, // FIXED: Added this field
+      updated_at: now,
     });
 
     if (error) {
@@ -363,6 +356,7 @@ export default function LocationsPage() {
     setMarkerPosition(null);
   };
 
+  // Show loading while checking role
   if (roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -371,7 +365,8 @@ export default function LocationsPage() {
     );
   }
 
-  if (!hasPermission("company_admin")) {
+  // Don't render if not allowed
+  if (activeRole.role === "supervisor" || activeRole.role === "talent") {
     return null;
   }
 
