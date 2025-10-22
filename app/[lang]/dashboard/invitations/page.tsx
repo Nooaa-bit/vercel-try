@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,7 @@ export default function InvitationsPage() {
   // STATE & SETUP
   // ============================================================
 
+  const { t } = useTranslation("invitation");
   const supabase = createClient();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
@@ -218,7 +220,7 @@ export default function InvitationsPage() {
       .order("expires_at", { ascending: false });
 
     if (error) {
-      toast.error("Failed to load invitations", { description: error.message });
+      toast.error(t("toasts.loadFailed"), { description: error.message });
     } else {
       setSentInvitations(data || []);
     }
@@ -245,11 +247,11 @@ export default function InvitationsPage() {
       .eq("id", invitationId);
 
     if (error) {
-      toast.error("Failed to revoke invitation", {
+      toast.error(t("toasts.revokeFailed"), {
         description: error.message,
       });
     } else {
-      toast.success("Invitation revoked");
+      toast.success(t("toasts.invitationRevoked"));
       setSentInvitations((prev) =>
         prev.filter((inv) => inv.id !== invitationId)
       );
@@ -314,7 +316,9 @@ export default function InvitationsPage() {
       if (companyMember) {
         return {
           ...draft,
-          warning: `Already company member with role: ${companyMember.role}`,
+          warning: t("warnings.alreadyMember", {
+            role: t(`roles.${companyMember.role}`),
+          }),
           conflictType: "member",
           userId: existingUser.id,
           existingRole: companyMember.role as Role,
@@ -337,13 +341,16 @@ export default function InvitationsPage() {
       const inv = existingInvitations[0];
       const isPending = inv.status === "pending";
       const dateStr = new Date(inv.expires_at).toLocaleDateString();
-      const warning = `${isPending ? "Pending" : "Expired"} invitation (${
-        inv.role
-      }) ${isPending ? "expires" : "on"} ${dateStr}`;
+      const warningKey = isPending
+        ? "warnings.pendingInvitation"
+        : "warnings.expiredInvitation";
 
       return {
         ...draft,
-        warning,
+        warning: t(warningKey, {
+          role: t(`roles.${inv.role}`),
+          date: dateStr,
+        }),
         conflictType: isPending ? "pending" : "expired",
       };
     }
@@ -358,7 +365,11 @@ export default function InvitationsPage() {
     const uniqueDrafts = removeDuplicateDrafts(drafts);
     if (uniqueDrafts.length < drafts.length) {
       const removed = drafts.length - uniqueDrafts.length;
-      toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
+      const key =
+        removed === 1
+          ? "toasts.duplicatesRemoved"
+          : "toasts.duplicatesRemoved_plural";
+      toast.info(t(key, { count: removed }));
     }
 
     const scanned = await Promise.all(uniqueDrafts.map(scanDraft));
@@ -366,12 +377,14 @@ export default function InvitationsPage() {
 
     const conflicts = scanned.filter((d) => d.conflictType);
     if (conflicts.length > 0) {
-      toast.warning("Conflicts detected", {
-        description: `${conflicts.length} invitation(s) require attention in Problematic Invitations.`,
+      toast.warning(t("toasts.conflictsDetected"), {
+        description: t("toasts.conflictsDescription", {
+          count: conflicts.length,
+        }),
       });
     } else {
-      toast.success("All clear", {
-        description: "No conflicts detected. Ready to send.",
+      toast.success(t("toasts.allClear"), {
+        description: t("toasts.allClearDescription"),
       });
     }
     setSending(false);
@@ -393,8 +406,8 @@ export default function InvitationsPage() {
       const scanned = await scanDraft(draft);
       if (scanned.conflictType) {
         setDrafts((d) => d.map((dr) => (dr.id === draft.id ? scanned : dr)));
-        toast.warning("Conflict detected", {
-          description: "Use the button in Problematic Invitations to override.",
+        toast.warning(t("toasts.conflictDetected"), {
+          description: t("toasts.conflictDescription"),
         });
         return;
       }
@@ -418,10 +431,11 @@ export default function InvitationsPage() {
           .maybeSingle();
 
         if (companyMember) {
-          // Remove draft and provide feedback
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
-          toast.info("Already a member", {
-            description: `${draft.email} is already part of this company.`,
+          toast.info(t("toasts.alreadyMemberTitle"), {
+            description: t("toasts.alreadyMemberDescription", {
+              email: draft.email,
+            }),
           });
           return;
         }
@@ -445,10 +459,14 @@ export default function InvitationsPage() {
         .is("revoked_at", null);
 
       if (error) {
-        toast.error("Failed to update role", { description: error.message });
+        toast.error(t("toasts.roleUpdateFailed"), {
+          description: error.message,
+        });
       } else {
-        toast.success("Role updated", {
-          description: `Updated role for ${draft.email}`,
+        toast.success(t("toasts.roleUpdated"), {
+          description: t("toasts.roleUpdatedDescription", {
+            email: draft.email,
+          }),
         });
         setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
       }
@@ -471,7 +489,7 @@ export default function InvitationsPage() {
         .single();
 
       if (error) {
-        toast.error("Failed to send invitation", {
+        toast.error(t("toasts.invitationFailed"), {
           description: error.message,
         });
       } else if (invitation) {
@@ -490,15 +508,18 @@ export default function InvitationsPage() {
             throw new Error("Failed to send email");
           }
 
-          toast.success("Invitation sent", {
-            description: `Sent to ${draft.email}`,
+          toast.success(t("toasts.invitationSent"), {
+            description: t("toasts.invitationSentDescription", {
+              email: draft.email,
+            }),
           });
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
           console.error("Email sending error:", emailError);
-          toast.warning("Invitation created but email failed", {
-            description:
-              "The invitation was saved but the email couldn't be sent.",
+          toast.warning(t("toasts.invitationSent"), {
+            description: t("toasts.invitationSentDescription", {
+              email: draft.email,
+            }),
           });
         }
       }
@@ -514,7 +535,11 @@ export default function InvitationsPage() {
     const uniqueDrafts = removeDuplicateDrafts(drafts);
     if (uniqueDrafts.length < drafts.length) {
       const removed = drafts.length - uniqueDrafts.length;
-      toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
+      const key =
+        removed === 1
+          ? "toasts.duplicatesRemoved"
+          : "toasts.duplicatesRemoved_plural";
+      toast.info(t(key, { count: removed }));
       setDrafts(uniqueDrafts);
     }
 
@@ -582,7 +607,7 @@ export default function InvitationsPage() {
             sent++;
           } catch (emailError) {
             console.error("Email sending error:", emailError);
-            sent++; // Still count as sent even if email fails
+            sent++;
           }
         }
       }
@@ -592,18 +617,20 @@ export default function InvitationsPage() {
 
       const messages = [];
       if (sent > 0) {
-        messages.push(`Sent ${sent} invitation${sent > 1 ? "s" : ""}`);
+        const key = sent === 1 ? "toasts.sent" : "toasts.sent_plural";
+        messages.push(t(key, { count: sent }));
       }
       if (skipped > 0) {
-        messages.push(`${skipped} already member${skipped > 1 ? "s" : ""}`);
+        const key = skipped === 1 ? "toasts.skipped" : "toasts.skipped_plural";
+        messages.push(t(key, { count: skipped }));
       }
 
       if (messages.length > 0) {
-        toast.success("Invitations processed", {
+        toast.success(t("toasts.invitationsProcessed"), {
           description: messages.join(". "),
         });
       } else {
-        toast.info("No invitations to send");
+        toast.info(t("toasts.noInvitationsToSend"));
       }
       return;
     }
@@ -661,7 +688,7 @@ export default function InvitationsPage() {
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
           console.error("Email sending error:", emailError);
-          sent++; // Still count as sent
+          sent++;
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         }
       }
@@ -670,25 +697,28 @@ export default function InvitationsPage() {
     setSending(false);
 
     if (sent > 0 && problematicFound.length === 0) {
-      toast.success("All invitations sent", {
-        description: `Successfully sent ${sent} invitation${
-          sent > 1 ? "s" : ""
-        }`,
+      const key =
+        sent === 1
+          ? "toasts.allInvitationsSentDescription"
+          : "toasts.allInvitationsSentDescription_plural";
+      toast.success(t("toasts.allInvitationsSent"), {
+        description: t(key, { count: sent }),
       });
     } else if (sent > 0 && problematicFound.length > 0) {
-      toast.success("Partial success", {
-        description: `Sent ${sent} invitation${sent > 1 ? "s" : ""}. ${
-          problematicFound.length
-        } moved to Problematic Invitations.`,
+      toast.success(t("toasts.partialSuccess"), {
+        description: t("toasts.partialSuccessDescription", {
+          sent: sent,
+          problematic: problematicFound.length,
+        }),
       });
     } else if (problematicFound.length > 0 && sent === 0) {
-      toast.warning("Conflicts detected", {
-        description: `${problematicFound.length} invitation${
-          problematicFound.length > 1 ? "s" : ""
-        } moved to Problematic Invitations. Use the buttons there to override.`,
+      toast.warning(t("toasts.conflictsWarning"), {
+        description: t("toasts.conflictsWarningDescription", {
+          count: problematicFound.length,
+        }),
       });
     } else {
-      toast.info("No invitations to send");
+      toast.info(t("toasts.noInvitationsToSend"));
     }
   };
 
@@ -696,12 +726,12 @@ export default function InvitationsPage() {
   // LOADING & AUTH STATES
   // ============================================================
 
-  if (loading) return <p className="p-6">Loading…</p>;
+  if (loading) return <p className="p-6">{t("messages.loading")}</p>;
   if (!user)
     return (
       <Alert>
         <AlertCircle />
-        <AlertDescription>Not authenticated</AlertDescription>
+        <AlertDescription>{t("messages.notAuthenticated")}</AlertDescription>
       </Alert>
     );
 
@@ -711,14 +741,15 @@ export default function InvitationsPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 mt-14">
-      {/* Problematic invitations - Only for company admins and superadmins */}
+      {/* Problematic invitations */}
       {!isRegularUser &&
         problematicDrafts.length > 0 &&
         activeView === "draft" && (
           <Card className="mb-4 border-destructive bg-destructive/10">
             <CardHeader>
               <h3 className="font-semibold text-destructive">
-                Problematic Invitations ({problematicDrafts.length})
+                {t("sections.problematicInvitations")} (
+                {problematicDrafts.length})
               </h3>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -745,11 +776,12 @@ export default function InvitationsPage() {
                             size="sm"
                             variant="outline"
                           >
-                            <RefreshCw className="w-3 h-3 mr-1" /> Update Role
+                            <RefreshCw className="w-3 h-3 mr-1" />{" "}
+                            {t("buttons.updateRole")}
                           </Button>
                         ) : (
                           <p className="text-sm text-destructive">
-                            Cannot update superadmin
+                            {t("messages.cannotUpdateSuperadmin")}
                           </p>
                         )
                       ) : (
@@ -759,7 +791,8 @@ export default function InvitationsPage() {
                           size="sm"
                           variant="outline"
                         >
-                          <Send className="w-3 h-3 mr-1" /> Send Anyway
+                          <Send className="w-3 h-3 mr-1" />{" "}
+                          {t("buttons.sendAnyway")}
                         </Button>
                       )}
                       <Button
@@ -782,18 +815,16 @@ export default function InvitationsPage() {
 
       <Card>
         <CardHeader>
-          {/* Shadcn Tabs - Only for company admins and superadmins */}
           {canManageInvitations ? (
             <Tabs
               value={activeView}
               onValueChange={(v) => setActiveView(v as "draft" | "sent")}
             >
               <TabsList className="mb-4">
-                <TabsTrigger value="draft">Drafts</TabsTrigger>
-                <TabsTrigger value="sent">Sent</TabsTrigger>
+                <TabsTrigger value="draft">{t("tabs.drafts")}</TabsTrigger>
+                <TabsTrigger value="sent">{t("tabs.sent")}</TabsTrigger>
               </TabsList>
 
-              {/* DRAFT TAB CONTENT */}
               <TabsContent value="draft" className="mt-0">
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex gap-2">
@@ -813,7 +844,7 @@ export default function InvitationsPage() {
                       }
                       size="sm"
                     >
-                      <Plus className="w-4 h-4 mr-1" /> Add Draft
+                      <Plus className="w-4 h-4 mr-1" /> {t("buttons.addDraft")}
                     </Button>
                     {!isRegularUser && (
                       <Button
@@ -822,7 +853,7 @@ export default function InvitationsPage() {
                         variant="outline"
                         disabled={sending || drafts.length === 0}
                       >
-                        Scan All
+                        {t("buttons.scanAll")}
                       </Button>
                     )}
                     <Button
@@ -830,7 +861,7 @@ export default function InvitationsPage() {
                       disabled={sending || drafts.length === 0}
                       size="sm"
                     >
-                      <Send className="w-4 h-4 mr-1" /> Send All
+                      <Send className="w-4 h-4 mr-1" /> {t("buttons.sendAll")}
                     </Button>
                   </div>
                   <Button
@@ -838,29 +869,29 @@ export default function InvitationsPage() {
                       const count = drafts.length;
                       setDrafts([]);
                       if (count > 0) {
-                        toast.success(
-                          `Deleted ${count} draft${count > 1 ? "s" : ""}`
-                        );
+                        const key =
+                          count === 1
+                            ? "toasts.draftsDeleted"
+                            : "toasts.draftsDeleted_plural";
+                        toast.success(t(key, { count }));
                       }
                     }}
                     disabled={drafts.length === 0}
                     size="sm"
                     variant="destructive"
                   >
-                    <Trash2 className="w-3 h-3 mr-1" /> Delete All
+                    <Trash2 className="w-3 h-3 mr-1" /> {t("buttons.deleteAll")}
                   </Button>
                 </div>
               </TabsContent>
 
-              {/* SENT TAB CONTENT */}
               <TabsContent value="sent" className="mt-0">
-                {/* Search/Filter Section */}
                 <div className="mb-4 space-y-3">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder="Search by email..."
+                        placeholder={t("placeholders.searchEmail")}
                         value={searchEmail}
                         onChange={(e) => setSearchEmail(e.target.value)}
                         className="pl-9"
@@ -871,13 +902,15 @@ export default function InvitationsPage() {
                       onValueChange={(v) => setFilterRole(v as Role | "all")}
                     >
                       <SelectTrigger className="w-48">
-                        <SelectValue placeholder="All roles" />
+                        <SelectValue placeholder={t("placeholders.allRoles")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All roles</SelectItem>
+                        <SelectItem value="all">
+                          {t("placeholders.allRoles")}
+                        </SelectItem>
                         {allowedRoles.map((r) => (
                           <SelectItem key={r} value={r}>
-                            {r.replace("_", " ")}
+                            {t(`roles.${r}`)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -889,30 +922,36 @@ export default function InvitationsPage() {
                       }
                     >
                       <SelectTrigger className="w-40">
-                        <SelectValue placeholder="All statuses" />
+                        <SelectValue
+                          placeholder={t("placeholders.allStatuses")}
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All statuses</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
+                        <SelectItem value="all">{t("statuses.all")}</SelectItem>
+                        <SelectItem value="pending">
+                          {t("statuses.pending")}
+                        </SelectItem>
+                        <SelectItem value="expired">
+                          {t("statuses.expired")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     {hasActiveFilters && (
                       <Button onClick={clearFilters} variant="ghost" size="sm">
                         <X className="w-4 h-4 mr-1" />
-                        Clear
+                        {t("buttons.clear")}
                       </Button>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Showing {filteredSentInvitations.length} of{" "}
-                    {sentInvitations.length} invitations
+                    {t("labels.showing")} {filteredSentInvitations.length}{" "}
+                    {t("labels.of")} {sentInvitations.length}{" "}
+                    {t("messages.invitations")}
                   </p>
                 </div>
               </TabsContent>
             </Tabs>
           ) : (
-            // Regular users don't see tabs - just action buttons
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
                 <Button
@@ -929,14 +968,14 @@ export default function InvitationsPage() {
                   }
                   size="sm"
                 >
-                  <Plus className="w-4 h-4 mr-1" /> Add Draft
+                  <Plus className="w-4 h-4 mr-1" /> {t("buttons.addDraft")}
                 </Button>
                 <Button
                   onClick={sendAll}
                   disabled={sending || drafts.length === 0}
                   size="sm"
                 >
-                  <Send className="w-4 h-4 mr-1" /> Send All
+                  <Send className="w-4 h-4 mr-1" /> {t("buttons.sendAll")}
                 </Button>
               </div>
               <Button
@@ -944,28 +983,29 @@ export default function InvitationsPage() {
                   const count = drafts.length;
                   setDrafts([]);
                   if (count > 0) {
-                    toast.success(
-                      `Deleted ${count} draft${count > 1 ? "s" : ""}`
-                    );
+                    const key =
+                      count === 1
+                        ? "toasts.draftsDeleted"
+                        : "toasts.draftsDeleted_plural";
+                    toast.success(t(key, { count }));
                   }
                 }}
                 disabled={drafts.length === 0}
                 size="sm"
                 variant="destructive"
               >
-                <Trash2 className="w-3 h-3 mr-1" /> Delete All
+                <Trash2 className="w-3 h-3 mr-1" /> {t("buttons.deleteAll")}
               </Button>
             </div>
           )}
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* DRAFT VIEW */}
           {activeView === "draft" && (
             <>
               {drafts.filter((d) => !d.conflictType).length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  No drafts. Click Add Draft to start.
+                  {t("messages.noDrafts")}
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -974,7 +1014,6 @@ export default function InvitationsPage() {
                     .map((draft) => (
                       <div key={draft.id} className="border rounded p-3">
                         <div className="flex gap-2">
-                          {/* Company Selector for Superadmin */}
                           {isSuperAdmin && (
                             <Select
                               value={
@@ -986,7 +1025,9 @@ export default function InvitationsPage() {
                               }
                             >
                               <SelectTrigger className="w-48">
-                                <SelectValue placeholder="Select company" />
+                                <SelectValue
+                                  placeholder={t("placeholders.selectCompany")}
+                                />
                               </SelectTrigger>
                               <SelectContent>
                                 {companies.map((company) => (
@@ -1002,7 +1043,7 @@ export default function InvitationsPage() {
                           )}
 
                           <Input
-                            placeholder="Email"
+                            placeholder={t("placeholders.email")}
                             value={draft.email}
                             onChange={(e) =>
                               updateDraft(draft.id, "email", e.target.value)
@@ -1021,7 +1062,7 @@ export default function InvitationsPage() {
                             <SelectContent>
                               {allowedRoles.map((r) => (
                                 <SelectItem key={r} value={r}>
-                                  {r.replace("_", " ")}
+                                  {t(`roles.${r}`)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1053,18 +1094,17 @@ export default function InvitationsPage() {
             </>
           )}
 
-          {/* SENT VIEW - Only for company admins and superadmins */}
           {activeView === "sent" && canManageInvitations && (
             <>
               {loadingSentInvitations ? (
                 <p className="text-center text-muted-foreground py-8">
-                  Loading invitations...
+                  {t("messages.loadingInvitations")}
                 </p>
               ) : filteredSentInvitations.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   {hasActiveFilters
-                    ? "No invitations match your filters"
-                    : "No pending or expired invitations"}
+                    ? t("messages.noMatchingFilters")
+                    : t("messages.noInvitations")}
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -1076,11 +1116,12 @@ export default function InvitationsPage() {
                             {invitation.email}
                           </p>
                           <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                            <span className="capitalize">
-                              Role: {invitation.role.replace("_", " ")}
+                            <span>
+                              {t("labels.role")}:{" "}
+                              {t(`roles.${invitation.role}`)}
                             </span>
-                            <span className="capitalize">
-                              Status:{" "}
+                            <span>
+                              {t("labels.status")}:{" "}
                               <span
                                 className={
                                   invitation.status === "pending"
@@ -1088,11 +1129,11 @@ export default function InvitationsPage() {
                                     : "text-orange-600"
                                 }
                               >
-                                {invitation.status}
+                                {t(`statuses.${invitation.status}`)}
                               </span>
                             </span>
                             <span>
-                              Expires:{" "}
+                              {t("labels.expires")}:{" "}
                               {new Date(
                                 invitation.expires_at
                               ).toLocaleDateString()}
@@ -1105,7 +1146,7 @@ export default function InvitationsPage() {
                           variant="destructive"
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
-                          Revoke
+                          {t("buttons.revoke")}
                         </Button>
                       </div>
                     </div>
