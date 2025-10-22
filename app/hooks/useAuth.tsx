@@ -6,8 +6,20 @@ import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
+interface UserProfile {
+  id: number;
+  authUserId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  profilePicture?: string;
+  hasPassword: boolean;
+  createdAt: Date;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const router = useRouter();
@@ -17,7 +29,7 @@ export function useAuth() {
   // Extract language from pathname
   const lang = pathname.split("/")[1] === "el" ? "el" : "en";
 
-  // Main auth state handler
+  // Main auth state handler (UNCHANGED - your working version)
   useEffect(() => {
     const handleAuthState = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -65,6 +77,7 @@ export function useAuth() {
       } else if (event === "SIGNED_OUT") {
         console.log("🚪 User signed out detected");
         setUser(null);
+        setProfile(null); // Clear profile on sign out
 
         // Immediate redirect on sign out
         const protectedPaths = ["/dashboard", "/profile", "/dashboard2"];
@@ -83,6 +96,49 @@ export function useAuth() {
     handleAuthState();
     return () => subscription.unsubscribe();
   }, [router, pathname, supabase.auth, lang]);
+
+  // SEPARATE useEffect for profile fetching - only runs when user changes
+  useEffect(() => {
+    if (!user?.id) {
+      setProfile(null);
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user")
+          .select(
+            "id, auth_user_id, email, first_name, last_name, profile_picture, has_password, created_at"
+          )
+          .eq("auth_user_id", user.id)
+          .is("deleted_at", null)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching profile:", error);
+          return;
+        }
+
+        if (data) {
+          setProfile({
+            id: data.id,
+            authUserId: data.auth_user_id,
+            email: data.email,
+            firstName: data.first_name,
+            lastName: data.last_name,
+            profilePicture: data.profile_picture,
+            hasPassword: data.has_password,
+            createdAt: new Date(data.created_at),
+          });
+        }
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+      }
+    };
+
+    fetchProfile();
+  }, [user?.id]); // Only re-run when user ID changes
 
   // Sign out function
   const signOut = async () => {
@@ -103,6 +159,7 @@ export function useAuth() {
     } catch (error) {
       console.error("Sign out error:", error);
       setUser(null);
+      setProfile(null);
       router.replace(`/${lang}`);
     }
   };
@@ -114,6 +171,7 @@ export function useAuth() {
 
   return {
     user,
+    profile,
     loading,
     signIn,
     signOut,
