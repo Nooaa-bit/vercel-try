@@ -7,6 +7,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 /* 2. Design-token variables (light mode) */
 @layer base {
   :root {
