@@ -110,6 +110,7 @@ export default function LocationsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const supabase = createClient();
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -130,6 +131,7 @@ export default function LocationsPage() {
   } | null>(null);
   const [userLocation] = useState({ lat: 37.9838, lng: 23.7275 });
   const [showDropdown, setShowDropdown] = useState(false);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
 
   useEffect(() => {
     if (roleLoading) return;
@@ -174,11 +176,18 @@ export default function LocationsPage() {
         return;
       }
 
+      const initialLat = editingLocation
+        ? parseFloat(editingLocation.latitude)
+        : userLocation.lat;
+      const initialLng = editingLocation
+        ? parseFloat(editingLocation.longitude)
+        : userLocation.lng;
+
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: "mapbox://styles/mapbox/streets-v12",
-        center: [userLocation.lng, userLocation.lat],
-        zoom: 13,
+        center: [initialLng, initialLat],
+        zoom: editingLocation ? 16 : 13,
       });
 
       map.on("load", () => console.log("✅ Map loaded"));
@@ -187,23 +196,26 @@ export default function LocationsPage() {
         draggable: true,
         color: "#ef4444",
       })
-        .setLngLat([userLocation.lng, userLocation.lat])
+        .setLngLat([initialLng, initialLat])
         .addTo(map);
 
-      marker.on("dragend", () => {
+      // NEW: Reverse geocode when marker is dragged
+      marker.on("dragend", async () => {
         const lngLat = marker.getLngLat();
         setMarkerPosition({ lat: lngLat.lat, lng: lngLat.lng });
+
+        // Get address from coordinates
+        await reverseGeocode(lngLat.lat, lngLat.lng);
       });
 
       mapRef.current = map;
       markerRef.current = marker;
-      setMarkerPosition({ lat: userLocation.lat, lng: userLocation.lng });
+      setMarkerPosition({ lat: initialLat, lng: initialLng });
     };
 
     setTimeout(checkAndCreate, 300);
-  }, [dialogOpen, userLocation]);
+  }, [dialogOpen, userLocation, editingLocation]);
 
-  // FIXED: Same logic as test page
   useEffect(() => {
     if (addressSearch.length < 3) {
       setShowDropdown(false);
@@ -280,9 +292,45 @@ export default function LocationsPage() {
     setSearchingAddress(false);
   };
 
-  // FIXED: Same as test page
+  // NEW: Reverse geocoding function
+  const reverseGeocode = async (lat: number, lng: number) => {
+    setReverseGeocoding(true);
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
+      if (!apiKey) return;
+
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&apiKey=${apiKey}`
+      );
+
+      const data: GeoapifyResponse = await response.json();
+
+      if (data.features?.length > 0) {
+        const address = data.features[0].properties;
+        const newAddress: AddressSuggestion = {
+          formatted: address.formatted,
+          address_line1: address.address_line1 || "",
+          address_line2: address.address_line2 || "",
+          city: address.city || "",
+          state: address.state || "",
+          postcode: address.postcode || "",
+          country: address.country || "",
+          lat: address.lat,
+          lon: address.lon,
+        };
+
+        setSelectedAddress(newAddress);
+        setAddressSearch(newAddress.formatted);
+        console.log("📍 Address updated from pin drag:", newAddress.formatted);
+        toast.success("Address updated from map");
+      }
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+    }
+    setReverseGeocoding(false);
+  };
+
   const handleAddressSelect = (address: AddressSuggestion) => {
-    console.log("✅ Selected:", address.formatted);
     setSelectedAddress(address);
     setAddressSearch(address.formatted);
     setShowDropdown(false);
@@ -299,6 +347,49 @@ export default function LocationsPage() {
     setMarkerPosition({ lat: address.lat, lng: address.lon });
   };
 
+  const handleEdit = (location: Location) => {
+    setEditingLocation(location);
+    setLocationName(location.name);
+    setLocationType(location.type);
+    setAddressSearch(`${location.address}, ${location.city}`);
+    setAccessInstructions(location.access_instructions || "");
+
+    setSelectedAddress({
+      formatted: `${location.address}, ${location.city}`,
+      address_line1: location.address,
+      address_line2: location.address_line_2 || "",
+      city: location.city,
+      state: location.state || "",
+      postcode: location.postcode || "",
+      country: location.country,
+      lat: parseFloat(location.latitude),
+      lon: parseFloat(location.longitude),
+    });
+
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (locationId: number, locationName: string) => {
+    toast.promise(
+      async () => {
+        const now = new Date().toISOString();
+        const { error } = await supabase
+          .from("location")
+          .update({ deleted_at: now })
+          .eq("id", locationId);
+
+        if (error) throw error;
+
+        await fetchLocations();
+      },
+      {
+        loading: `Deleting ${locationName}...`,
+        success: `${locationName} deleted successfully`,
+        error: "Failed to delete location",
+      }
+    );
+  };
+
   const handleSaveLocation = async () => {
     if (!locationName || !selectedAddress || !markerPosition) {
       toast.error("Please provide a name and select an address");
@@ -309,32 +400,60 @@ export default function LocationsPage() {
 
     const now = new Date().toISOString();
 
-    const { data, error } = await supabase.from("location").insert({
-      company_id: activeRole.companyId,
-      name: locationName,
-      type: locationType,
-      address: selectedAddress.address_line1,
-      address_line_2: selectedAddress.address_line2 || null,
-      city: selectedAddress.city,
-      state: selectedAddress.state || null,
-      postcode: selectedAddress.postcode || null,
-      country: selectedAddress.country,
-      latitude: markerPosition.lat.toString(),
-      longitude: markerPosition.lng.toString(),
-      access_instructions: accessInstructions || null,
-      is_active: true,
-      created_at: now,
-      updated_at: now,
-    });
+    if (editingLocation) {
+      const { error } = await supabase
+        .from("location")
+        .update({
+          name: locationName,
+          type: locationType,
+          address: selectedAddress.address_line1,
+          address_line_2: selectedAddress.address_line2 || null,
+          city: selectedAddress.city,
+          state: selectedAddress.state || null,
+          postcode: selectedAddress.postcode || null,
+          country: selectedAddress.country,
+          latitude: markerPosition.lat.toString(),
+          longitude: markerPosition.lng.toString(),
+          access_instructions: accessInstructions || null,
+          updated_at: now,
+        })
+        .eq("id", editingLocation.id);
 
-    if (error) {
-      console.error("❌ Save error:", error);
-      toast.error(`Failed: ${error.message}`);
+      if (error) {
+        toast.error(`Failed: ${error.message}`);
+      } else {
+        toast.success("Location updated successfully");
+        setDialogOpen(false);
+        resetForm();
+        fetchLocations();
+      }
     } else {
-      toast.success("Location created successfully");
-      setDialogOpen(false);
-      resetForm();
-      fetchLocations();
+      const { error } = await supabase.from("location").insert({
+        company_id: activeRole.companyId,
+        name: locationName,
+        type: locationType,
+        address: selectedAddress.address_line1,
+        address_line_2: selectedAddress.address_line2 || null,
+        city: selectedAddress.city,
+        state: selectedAddress.state || null,
+        postcode: selectedAddress.postcode || null,
+        country: selectedAddress.country,
+        latitude: markerPosition.lat.toString(),
+        longitude: markerPosition.lng.toString(),
+        access_instructions: accessInstructions || null,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      });
+
+      if (error) {
+        toast.error(`Failed: ${error.message}`);
+      } else {
+        toast.success("Location created successfully");
+        setDialogOpen(false);
+        resetForm();
+        fetchLocations();
+      }
     }
 
     setSaving(false);
@@ -349,6 +468,7 @@ export default function LocationsPage() {
     setShowDropdown(false);
     setAccessInstructions("");
     setMarkerPosition(null);
+    setEditingLocation(null);
   };
 
   if (roleLoading) {
@@ -382,7 +502,13 @@ export default function LocationsPage() {
               </CardDescription>
             </div>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) resetForm();
+              }}
+            >
               <DialogTrigger asChild>
                 <Button className="bg-pulse-500 hover:bg-pulse-600">
                   <Plus className="w-4 h-4 mr-2" />
@@ -391,9 +517,13 @@ export default function LocationsPage() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Create New Venue</DialogTitle>
+                  <DialogTitle>
+                    {editingLocation ? "Edit Venue" : "Create New Venue"}
+                  </DialogTitle>
                   <DialogDescription>
-                    Add a new location for your company
+                    {editingLocation
+                      ? "Update the location details"
+                      : "Add a new location for your company"}
                   </DialogDescription>
                 </DialogHeader>
 
@@ -428,7 +558,6 @@ export default function LocationsPage() {
                     </div>
                   </div>
 
-                  {/* FIXED: Same as test page */}
                   <div className="space-y-2">
                     <Label>Address *</Label>
                     <div className="relative">
@@ -451,12 +580,11 @@ export default function LocationsPage() {
                         className="pl-10"
                         autoComplete="off"
                       />
-                      {searchingAddress && (
+                      {(searchingAddress || reverseGeocoding) && (
                         <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-3 text-muted-foreground" />
                       )}
                     </div>
 
-                    {/* FIXED: Only show when showDropdown is true */}
                     {showDropdown && suggestions.length > 0 && (
                       <div className="border rounded-md max-h-48 overflow-y-auto bg-background shadow-lg">
                         {suggestions.map((suggestion, index) => (
@@ -485,7 +613,6 @@ export default function LocationsPage() {
                       </div>
                     )}
 
-                    {/* Show selected address confirmation */}
                     {selectedAddress && !showDropdown && (
                       <div className="text-xs text-green-600 dark:text-green-400 mt-1">
                         ✓ {selectedAddress.formatted}
@@ -500,7 +627,9 @@ export default function LocationsPage() {
                       className="w-full h-[300px] rounded-lg border"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Drag the red marker to fine-tune the location
+                      {reverseGeocoding
+                        ? "🔄 Getting address from map..."
+                        : "📍 Drag the red marker to update the address"}
                     </p>
                   </div>
 
@@ -533,12 +662,21 @@ export default function LocationsPage() {
                     {saving ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
+                        {editingLocation ? "Updating..." : "Saving..."}
                       </>
                     ) : (
                       <>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Location
+                        {editingLocation ? (
+                          <>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Update Location
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Location
+                          </>
+                        )}
                       </>
                     )}
                   </Button>
@@ -595,14 +733,20 @@ export default function LocationsPage() {
                       </p>
                     </div>
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" size="sm" className="flex-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleEdit(location)}
+                      >
                         <Pencil className="w-3 h-3 mr-1" />
                         Edit
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-destructive"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(location.id, location.name)}
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>

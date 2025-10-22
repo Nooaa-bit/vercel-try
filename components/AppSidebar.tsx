@@ -44,7 +44,7 @@ interface AppSidebarProps {
   } | null;
 }
 
-type Role = "superadmin" | "company_admin" | "supervisor" | "worker";
+type Role = "superadmin" | "company_admin" | "supervisor" | "talent";
 
 interface NavItem {
   titleKey: string;
