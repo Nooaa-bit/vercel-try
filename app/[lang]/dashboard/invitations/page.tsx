@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -23,9 +35,12 @@ import {
   RefreshCw,
   Search,
   X,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // ============================================================
 // TYPE DEFINITIONS & CONSTANTS
@@ -84,7 +99,6 @@ export default function InvitationsPage() {
   // STATE & SETUP
   // ============================================================
 
-  const { t } = useTranslation("invitation");
   const supabase = createClient();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
@@ -95,6 +109,12 @@ export default function InvitationsPage() {
   const [activeView, setActiveView] = useState<"draft" | "sent">("draft");
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
   const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
+
+  // Superadmin company selector
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
+    null
+  );
+  const [companySearchOpen, setCompanySearchOpen] = useState(false);
 
   // Extract language from URL path
   const currentLanguage = pathname.split("/")[1] as "en" | "el";
@@ -145,6 +165,10 @@ export default function InvitationsPage() {
           .order("name");
 
         setCompanies(companiesData || []);
+        // Set first company as default
+        if (companiesData && companiesData.length > 0) {
+          setSelectedCompanyId(companiesData[0].id);
+        }
       }
 
       setLoading(false);
@@ -162,6 +186,8 @@ export default function InvitationsPage() {
   const isRegularUser = user?.role === "talent" || user?.role === "supervisor";
   const canManageInvitations = isSuperAdmin || isCompanyAdmin;
   const problematicDrafts = drafts.filter((d) => d.conflictType);
+
+  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
 
   // Filtered sent invitations based on search/filters
   const filteredSentInvitations = sentInvitations.filter((inv) => {
@@ -208,31 +234,34 @@ export default function InvitationsPage() {
   const fetchSentInvitations = async () => {
     if (!user) return;
 
+    const targetCompanyId = isSuperAdmin ? selectedCompanyId : user.companyId;
+    if (!targetCompanyId) return;
+
     setLoadingSentInvitations(true);
     const { data, error } = await supabase
       .from("invitation")
       .select(
         "id, email, role, status, expires_at, invited_by, deleted_at, deleted_by"
       )
-      .eq("company_id", user.companyId)
+      .eq("company_id", targetCompanyId)
       .is("deleted_at", null)
       .in("status", ["pending", "expired"])
       .order("expires_at", { ascending: false });
 
     if (error) {
-      toast.error(t("toasts.loadFailed"), { description: error.message });
+      toast.error("Failed to load invitations", { description: error.message });
     } else {
       setSentInvitations(data || []);
     }
     setLoadingSentInvitations(false);
   };
 
-  // Load sent invitations when switching to sent view
+  // Load sent invitations when switching to sent view or changing company
   useEffect(() => {
     if (activeView === "sent" && canManageInvitations) {
       fetchSentInvitations();
     }
-  }, [activeView, user]);
+  }, [activeView, user, selectedCompanyId]);
 
   // Delete/revoke a sent invitation
   const revokeSentInvitation = async (invitationId: number) => {
@@ -247,11 +276,11 @@ export default function InvitationsPage() {
       .eq("id", invitationId);
 
     if (error) {
-      toast.error(t("toasts.revokeFailed"), {
+      toast.error("Failed to revoke invitation", {
         description: error.message,
       });
     } else {
-      toast.success(t("toasts.invitationRevoked"));
+      toast.success("Invitation revoked");
       setSentInvitations((prev) =>
         prev.filter((inv) => inv.id !== invitationId)
       );
@@ -294,7 +323,7 @@ export default function InvitationsPage() {
     }
 
     const targetCompanyId = isSuperAdmin
-      ? draft.companyId || user.companyId
+      ? draft.companyId || selectedCompanyId || user.companyId
       : user.companyId;
 
     // Check if user exists and is a member of the target company
@@ -316,9 +345,7 @@ export default function InvitationsPage() {
       if (companyMember) {
         return {
           ...draft,
-          warning: t("warnings.alreadyMember", {
-            role: t(`roles.${companyMember.role}`),
-          }),
+          warning: `Already company member with role: ${companyMember.role}`,
           conflictType: "member",
           userId: existingUser.id,
           existingRole: companyMember.role as Role,
@@ -341,16 +368,13 @@ export default function InvitationsPage() {
       const inv = existingInvitations[0];
       const isPending = inv.status === "pending";
       const dateStr = new Date(inv.expires_at).toLocaleDateString();
-      const warningKey = isPending
-        ? "warnings.pendingInvitation"
-        : "warnings.expiredInvitation";
+      const warning = `${isPending ? "Pending" : "Expired"} invitation (${
+        inv.role
+      }) ${isPending ? "expires" : "on"} ${dateStr}`;
 
       return {
         ...draft,
-        warning: t(warningKey, {
-          role: t(`roles.${inv.role}`),
-          date: dateStr,
-        }),
+        warning,
         conflictType: isPending ? "pending" : "expired",
       };
     }
@@ -365,11 +389,7 @@ export default function InvitationsPage() {
     const uniqueDrafts = removeDuplicateDrafts(drafts);
     if (uniqueDrafts.length < drafts.length) {
       const removed = drafts.length - uniqueDrafts.length;
-      const key =
-        removed === 1
-          ? "toasts.duplicatesRemoved"
-          : "toasts.duplicatesRemoved_plural";
-      toast.info(t(key, { count: removed }));
+      toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
     }
 
     const scanned = await Promise.all(uniqueDrafts.map(scanDraft));
@@ -377,14 +397,12 @@ export default function InvitationsPage() {
 
     const conflicts = scanned.filter((d) => d.conflictType);
     if (conflicts.length > 0) {
-      toast.warning(t("toasts.conflictsDetected"), {
-        description: t("toasts.conflictsDescription", {
-          count: conflicts.length,
-        }),
+      toast.warning("Conflicts detected", {
+        description: `${conflicts.length} invitation(s) require attention in Problematic Invitations.`,
       });
     } else {
-      toast.success(t("toasts.allClear"), {
-        description: t("toasts.allClearDescription"),
+      toast.success("All clear", {
+        description: "No conflicts detected. Ready to send.",
       });
     }
     setSending(false);
@@ -398,16 +416,20 @@ export default function InvitationsPage() {
     if (!user || !draft.email.includes("@")) return;
 
     const targetCompanyId = isSuperAdmin
-      ? draft.companyId || user.companyId
+      ? selectedCompanyId!
       : user.companyId;
-
+      
+  if (isSuperAdmin && !selectedCompanyId) {
+    toast.error("Please select a company first");
+    return;
+  }
     // For company admins: scan for conflicts if not forcing
     if (!isRegularUser && !force) {
       const scanned = await scanDraft(draft);
       if (scanned.conflictType) {
         setDrafts((d) => d.map((dr) => (dr.id === draft.id ? scanned : dr)));
-        toast.warning(t("toasts.conflictDetected"), {
-          description: t("toasts.conflictDescription"),
+        toast.warning("Conflict detected", {
+          description: "Use the button in Problematic Invitations to override.",
         });
         return;
       }
@@ -431,11 +453,10 @@ export default function InvitationsPage() {
           .maybeSingle();
 
         if (companyMember) {
+          // Remove draft and provide feedback
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
-          toast.info(t("toasts.alreadyMemberTitle"), {
-            description: t("toasts.alreadyMemberDescription", {
-              email: draft.email,
-            }),
+          toast.info("Already a member", {
+            description: `${draft.email} is already part of this company.`,
           });
           return;
         }
@@ -459,14 +480,10 @@ export default function InvitationsPage() {
         .is("revoked_at", null);
 
       if (error) {
-        toast.error(t("toasts.roleUpdateFailed"), {
-          description: error.message,
-        });
+        toast.error("Failed to update role", { description: error.message });
       } else {
-        toast.success(t("toasts.roleUpdated"), {
-          description: t("toasts.roleUpdatedDescription", {
-            email: draft.email,
-          }),
+        toast.success("Role updated", {
+          description: `Updated role for ${draft.email}`,
         });
         setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
       }
@@ -489,7 +506,7 @@ export default function InvitationsPage() {
         .single();
 
       if (error) {
-        toast.error(t("toasts.invitationFailed"), {
+        toast.error("Failed to send invitation", {
           description: error.message,
         });
       } else if (invitation) {
@@ -508,18 +525,15 @@ export default function InvitationsPage() {
             throw new Error("Failed to send email");
           }
 
-          toast.success(t("toasts.invitationSent"), {
-            description: t("toasts.invitationSentDescription", {
-              email: draft.email,
-            }),
+          toast.success("Invitation sent", {
+            description: `Sent to ${draft.email}`,
           });
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
           console.error("Email sending error:", emailError);
-          toast.warning(t("toasts.invitationSent"), {
-            description: t("toasts.invitationSentDescription", {
-              email: draft.email,
-            }),
+          toast.warning("Invitation created but email failed", {
+            description:
+              "The invitation was saved but the email couldn't be sent.",
           });
         }
       }
@@ -535,11 +549,7 @@ export default function InvitationsPage() {
     const uniqueDrafts = removeDuplicateDrafts(drafts);
     if (uniqueDrafts.length < drafts.length) {
       const removed = drafts.length - uniqueDrafts.length;
-      const key =
-        removed === 1
-          ? "toasts.duplicatesRemoved"
-          : "toasts.duplicatesRemoved_plural";
-      toast.info(t(key, { count: removed }));
+      toast.info(`Removed ${removed} duplicate draft${removed > 1 ? "s" : ""}`);
       setDrafts(uniqueDrafts);
     }
 
@@ -607,7 +617,7 @@ export default function InvitationsPage() {
             sent++;
           } catch (emailError) {
             console.error("Email sending error:", emailError);
-            sent++;
+            sent++; // Still count as sent even if email fails
           }
         }
       }
@@ -617,20 +627,18 @@ export default function InvitationsPage() {
 
       const messages = [];
       if (sent > 0) {
-        const key = sent === 1 ? "toasts.sent" : "toasts.sent_plural";
-        messages.push(t(key, { count: sent }));
+        messages.push(`Sent ${sent} invitation${sent > 1 ? "s" : ""}`);
       }
       if (skipped > 0) {
-        const key = skipped === 1 ? "toasts.skipped" : "toasts.skipped_plural";
-        messages.push(t(key, { count: skipped }));
+        messages.push(`${skipped} already member${skipped > 1 ? "s" : ""}`);
       }
 
       if (messages.length > 0) {
-        toast.success(t("toasts.invitationsProcessed"), {
+        toast.success("Invitations processed", {
           description: messages.join(". "),
         });
       } else {
-        toast.info(t("toasts.noInvitationsToSend"));
+        toast.info("No invitations to send");
       }
       return;
     }
@@ -655,7 +663,7 @@ export default function InvitationsPage() {
     // Send clean invitations
     for (const draft of cleanDrafts) {
       const targetCompanyId = isSuperAdmin
-        ? draft.companyId || user.companyId
+        ? draft.companyId || selectedCompanyId || user.companyId
         : user.companyId;
 
       const { data: invitation, error } = await supabase
@@ -688,7 +696,7 @@ export default function InvitationsPage() {
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
           console.error("Email sending error:", emailError);
-          sent++;
+          sent++; // Still count as sent
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         }
       }
@@ -697,28 +705,25 @@ export default function InvitationsPage() {
     setSending(false);
 
     if (sent > 0 && problematicFound.length === 0) {
-      const key =
-        sent === 1
-          ? "toasts.allInvitationsSentDescription"
-          : "toasts.allInvitationsSentDescription_plural";
-      toast.success(t("toasts.allInvitationsSent"), {
-        description: t(key, { count: sent }),
+      toast.success("All invitations sent", {
+        description: `Successfully sent ${sent} invitation${
+          sent > 1 ? "s" : ""
+        }`,
       });
     } else if (sent > 0 && problematicFound.length > 0) {
-      toast.success(t("toasts.partialSuccess"), {
-        description: t("toasts.partialSuccessDescription", {
-          sent: sent,
-          problematic: problematicFound.length,
-        }),
+      toast.success("Partial success", {
+        description: `Sent ${sent} invitation${sent > 1 ? "s" : ""}. ${
+          problematicFound.length
+        } moved to Problematic Invitations.`,
       });
     } else if (problematicFound.length > 0 && sent === 0) {
-      toast.warning(t("toasts.conflictsWarning"), {
-        description: t("toasts.conflictsWarningDescription", {
-          count: problematicFound.length,
-        }),
+      toast.warning("Conflicts detected", {
+        description: `${problematicFound.length} invitation${
+          problematicFound.length > 1 ? "s" : ""
+        } moved to Problematic Invitations. Use the buttons there to override.`,
       });
     } else {
-      toast.info(t("toasts.noInvitationsToSend"));
+      toast.info("No invitations to send");
     }
   };
 
@@ -726,12 +731,12 @@ export default function InvitationsPage() {
   // LOADING & AUTH STATES
   // ============================================================
 
-  if (loading) return <p className="p-6">{t("messages.loading")}</p>;
+  if (loading) return <p className="p-6">Loading…</p>;
   if (!user)
     return (
       <Alert>
         <AlertCircle />
-        <AlertDescription>{t("messages.notAuthenticated")}</AlertDescription>
+        <AlertDescription>Not authenticated</AlertDescription>
       </Alert>
     );
 
@@ -741,15 +746,14 @@ export default function InvitationsPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 mt-14">
-      {/* Problematic invitations */}
+      {/* Problematic invitations - Only for company admins and superadmins */}
       {!isRegularUser &&
         problematicDrafts.length > 0 &&
         activeView === "draft" && (
           <Card className="mb-4 border-destructive bg-destructive/10">
             <CardHeader>
               <h3 className="font-semibold text-destructive">
-                {t("sections.problematicInvitations")} (
-                {problematicDrafts.length})
+                Problematic Invitations ({problematicDrafts.length})
               </h3>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -776,12 +780,11 @@ export default function InvitationsPage() {
                             size="sm"
                             variant="outline"
                           >
-                            <RefreshCw className="w-3 h-3 mr-1" />{" "}
-                            {t("buttons.updateRole")}
+                            <RefreshCw className="w-3 h-3 mr-1" /> Update Role
                           </Button>
                         ) : (
                           <p className="text-sm text-destructive">
-                            {t("messages.cannotUpdateSuperadmin")}
+                            Cannot update superadmin
                           </p>
                         )
                       ) : (
@@ -791,8 +794,7 @@ export default function InvitationsPage() {
                           size="sm"
                           variant="outline"
                         >
-                          <Send className="w-3 h-3 mr-1" />{" "}
-                          {t("buttons.sendAnyway")}
+                          <Send className="w-3 h-3 mr-1" /> Send Anyway
                         </Button>
                       )}
                       <Button
@@ -815,18 +817,75 @@ export default function InvitationsPage() {
 
       <Card>
         <CardHeader>
+          {/* Tabs with Company Selector for Superadmin */}
           {canManageInvitations ? (
-            <Tabs
-              value={activeView}
-              onValueChange={(v) => setActiveView(v as "draft" | "sent")}
-            >
-              <TabsList className="mb-4">
-                <TabsTrigger value="draft">{t("tabs.drafts")}</TabsTrigger>
-                <TabsTrigger value="sent">{t("tabs.sent")}</TabsTrigger>
-              </TabsList>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Tabs
+                  value={activeView}
+                  onValueChange={(v) => setActiveView(v as "draft" | "sent")}
+                  className="flex-1"
+                >
+                  <TabsList>
+                    <TabsTrigger value="draft">Drafts</TabsTrigger>
+                    <TabsTrigger value="sent">Sent</TabsTrigger>
+                  </TabsList>
+                </Tabs>
 
-              <TabsContent value="draft" className="mt-0">
-                <div className="flex justify-between items-center mb-4">
+                {/* Company Selector for Superadmin */}
+                {isSuperAdmin && (
+                  <Popover
+                    open={companySearchOpen}
+                    onOpenChange={setCompanySearchOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={companySearchOpen}
+                        className="w-64 justify-between"
+                      >
+                        {selectedCompany?.name || "Select company..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-0">
+                      <Command>
+                        <CommandInput placeholder="Search company..." />
+                        <CommandList>
+                          <CommandEmpty>No company found.</CommandEmpty>
+                          <CommandGroup>
+                            {companies.map((company) => (
+                              <CommandItem
+                                key={company.id}
+                                value={company.name}
+                                onSelect={() => {
+                                  setSelectedCompanyId(company.id);
+                                  setCompanySearchOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedCompanyId === company.id
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {company.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+
+              {/* DRAFT TAB CONTENT */}
+              {activeView === "draft" && (
+                <div className="flex justify-between items-center">
                   <div className="flex gap-2">
                     <Button
                       onClick={() =>
@@ -837,14 +896,14 @@ export default function InvitationsPage() {
                             email: "",
                             role: "talent",
                             companyId: isSuperAdmin
-                              ? companies[0]?.id
+                              ? selectedCompanyId || companies[0]?.id
                               : user.companyId,
                           },
                         ])
                       }
                       size="sm"
                     >
-                      <Plus className="w-4 h-4 mr-1" /> {t("buttons.addDraft")}
+                      <Plus className="w-4 h-4 mr-1" /> Add Draft
                     </Button>
                     {!isRegularUser && (
                       <Button
@@ -853,7 +912,7 @@ export default function InvitationsPage() {
                         variant="outline"
                         disabled={sending || drafts.length === 0}
                       >
-                        {t("buttons.scanAll")}
+                        Scan All
                       </Button>
                     )}
                     <Button
@@ -861,7 +920,7 @@ export default function InvitationsPage() {
                       disabled={sending || drafts.length === 0}
                       size="sm"
                     >
-                      <Send className="w-4 h-4 mr-1" /> {t("buttons.sendAll")}
+                      <Send className="w-4 h-4 mr-1" /> Send All
                     </Button>
                   </div>
                   <Button
@@ -869,29 +928,28 @@ export default function InvitationsPage() {
                       const count = drafts.length;
                       setDrafts([]);
                       if (count > 0) {
-                        const key =
-                          count === 1
-                            ? "toasts.draftsDeleted"
-                            : "toasts.draftsDeleted_plural";
-                        toast.success(t(key, { count }));
+                        toast.success(
+                          `Deleted ${count} draft${count > 1 ? "s" : ""}`
+                        );
                       }
                     }}
                     disabled={drafts.length === 0}
                     size="sm"
                     variant="destructive"
                   >
-                    <Trash2 className="w-3 h-3 mr-1" /> {t("buttons.deleteAll")}
+                    <Trash2 className="w-3 h-3 mr-1" /> Delete All
                   </Button>
                 </div>
-              </TabsContent>
+              )}
 
-              <TabsContent value="sent" className="mt-0">
-                <div className="mb-4 space-y-3">
+              {/* SENT TAB CONTENT */}
+              {activeView === "sent" && (
+                <div className="space-y-3">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder={t("placeholders.searchEmail")}
+                        placeholder="Search by email..."
                         value={searchEmail}
                         onChange={(e) => setSearchEmail(e.target.value)}
                         className="pl-9"
@@ -902,15 +960,13 @@ export default function InvitationsPage() {
                       onValueChange={(v) => setFilterRole(v as Role | "all")}
                     >
                       <SelectTrigger className="w-48">
-                        <SelectValue placeholder={t("placeholders.allRoles")} />
+                        <SelectValue placeholder="All roles" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">
-                          {t("placeholders.allRoles")}
-                        </SelectItem>
+                        <SelectItem value="all">All roles</SelectItem>
                         {allowedRoles.map((r) => (
                           <SelectItem key={r} value={r}>
-                            {t(`roles.${r}`)}
+                            {r.replace("_", " ")}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -922,36 +978,30 @@ export default function InvitationsPage() {
                       }
                     >
                       <SelectTrigger className="w-40">
-                        <SelectValue
-                          placeholder={t("placeholders.allStatuses")}
-                        />
+                        <SelectValue placeholder="All statuses" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{t("statuses.all")}</SelectItem>
-                        <SelectItem value="pending">
-                          {t("statuses.pending")}
-                        </SelectItem>
-                        <SelectItem value="expired">
-                          {t("statuses.expired")}
-                        </SelectItem>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
                       </SelectContent>
                     </Select>
                     {hasActiveFilters && (
                       <Button onClick={clearFilters} variant="ghost" size="sm">
                         <X className="w-4 h-4 mr-1" />
-                        {t("buttons.clear")}
+                        Clear
                       </Button>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {t("labels.showing")} {filteredSentInvitations.length}{" "}
-                    {t("labels.of")} {sentInvitations.length}{" "}
-                    {t("messages.invitations")}
+                    Showing {filteredSentInvitations.length} of{" "}
+                    {sentInvitations.length} invitations
                   </p>
                 </div>
-              </TabsContent>
-            </Tabs>
+              )}
+            </div>
           ) : (
+            // Regular users don't see tabs - just action buttons
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
                 <Button
@@ -968,14 +1018,14 @@ export default function InvitationsPage() {
                   }
                   size="sm"
                 >
-                  <Plus className="w-4 h-4 mr-1" /> {t("buttons.addDraft")}
+                  <Plus className="w-4 h-4 mr-1" /> Add Draft
                 </Button>
                 <Button
                   onClick={sendAll}
                   disabled={sending || drafts.length === 0}
                   size="sm"
                 >
-                  <Send className="w-4 h-4 mr-1" /> {t("buttons.sendAll")}
+                  <Send className="w-4 h-4 mr-1" /> Send All
                 </Button>
               </div>
               <Button
@@ -983,29 +1033,28 @@ export default function InvitationsPage() {
                   const count = drafts.length;
                   setDrafts([]);
                   if (count > 0) {
-                    const key =
-                      count === 1
-                        ? "toasts.draftsDeleted"
-                        : "toasts.draftsDeleted_plural";
-                    toast.success(t(key, { count }));
+                    toast.success(
+                      `Deleted ${count} draft${count > 1 ? "s" : ""}`
+                    );
                   }
                 }}
                 disabled={drafts.length === 0}
                 size="sm"
                 variant="destructive"
               >
-                <Trash2 className="w-3 h-3 mr-1" /> {t("buttons.deleteAll")}
+                <Trash2 className="w-3 h-3 mr-1" /> Delete All
               </Button>
             </div>
           )}
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* DRAFT VIEW */}
           {activeView === "draft" && (
             <>
               {drafts.filter((d) => !d.conflictType).length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  {t("messages.noDrafts")}
+                  No drafts. Click Add Draft to start.
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -1014,36 +1063,8 @@ export default function InvitationsPage() {
                     .map((draft) => (
                       <div key={draft.id} className="border rounded p-3">
                         <div className="flex gap-2">
-                          {isSuperAdmin && (
-                            <Select
-                              value={
-                                draft.companyId?.toString() ||
-                                companies[0]?.id.toString()
-                              }
-                              onValueChange={(v) =>
-                                updateDraft(draft.id, "companyId", parseInt(v))
-                              }
-                            >
-                              <SelectTrigger className="w-48">
-                                <SelectValue
-                                  placeholder={t("placeholders.selectCompany")}
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {companies.map((company) => (
-                                  <SelectItem
-                                    key={company.id}
-                                    value={company.id.toString()}
-                                  >
-                                    {company.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-
                           <Input
-                            placeholder={t("placeholders.email")}
+                            placeholder="Email"
                             value={draft.email}
                             onChange={(e) =>
                               updateDraft(draft.id, "email", e.target.value)
@@ -1062,7 +1083,7 @@ export default function InvitationsPage() {
                             <SelectContent>
                               {allowedRoles.map((r) => (
                                 <SelectItem key={r} value={r}>
-                                  {t(`roles.${r}`)}
+                                  {r.replace("_", " ")}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1094,17 +1115,18 @@ export default function InvitationsPage() {
             </>
           )}
 
+          {/* SENT VIEW - Only for company admins and superadmins */}
           {activeView === "sent" && canManageInvitations && (
             <>
               {loadingSentInvitations ? (
                 <p className="text-center text-muted-foreground py-8">
-                  {t("messages.loadingInvitations")}
+                  Loading invitations...
                 </p>
               ) : filteredSentInvitations.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   {hasActiveFilters
-                    ? t("messages.noMatchingFilters")
-                    : t("messages.noInvitations")}
+                    ? "No invitations match your filters"
+                    : "No pending or expired invitations"}
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -1116,12 +1138,11 @@ export default function InvitationsPage() {
                             {invitation.email}
                           </p>
                           <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                            <span>
-                              {t("labels.role")}:{" "}
-                              {t(`roles.${invitation.role}`)}
+                            <span className="capitalize">
+                              Role: {invitation.role.replace("_", " ")}
                             </span>
-                            <span>
-                              {t("labels.status")}:{" "}
+                            <span className="capitalize">
+                              Status:{" "}
                               <span
                                 className={
                                   invitation.status === "pending"
@@ -1129,11 +1150,11 @@ export default function InvitationsPage() {
                                     : "text-orange-600"
                                 }
                               >
-                                {t(`statuses.${invitation.status}`)}
+                                {invitation.status}
                               </span>
                             </span>
                             <span>
-                              {t("labels.expires")}:{" "}
+                              Expires:{" "}
                               {new Date(
                                 invitation.expires_at
                               ).toLocaleDateString()}
@@ -1146,7 +1167,7 @@ export default function InvitationsPage() {
                           variant="destructive"
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
-                          {t("buttons.revoke")}
+                          Revoke
                         </Button>
                       </div>
                     </div>
