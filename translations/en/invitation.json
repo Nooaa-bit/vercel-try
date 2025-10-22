@@ -1,0 +1,100 @@
+{
+  "invitation": {
+    "pageTitle": "Invitations",
+    "tabs": {
+      "drafts": "Drafts",
+      "sent": "Sent"
+    },
+    "buttons": {
+      "addDraft": "Add Draft",
+      "scanAll": "Scan All",
+      "sendAll": "Send All",
+      "deleteAll": "Delete All",
+      "send": "Send",
+      "delete": "Delete",
+      "revoke": "Revoke",
+      "sendAnyway": "Send Anyway",
+      "updateRole": "Update Role",
+      "clear": "Clear"
+    },
+    "placeholders": {
+      "email": "Email",
+      "searchEmail": "Search by email...",
+      "selectCompany": "Select company",
+      "allRoles": "All roles",
+      "allStatuses": "All statuses"
+    },
+    "labels": {
+      "showing": "Showing",
+      "of": "of",
+      "role": "Role",
+      "status": "Status",
+      "expires": "Expires"
+    },
+    "roles": {
+      "talent": "Talent",
+      "supervisor": "Supervisor",
+      "company_admin": "Company Admin",
+      "superadmin": "Super Admin"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "expired": "Expired",
+      "all": "All statuses"
+    },
+    "sections": {
+      "problematicInvitations": "Problematic Invitations"
+    },
+    "messages": {
+      "noDrafts": "No drafts. Click Add Draft to start.",
+      "noInvitations": "No pending or expired invitations",
+      "noMatchingFilters": "No invitations match your filters",
+      "loadingInvitations": "Loading invitations...",
+      "notAuthenticated": "Not authenticated",
+      "loading": "Loading…",
+      "cannotUpdateSuperadmin": "Cannot update superadmin",
+      "invitations": "invitations"
+    },
+    "warnings": {
+      "alreadyMember": "Already company member with role: {role}",
+      "pendingInvitation": "Pending invitation ({role}) expires {date}",
+      "expiredInvitation": "Expired invitation ({role}) on {date}"
+    },
+    "toasts": {
+      "duplicatesRemoved": "Removed {count} duplicate draft",
+      "duplicatesRemoved_plural": "Removed {count} duplicate drafts",
+      "conflictsDetected": "Conflicts detected",
+      "conflictsDescription": "{count} invitation(s) require attention in Problematic Invitations.",
+      "allClear": "All clear",
+      "allClearDescription": "No conflicts detected. Ready to send.",
+      "conflictDetected": "Conflict detected",
+      "conflictDescription": "Use the button in Problematic Invitations to override.",
+      "alreadyMemberTitle": "Already a member",
+      "alreadyMemberDescription": "{email} is already part of this company.",
+      "roleUpdateFailed": "Failed to update role",
+      "roleUpdated": "Role updated",
+      "roleUpdatedDescription": "Updated role for {email}",
+      "invitationFailed": "Failed to send invitation",
+      "invitationSent": "Invitation sent",
+      "invitationSentDescription": "Sent to {email}",
+      "sent": "Sent {count} invitation",
+      "sent_plural": "Sent {count} invitations",
+      "skipped": "{count} already member",
+      "skipped_plural": "{count} already members",
+      "invitationsProcessed": "Invitations processed",
+      "noInvitationsToSend": "No invitations to send",
+      "allInvitationsSent": "All invitations sent",
+      "allInvitationsSentDescription": "Successfully sent {count} invitation",
+      "allInvitationsSentDescription_plural": "Successfully sent {count} invitations",
+      "partialSuccess": "Partial success",
+      "partialSuccessDescription": "Sent {sent} invitation(s). {problematic} moved to Problematic Invitations.",
+      "conflictsWarning": "Conflicts detected",
+      "conflictsWarningDescription": "{count} invitation(s) moved to Problematic Invitations. Use the buttons there to override.",
+      "loadFailed": "Failed to load invitations",
+      "revokeFailed": "Failed to revoke invitation",
+      "invitationRevoked": "Invitation revoked",
+      "draftsDeleted": "Deleted {count} draft",
+      "draftsDeleted_plural": "Deleted {count} drafts"
+    }
+  }
+}

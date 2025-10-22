@@ -1,0 +1,100 @@
+{
+  "invitation": {
+    "pageTitle": "Προσκλήσεις",
+    "tabs": {
+      "drafts": "Πρόχειρα",
+      "sent": "Απεσταλμένα"
+    },
+    "buttons": {
+      "addDraft": "Προσθήκη Πρόχειρου",
+      "scanAll": "Σάρωση Όλων",
+      "sendAll": "Αποστολή Όλων",
+      "deleteAll": "Διαγραφή Όλων",
+      "send": "Αποστολή",
+      "delete": "Διαγραφή",
+      "revoke": "Ανάκληση",
+      "sendAnyway": "Αποστολή Ούτως ή Άλλως",
+      "updateRole": "Ενημέρωση Ρόλου",
+      "clear": "Καθαρισμός"
+    },
+    "placeholders": {
+      "email": "Email",
+      "searchEmail": "Αναζήτηση με email...",
+      "selectCompany": "Επιλογή εταιρείας",
+      "allRoles": "Όλοι οι ρόλοι",
+      "allStatuses": "Όλες οι καταστάσεις"
+    },
+    "labels": {
+      "showing": "Εμφάνιση",
+      "of": "από",
+      "role": "Ρόλος",
+      "status": "Κατάσταση",
+      "expires": "Λήγει"
+    },
+    "roles": {
+      "talent": "Ταλέντο",
+      "supervisor": "Επόπτης",
+      "company_admin": "Διαχειριστής Εταιρείας",
+      "superadmin": "Υπερδιαχειριστής"
+    },
+    "statuses": {
+      "pending": "Εκκρεμεί",
+      "expired": "Έληξε",
+      "all": "Όλες οι καταστάσεις"
+    },
+    "sections": {
+      "problematicInvitations": "Προβληματικές Προσκλήσεις"
+    },
+    "messages": {
+      "noDrafts": "Κανένα πρόχειρο. Κάντε κλικ στο Προσθήκη Πρόχειρου για να ξεκινήσετε.",
+      "noInvitations": "Δεν υπάρχουν εκκρεμείς ή ληγμένες προσκλήσεις",
+      "noMatchingFilters": "Καμία πρόσκληση δεν ταιριάζει με τα φίλτρα σας",
+      "loadingInvitations": "Φόρτωση προσκλήσεων...",
+      "notAuthenticated": "Δεν έχετε πιστοποιηθεί",
+      "loading": "Φόρτωση…",
+      "cannotUpdateSuperadmin": "Δεν είναι δυνατή η ενημέρωση υπερδιαχειριστή",
+      "invitations": "προσκλήσεις"
+    },
+    "warnings": {
+      "alreadyMember": "Ήδη μέλος της εταιρείας με ρόλο: {role}",
+      "pendingInvitation": "Εκκρεμής πρόσκληση ({role}) λήγει {date}",
+      "expiredInvitation": "Ληγμένη πρόσκληση ({role}) στις {date}"
+    },
+    "toasts": {
+      "duplicatesRemoved": "Αφαιρέθηκε {count} διπλότυπο πρόχειρο",
+      "duplicatesRemoved_plural": "Αφαιρέθηκαν {count} διπλότυπα πρόχειρα",
+      "conflictsDetected": "Εντοπίστηκαν συγκρούσεις",
+      "conflictsDescription": "{count} πρόσκληση/εις απαιτούν προσοχή στις Προβληματικές Προσκλήσεις.",
+      "allClear": "Όλα καθαρά",
+      "allClearDescription": "Δεν εντοπίστηκαν συγκρούσεις. Έτοιμο για αποστολή.",
+      "conflictDetected": "Εντοπίστηκε σύγκρουση",
+      "conflictDescription": "Χρησιμοποιήστε το κουμπί στις Προβληματικές Προσκλήσεις για παράκαμψη.",
+      "alreadyMemberTitle": "Ήδη μέλος",
+      "alreadyMemberDescription": "Το {email} είναι ήδη μέρος αυτής της εταιρείας.",
+      "roleUpdateFailed": "Αποτυχία ενημέρωσης ρόλου",
+      "roleUpdated": "Ο ρόλος ενημερώθηκε",
+      "roleUpdatedDescription": "Ενημερώθηκε ο ρόλος για το {email}",
+      "invitationFailed": "Αποτυχία αποστολής πρόσκλησης",
+      "invitationSent": "Η πρόσκληση στάλθηκε",
+      "invitationSentDescription": "Στάλθηκε στο {email}",
+      "sent": "Στάλθηκε {count} πρόσκληση",
+      "sent_plural": "Στάλθηκαν {count} προσκλήσεις",
+      "skipped": "{count} ήδη μέλος",
+      "skipped_plural": "{count} ήδη μέλη",
+      "invitationsProcessed": "Οι προσκλήσεις επεξεργάστηκαν",
+      "noInvitationsToSend": "Δεν υπάρχουν προσκλήσεις για αποστολή",
+      "allInvitationsSent": "Όλες οι προσκλήσεις στάλθηκαν",
+      "allInvitationsSentDescription": "Στάλθηκε επιτυχώς {count} πρόσκληση",
+      "allInvitationsSentDescription_plural": "Στάλθηκαν επιτυχώς {count} προσκλήσεις",
+      "partialSuccess": "Μερική επιτυχία",
+      "partialSuccessDescription": "Στάλθηκαν {sent} πρόσκληση/εις. {problematic} μεταφέρθηκαν στις Προβληματικές Προσκλήσεις.",
+      "conflictsWarning": "Εντοπίστηκαν συγκρούσεις",
+      "conflictsWarningDescription": "{count} πρόσκληση/εις μεταφέρθηκαν στις Προβληματικές Προσκλήσεις. Χρησιμοποιήστε τα κουμπιά εκεί για παράκαμψη.",
+      "loadFailed": "Αποτυχία φόρτωσης προσκλήσεων",
+      "revokeFailed": "Αποτυχία ανάκλησης πρόσκλησης",
+      "invitationRevoked": "Η πρόσκληση ανακλήθηκε",
+      "draftsDeleted": "Διαγράφηκε {count} πρόχειρο",
+      "draftsDeleted_plural": "Διαγράφηκαν {count} πρόχειρα"
+    }
+  }
+}
