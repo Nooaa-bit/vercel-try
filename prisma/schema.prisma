@@ -15,6 +15,7 @@ model user {
   email       String    @unique
   firstName   String?   @map("first_name")
   lastName    String?   @map("last_name")
+  profilePicture   String?             @map("profile_picture")  
   hasPassword Boolean   @default(false) @map("has_password")
   createdAt   DateTime  @default(now()) @map("created_at")
   deletedAt   DateTime? @map("deleted_at")

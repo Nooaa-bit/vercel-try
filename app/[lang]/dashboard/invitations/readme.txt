@@ -1,12 +1,12 @@
 User Invitations Logic 
-Superuser - Invites to all companies and roles
-Company Adimn - Invites only to his company id. Admins, supervisors, talent
-These two get a 'report' for problematic invitations. i.e. invitations where the user already exists in the company id (so we essentially change their role). Problematic invitations are also the ones that refer to an email which is already invited.
-Supervisors and talent can only invite talent and only to their company. They are not notified. The system just gets their invitations and sends out the ones that are valid. "All invitations that are not tied to an email with an existing row at the usercompanyrole table will be sent out."
-Draft button. Sent button.
+- Superuser - Invites to all companies and roles
+- Company Adimn - Invites only to his company id. Admins, supervisors, talent
+- These two get a 'report' for problematic invitations. i.e. invitations where the user already exists in the company id (so we essentially change their role). Problematic invitations are also the ones that refer to an email which is already invited.
+- Supervisors and talent can only invite talent and only to their company. They are not notified. The system just gets their invitations and sends out the ones that are valid. "All invitations that are not tied to an email with an existing row at the usercompanyrole table will be sent out."
+- Draft button. Sent button.
 Superadmins and company admins can see these buttons and switch to the sent invitations view (i.e. the list of all invitations where they can revoke them. 
-Draft page contains search section (email role status)
-for users and supervisors we can just accept all their invitations, and then at another step check the validity and only send out the ones possible.
+- Draft page contains search section (email role status)
+- Users and supervisors we can just accept all their invitations, and then at another step check the validity and only send out the ones possible.
 process to make test users
 
 
@@ -55,14 +55,6 @@ vercel/
     └── el/
         ├── invitations.json
         └── invitation-email.json
-
-
-
-
-
-
-
-
 
 
 
