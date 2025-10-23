@@ -165,7 +165,16 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
         loading,
       }}
     >
-      {children}
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm text-muted-foreground">Loading...</span>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
     </ActiveRoleContext.Provider>
   );
 }
