@@ -1,3 +1,4 @@
+//hype-hire/vercel/components/AppSidebar.tsx
 "use client";
 
 import {
@@ -81,7 +82,12 @@ export function AppSidebar({ user }: AppSidebarProps) {
       url: "/dashboard/invitations",
       icon: UserRoundPlus,
     },
-    { titleKey: "analytics", url: "/dashboard/analytics", icon: BarChart3 },
+    {
+      titleKey: "analytics",
+      url: "/dashboard/analytics",
+      icon: BarChart3,
+      requiredRole: "company_admin", 
+    },
     { titleKey: "contracts", url: "/dashboard/contracts", icon: FileText },
   ];
 

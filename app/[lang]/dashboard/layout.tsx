@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/layout.tsx
 "use client";
 
 import { useTranslation } from "react-i18next";

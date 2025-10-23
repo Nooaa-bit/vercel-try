@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/hooks/useActiveRole.tsx
 "use client";
 
 import {
@@ -58,7 +57,7 @@ const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
 export function ActiveRoleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [availableRoles, setAvailableRoles] = useState<UserCompanyRole[]>([]);
-  const [activeRoleId, setActiveRoleId] = useState<number>(0);
+  const [activeRoleId, setActiveRoleId] = useState<number | null>(null); // Changed: null instead of 0
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -66,7 +65,7 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     async function loadRoles() {
       if (!user) {
         setAvailableRoles([]);
-        setActiveRoleId(0);
+        setActiveRoleId(null); // Changed: null instead of 0
         setLoading(false);
         return;
       }
@@ -113,6 +112,20 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     loadRoles();
   }, [user, supabase]);
 
+  // NEW: Don't render children until roles are loaded
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm text-muted-foreground">
+            Loading roles...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const activeRole =
     availableRoles.find((r) => r.id === activeRoleId) || DEFAULT_ROLE;
 
@@ -133,7 +146,7 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
         activeCompanyId: activeRole.companyId,
         setActiveRole,
         hasPermission,
-        loading,
+        loading: false, // Changed: Always false when context is provided
       }}
     >
       {children}
