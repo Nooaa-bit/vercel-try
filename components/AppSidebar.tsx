@@ -67,13 +67,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const mainItems: NavItem[] = [
     { titleKey: "dashboard", url: "/dashboard", icon: LayoutDashboard },
     { titleKey: "calendar", url: "/dashboard/calendar", icon: CalendarIcon },
-    {
-      titleKey: "locations",
-      url: "/dashboard/locations",
-      icon: MapPinIcon,
-      requiredRole: "company_admin",
-    },
-    { titleKey: "team", url: "/dashboard/team", icon: Users },
+    {titleKey: "locations",url: "/dashboard/locations",icon: MapPinIcon,requiredRole: "company_admin",},
+    {titleKey: "team",url: "/dashboard/team",icon: Users,requiredRole: "company_admin",},
   ];
 
   const documentItems: NavItem[] = [

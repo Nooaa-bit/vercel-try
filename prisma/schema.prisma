@@ -10,78 +10,77 @@ datasource db {
 }
 
 model user {
-  id               Int                 @id @default(autoincrement()) @map("id")
-  authUserId  String    @unique @map("auth_user_id")
-  email       String    @unique
-  firstName   String?   @map("first_name")
-  lastName    String?   @map("last_name")
-  profilePicture   String?             @map("profile_picture")  
-  hasPassword Boolean   @default(false) @map("has_password")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  deletedAt   DateTime? @map("deleted_at")
-  deletedBy   Int?      @map("deleted_by")
+  id             Int       @id @default(autoincrement()) @map("id")
+  authUserId     String    @unique @map("auth_user_id")
+  email          String    @unique
+  firstName      String?   @map("first_name")
+  lastName       String?   @map("last_name")
+  profilePicture String?   @map("profile_picture")
+  hasPassword    Boolean   @default(false) @map("has_password")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+  deletedBy      Int?      @map("deleted_by")
 
   // Relations
   userCompanyRoles user_company_role[]
   // Back-references for user_company_role
   revokedRoles     user_company_role[] @relation("UserCompanyRoleRevokedBy")
-  
+
   // Back-references for invitation
-  invitationsSent     invitation[] @relation("InvitationInvitedBy")
-  invitationsDeleted  invitation[] @relation("InvitationDeletedBy")
+  invitationsSent    invitation[] @relation("InvitationInvitedBy")
+  invitationsDeleted invitation[] @relation("InvitationDeletedBy")
 
   @@map("user")
 }
 
 model company {
-  name             String              @unique @map("name")
-  createdAt        DateTime            @default(now()) @map("created_at")
-  deletedAt        DateTime?           @map("deleted_at")
-  id               Int                 @id @default(autoincrement()) @map("id")
-  
+  name      String    @unique @map("name")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  id        Int       @id @default(autoincrement()) @map("id")
+
   userCompanyRoles user_company_role[]
   invitation       invitation[]
-  locations   Location[]
+  locations        Location[]
 
-  
   @@map("company")
 }
 
 model user_company_role {
-  role      role     @map("role")
-  createdAt DateTime @default(now()) @map("created_at")
+  role      role      @map("role")
+  createdAt DateTime  @default(now()) @map("created_at")
   revokedAt DateTime? @map("revoked_at")
-  revokedBy Int?     @map("revoked_by") 
-  id        Int      @id @default(autoincrement()) @map("id")
-  userId    Int      @map("user_id")
-  companyId Int      @map("company_id")
-  
+  revokedBy Int?      @map("revoked_by")
+  id        Int       @id @default(autoincrement()) @map("id")
+  userId    Int       @map("user_id")
+  companyId Int       @map("company_id")
+
   // Relations with explicit foreign key names
-  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "user_company_role_user_fkey")
-  company   company  @relation(fields: [companyId], references: [id], onDelete: Cascade, map: "user_company_role_company_fkey")
-  revokedByUser user? @relation("UserCompanyRoleRevokedBy", fields: [revokedBy], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_company_role_revoked_by_fkey")
-  
+  user          user    @relation(fields: [userId], references: [id], onDelete: Cascade, map: "user_company_role_user_fkey")
+  company       company @relation(fields: [companyId], references: [id], onDelete: Cascade, map: "user_company_role_company_fkey")
+  revokedByUser user?   @relation("UserCompanyRoleRevokedBy", fields: [revokedBy], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_company_role_revoked_by_fkey")
+
   @@unique([userId, companyId, role], map: "user_company_unique")
   @@map("user_company_role")
 }
 
 model invitation {
-  token      String    @unique @default(dbgenerated("gen_random_uuid()")) @map("token") @db.Uuid
+  token      String            @unique @default(dbgenerated("gen_random_uuid()")) @map("token") @db.Uuid
   email      String
   role       role
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  invitedBy  Int       @map("invited_by") 
-  redeemedAt DateTime? @map("redeemed_at") @db.Timestamptz(6)
-  deletedAt  DateTime? @map("deleted_at")
-  deletedBy  Int?      @map("deleted_by") 
-  status invitation_status @default(pending)  // ✅ Use the enum
-  id         Int       @id @default(autoincrement()) @map("id")
-  companyId  Int       @map("company_id")
+  expiresAt  DateTime          @map("expires_at") @db.Timestamptz(6)
+  invitedBy  Int               @map("invited_by")
+  redeemedAt DateTime?         @map("redeemed_at") @db.Timestamptz(6)
+  deletedAt  DateTime?         @map("deleted_at")
+  deletedBy  Int?              @map("deleted_by")
+  status     invitation_status @default(pending) // ✅ Use the enum
+  id         Int               @id @default(autoincrement()) @map("id")
+  companyId  Int               @map("company_id")
 
   // Relations with unique constraint names
-  company    company   @relation(fields: [companyId], references: [id], map: "invitation_company_fkey")
-  inviter    user      @relation("InvitationInvitedBy", fields: [invitedBy], references: [id], map: "invitation_inviter_fkey")
-  deleter    user?     @relation("InvitationDeletedBy", fields: [deletedBy], references: [id], map: "invitation_deleter_fkey")
+  company company @relation(fields: [companyId], references: [id], map: "invitation_company_fkey")
+  inviter user    @relation("InvitationInvitedBy", fields: [invitedBy], references: [id], map: "invitation_inviter_fkey")
+  deleter user?   @relation("InvitationDeletedBy", fields: [deletedBy], references: [id], map: "invitation_deleter_fkey")
 
   @@index([email])
   @@index([companyId])
@@ -93,6 +92,7 @@ enum role {
   company_admin
   supervisor
   talent
+
   @@map("role")
 }
 
@@ -103,14 +103,15 @@ enum invitation_status {
   expired
   revoked
   draft
+
   @@map("invitation_status")
 }
 
 enum LocationType {
-   Office
+  Office
   Warehouse
   RetailStore
-  Restaurant 
+  Restaurant
   EventSpace
   ConstructionSite
   Factory
@@ -132,55 +133,50 @@ model ContactMessage {
   @@map("contact_messages")
 }
 
-
 model Location {
-  id          Int           @id @default(autoincrement())
-  companyId   Int           @map("company_id")
-  
+  id        Int @id @default(autoincrement())
+  companyId Int @map("company_id")
+
   // Basic Information
-  name        String        @db.VarChar(255)
-  type        LocationType  @default(Other)
-  
+  name String       @db.VarChar(255)
+  type LocationType @default(Other)
+
   // Address Components (from Geoapify)
-  address     String        @db.VarChar(500)
-  addressLine2 String?      @map("address_line_2") @db.VarChar(255)
-  city        String        @db.VarChar(100)
-  state       String?       @db.VarChar(100)
-  postcode    String?       @db.VarChar(20)
-  country     String        @db.VarChar(100)
-  
+  address      String  @db.VarChar(500)
+  addressLine2 String? @map("address_line_2") @db.VarChar(255)
+  city         String  @db.VarChar(100)
+  state        String? @db.VarChar(100)
+  postcode     String? @db.VarChar(20)
+  country      String  @db.VarChar(100)
+
   // Geographic Coordinates (for mapping)
-  latitude    Decimal       @db.Decimal(10, 8)
-  longitude   Decimal       @db.Decimal(11, 8)
-  
+  latitude  Decimal @db.Decimal(10, 8)
+  longitude Decimal @db.Decimal(11, 8)
+
   // Additional Information
-  accessInstructions String?  @map("access_instructions") @db.Text
-  contactPhone       String?  @map("contact_phone") @db.VarChar(50)
-  contactEmail       String?  @map("contact_email") @db.VarChar(255)
-  
+  accessInstructions String? @map("access_instructions") @db.Text
+  contactPhone       String? @map("contact_phone") @db.VarChar(50)
+  contactEmail       String? @map("contact_email") @db.VarChar(255)
+
   // Metadata
-  isActive    Boolean       @default(true) @map("is_active")
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz(6)
-  
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   // Relations
-  company     company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  company company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // Jobs at this location (if you have a jobs table)
   // jobs        Job[]
-  
+
   // Shifts at this location (if you have a shifts table)
   // shifts      Shift[]
 
-  @@map("location")
   @@index([companyId, deletedAt])
   @@index([latitude, longitude])
+  @@map("location")
 }
-
-
-
-
 
 // If you think venue types might change often, consider a reference table instead:
 //model LocationType {
@@ -192,7 +188,7 @@ model Location {
 //  locations   Location[]
 //  @@map("location_type")}
 //model Location {
-  // ... other fields ...
- // typeId      Int        @map("type_id")
+// ... other fields ...
+// typeId      Int        @map("type_id")
 //type        LocationType @relation(fields: [typeId], references: [id])
-  // ... rest of model ...}
+// ... rest of model ...}
