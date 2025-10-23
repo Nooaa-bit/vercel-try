@@ -32,6 +32,7 @@ interface ActiveRoleContext {
   activeCompanyId: number;
   setActiveRole: (roleId: number) => void;
   hasPermission: (requiredRole: Role) => boolean;
+  hasAnyRole: (requiredRoles: Role[]) => boolean;
   loading: boolean;
 }
 
@@ -43,12 +44,7 @@ interface RoleQueryResult {
   company: Array<{ name: string }> | null;
 }
 
-const DEFAULT_ROLE: UserCompanyRole = {
-  id: 0,
-  role: "talent",
-  companyId: 0,
-  companyName: "Hype Hire",
-};
+// No default role - we'll handle loading state explicitly
 
 const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
   undefined
@@ -112,22 +108,36 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     loadRoles();
   }, [user, supabase]);
 
-  // NEW: Don't render children until roles are loaded
+  // Don't render anything until we've finished loading the roles
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
           <span className="text-sm text-muted-foreground">
-            Loading roles...
+            Loading your account...
           </span>
         </div>
       </div>
     );
   }
 
-  const activeRole =
-    availableRoles.find((r) => r.id === activeRoleId) || DEFAULT_ROLE;
+  // If we have no roles after loading, something went wrong
+  if (availableRoles.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold mb-2">No roles found</h2>
+          <p className="text-muted-foreground">
+            You do not have access to any companies. Please contact support.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // At this point, we know we have at least one role
+  const activeRole = availableRoles.find((r) => r.id === activeRoleId) || availableRoles[0];
 
   const setActiveRole = (roleId: number) => {
     setActiveRoleId(roleId);
@@ -138,6 +148,11 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     return ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[requiredRole];
   };
 
+  const providerHasAnyRole = (requiredRoles: Role[]) => {
+    if (loading) return false;
+    return requiredRoles.some((role) => hasPermission(role));
+  };
+
   return (
     <ActiveRoleContext.Provider
       value={{
@@ -146,7 +161,8 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
         activeCompanyId: activeRole.companyId,
         setActiveRole,
         hasPermission,
-        loading: false, // Changed: Always false when context is provided
+        hasAnyRole: providerHasAnyRole,
+        loading,
       }}
     >
       {children}
@@ -156,7 +172,18 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
 
 export function useActiveRole() {
   const context = useContext(ActiveRoleContext);
-  if (!context)
+  if (!context) {
     throw new Error("useActiveRole must be used within ActiveRoleProvider");
-  return context;
+  }
+
+  // Helper to check if user has any of the required roles
+  const hasAnyRole = (requiredRoles: Role[]) => {
+    if (context.loading) return false; // Don't allow access while loading
+    return requiredRoles.some((role) => context.hasPermission(role));
+  };
+
+  return {
+    ...context,
+    hasAnyRole,
+  };
 }

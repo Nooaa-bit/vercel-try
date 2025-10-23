@@ -6,46 +6,29 @@ import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
-export default function AnalyticsPage() {
-  const { t } = useTranslation("dashboard");
-  const router = useRouter();
-  const pathname = usePathname();
-  const { activeRole, hasPermission, loading } = useActiveRole();
-  const [mounted, setMounted] = useState(false);
 
-  // Wait for component to mount on client side
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
-  // Only check permissions after both mounted AND loading complete
-  useEffect(() => {
-    if (mounted && !loading) {
-      if (!hasPermission("company_admin")) {
-        const langMatch = pathname?.match(/^\/([^/]+)\//);
-        const lang = langMatch ? langMatch[1] : "en";
-        router.replace(`/${lang}/dashboard`);
+  export default function ProtectedPage() {
+    // Get the active role from the context
+    const { activeRole, hasPermission } = useActiveRole();
+    const { t } = useTranslation("dashboard");
+    const router = useRouter();
+    
+    // Check if user has permission to view this page
+    const hasAccess = hasPermission('company_admin'); // company_admin or higher (superadmin)
+    
+    useEffect(() => {
+      if (!hasAccess) {
+        router.push('/dashboard');
       }
+    }, [hasAccess, router]);
+    
+    // If not authorized, show nothing (will redirect)
+    if (!hasAccess) {
+      return null;
     }
-  }, [mounted, loading, hasPermission, router, pathname]);
-
-  // Show nothing until component mounts (prevents hydration issues)
-  if (!mounted || loading) {
-    return (
-      <div className="min-h-screen bg-background pt-20 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm text-muted-foreground">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Final permission check before rendering
-  if (!hasPermission("company_admin")) {
-    return null;
-  }
 
   return (
     <div className="space-y-6">
