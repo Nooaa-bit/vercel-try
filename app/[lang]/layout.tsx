@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "../globals.css";
 import Navbar from "@/components/navbar";
-import { createClient } from "@/lib/supabase/server";
 import { LanguageProvider } from "@/lib/LanguageContext";
 import { ThemeProvider } from "@/app/hooks/useTheme";
 import { Toaster } from "sonner";
@@ -13,6 +12,8 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"],
   variable: "--font-inter",
 });
+
+const supportedLangs = new Set(["en", "el"]); //if you add more languages, you only update one place (the Set).
 
 //for localized SEO consider generateMetadata to produce per‑language titles and descriptions using the lang param.
 export const metadata: Metadata = {
@@ -27,8 +28,8 @@ export default async function RootLayout({
   children: React.ReactNode;
   params: Promise<{ lang: string }>; // Changed from Language to string
 }) {
-  const { lang } = await params;
-  const validLang = lang === "en" || lang === "el" ? lang : "en"; // Default to 'en' if invalid
+ const { lang } = await params;
+ const validLang = supportedLangs.has(lang) ? lang : "en";// Default to 'en' if invalid
 
   return (
     <html lang={validLang}>

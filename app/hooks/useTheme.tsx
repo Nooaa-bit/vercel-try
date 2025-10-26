@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/hooks/useTheme.tsx
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -17,33 +18,36 @@ export function useTheme() {
   return context;
 }
 
-// Helper to get initial theme
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  const stored = localStorage.getItem("theme");
-  return stored === "dark" ? "dark" : "light";
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [theme, setTheme] = useState<Theme>("light");
+  const [mounted, setMounted] = useState(false);
 
-  // Check if current page is homepage
-  const isHomePage =
-    pathname === "/" ||
-    pathname === "/en" ||
-    pathname === "/el" ||
-    pathname === "/en/" ||
-    pathname === "/el/";
-
+  // Load theme from localStorage after mount (client-side only)
   useEffect(() => {
-    // Apply dark mode ONLY if theme is dark AND not on homepage
+    const stored = localStorage.getItem("theme");
+    if (stored === "dark") setTheme("dark");
+    setMounted(true);
+  }, []);
+
+  // Check if current page is homepage (simple regex, no useMemo needed)
+  //import { useMemo } from "react";
+  // const isHomePage = useMemo(() => {
+  const isHomePage = /^\/(en|el)?\/?$/.test(pathname);
+
+  // Apply dark mode to DOM
+  useEffect(() => {
+    if (!mounted) return;
     const shouldApplyDark = theme === "dark" && !isHomePage;
     document.documentElement.classList.toggle("dark", shouldApplyDark);
+  }, [theme, isHomePage, mounted]);
 
-    // Always save theme preference (so it persists when leaving homepage)
-    localStorage.setItem("theme", theme);
-  }, [theme, isHomePage]);
+  // Save theme preference (separate effect for clarity)
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("theme", theme);
+    }
+  }, [theme, mounted]);
 
   const toggle = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 

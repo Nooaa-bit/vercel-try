@@ -12,12 +12,6 @@ export default {
   ],
   prefix: "",
   theme: {
-  	fontFamily: {
-  		sans: [
-  			'Inter',
-  			'sans-serif'
-  		]
-  	},
   	container: {
   		center: true,
   		padding: '2rem',
@@ -206,5 +200,5 @@ export default {
   		}
   	}
   },
-  plugins: [tailwindcssAnimate, require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;
