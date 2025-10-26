@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const HypeSection = () => {
-  const { t } = useTranslation("hype");
+  const { t, ready } = useTranslation("hype"); 
   const sectionRef = useRef<HTMLDivElement>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -72,6 +72,7 @@ const HypeSection = () => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
 
+    
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (sectionRef.current) {
@@ -84,6 +85,15 @@ const HypeSection = () => {
   const isSecondCardVisible = activeCardIndex >= 1;
   const isThirdCardVisible = activeCardIndex >= 2;
 
+  if (!ready) {
+    return (
+      <div className="relative" style={{ height: "300vh" }}>
+        <section className="w-full h-screen py-10 md:py-16 sticky top-0 overflow-hidden flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+        </section>
+      </div>
+    );
+  }
   return (
     <div ref={sectionRef} className="relative" style={{ height: "300vh" }}>
       <section

@@ -1,9 +1,31 @@
+//hype-hire/vercel/app/[lang]/terms/page.tsx
 "use client";
 
 import { useTranslation } from "react-i18next";
 
 export default function TermsPage() {
-  const { t } = useTranslation("terms");
+  const { t, ready } = useTranslation("terms");
+
+  // Loading skeleton while translations load
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-background pt-24 pb-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-card rounded-lg shadow-md p-8 border border-border animate-pulse">
+            <div className="h-10 bg-gray-200 rounded w-2/3 mb-6" />
+            <div className="space-y-6">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
+              <div className="h-20 bg-gray-200 rounded mb-6" />
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
+              <div className="h-20 bg-gray-200 rounded mb-6" />
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
+              <div className="h-32 bg-gray-200 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pt-24 pb-12">

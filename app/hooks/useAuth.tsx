@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/hooks/useAuth.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,6 +16,8 @@ interface UserProfile {
   createdAt: Date;
 }
 
+const supabase = createClient();
+
 export function useAuth() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -24,12 +25,11 @@ export function useAuth() {
 
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
 
   // Extract language from pathname
   const lang = pathname.split("/")[1] === "el" ? "el" : "en";
 
-  // Main auth state handler (UNCHANGED - your working version)
+  // Main auth state handler
   useEffect(() => {
     const handleAuthState = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -77,27 +77,15 @@ export function useAuth() {
       } else if (event === "SIGNED_OUT") {
         console.log("🚪 User signed out detected");
         setUser(null);
-        setProfile(null); // Clear profile on sign out
-
-        // Immediate redirect on sign out
-        const protectedPaths = ["/dashboard", "/profile", "/dashboard2"];
-        const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
-        const isOnProtectedPath = protectedPaths.some((path) =>
-          pathnameWithoutLang.startsWith(path)
-        );
-
-        if (isOnProtectedPath) {
-          console.log("🔄 Redirecting to homepage after sign out...");
-          router.replace(`/${lang}`);
-        }
+        setProfile(null);
       }
     });
 
     handleAuthState();
     return () => subscription.unsubscribe();
-  }, [router, pathname, supabase.auth, lang]);
+  }, [router]);
 
-  // SEPARATE useEffect for profile fetching - only runs when user changes
+  // Profile fetching
   useEffect(() => {
     if (!user?.id) {
       setProfile(null);
@@ -138,22 +126,34 @@ export function useAuth() {
     };
 
     fetchProfile();
-  }, [user?.id]); // Only re-run when user ID changes
+  }, [user?.id]);
+
+  // Dashboard protection - redirect to homepage if not logged in
+  useEffect(() => {
+    // Wait until loading is complete
+    if (loading) return;
+
+    // Check if user is trying to access dashboard without being logged in
+    const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
+    const isDashboardRoute = pathnameWithoutLang.includes("/dashboard");
+
+    if (isDashboardRoute && !user) {
+      console.log("🔒 Unauthorized dashboard access, redirecting to homepage");
+      router.replace(`/${lang}`);
+    }
+  }, [loading, user, pathname, router, lang]);
 
   // Sign out function
   const signOut = async () => {
     try {
       console.log("🚪 Client-side sign out initiated...");
-      const protectedPaths = ["/dashboard", "/profile", "/dashboard2"];
-      const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
-      const isOnProtectedPath = protectedPaths.some((path) =>
-        pathnameWithoutLang.startsWith(path)
-      );
-
       await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
 
-      // Immediate redirect after sign out
-      if (isOnProtectedPath) {
+      // Redirect to homepage after sign out
+      const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
+      if (pathnameWithoutLang.includes("/dashboard")) {
         window.location.href = `/${lang}`;
       }
     } catch (error) {

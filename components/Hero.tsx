@@ -1,3 +1,4 @@
+//hype-hire/vercel/components/Hero.tsx
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -23,8 +24,8 @@ const Hero = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
 
-  // Get translation function from the 'hero' namespace
-  const { t } = useTranslation("hero");
+  // Get translation function from the 'hero' namespace - CHECK IF READY
+  const { t, ready } = useTranslation("hero");
 
   useEffect(() => {
     // Check if mobile on mount and when window resizes
@@ -106,6 +107,28 @@ const Hero = () => {
     e.preventDefault();
     setShowDialog(true);
   };
+
+  // LOADING STATE: Don't render content until translations are ready
+  if (!ready) {
+    return (
+      <section
+        className="overflow-hidden relative bg-cover"
+        id="hero"
+        style={{
+          backgroundImage: 'url("/Header-background.webp")',
+          backgroundPosition: "center 30%",
+          padding: isMobile ? "100px 12px 40px" : "120px 20px 60px",
+          minHeight: "600px",
+        }}
+      >
+        <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-96">
+            <div className="w-8 h-8 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>

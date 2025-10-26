@@ -1,20 +1,14 @@
-//hype-hire/vercel/app/[lang]/page.tsx
+// hype-hire/vercel/app/[lang]/page.tsx
 "use client";
 
-import Link from "next/link";
-import { useTranslation } from "react-i18next";
-import { useLanguage } from "@/lib/LanguageContext";
 import React, { useEffect } from "react";
 import Hero from "@/components/Hero";
 import HypeSection from "@/components/HypeSection";
 import DetailsSection from "@/components/DetailsSection";
 import Footer from "@/components/Footer";
 
- 
-
 export default function Home() {
-   const { t } = useTranslation("home");
-   const { language } = useLanguage();
+
   // Initialize intersection observer to detect when elements enter viewport
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -33,35 +27,9 @@ export default function Home() {
     elements.forEach((el) => observer.observe(el));
 
     return () => {
-      elements.forEach((el) => observer.unobserve(el));
+      observer.disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    // This helps ensure smooth scrolling for the anchor links
-    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-      anchor.addEventListener("click", function (e) {
-        e.preventDefault();
-
-        const targetId = (e.currentTarget as HTMLAnchorElement)
-          .getAttribute("href")
-          ?.substring(1);
-        if (!targetId) return;
-
-        const targetElement = document.getElementById(targetId);
-        if (!targetElement) return;
-
-        // Increased offset to account for mobile nav
-        const offset = window.innerWidth < 768 ? 100 : 80;
-
-        window.scrollTo({
-          top: targetElement.offsetTop - offset,
-          behavior: "smooth",
-        });
-      });
-    });
-  }, []);
-
 
   return (
     <div className="min-h-screen">

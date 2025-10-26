@@ -3,7 +3,22 @@
 import { useTranslation } from "react-i18next";
 
 export default function PrivacyPage() {
-  const { t } = useTranslation("privacy");
+  const { t, ready } = useTranslation("privacy");
+
+  // Loading state while translations load
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-background pt-24 pb-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-card rounded-lg shadow-md p-8 border border-border">
+            <div className="flex items-center justify-center h-96">
+              <div className="w-8 h-8 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pt-24 pb-12">

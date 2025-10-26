@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "../globals.css";
@@ -13,8 +14,6 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const supportedLangs = new Set(["en", "el"]); //if you add more languages, you only update one place (the Set).
-
 //for localized SEO consider generateMetadata to produce per‑language titles and descriptions using the lang param.
 export const metadata: Metadata = {
   title: "HypeHire",
@@ -26,18 +25,17 @@ export default async function RootLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ lang: string }>; // Changed from Language to string
+  params: { lang: string };
 }) {
- const { lang } = await params;
- const validLang = supportedLangs.has(lang) ? lang : "en";// Default to 'en' if invalid
+  const { lang } = await  params; // trust middleware
 
   return (
-    <html lang={validLang}>
+    <html lang={lang}>
       <body className={`${inter.variable} antialiased`}>
         <ThemeProvider>
-          <LanguageProvider lang={validLang}>
+          <LanguageProvider lang={lang}>
             <Navbar />
-         {children}
+            {children}
             <Toaster richColors closeButton position="bottom-right" />
           </LanguageProvider>
         </ThemeProvider>

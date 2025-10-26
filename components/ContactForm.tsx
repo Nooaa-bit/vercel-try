@@ -1,4 +1,3 @@
-//hype-hire/vercel/components/ContactForm.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -24,7 +23,7 @@ export function ContactForm({
   onCancel,
   translationNamespace = "contact-form",
 }: ContactFormProps) {
-  const { t } = useTranslation(translationNamespace);
+  const { t, ready } = useTranslation(translationNamespace);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -41,16 +40,44 @@ export function ContactForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.fullName || !formData.email) {
-      toast.error(t("requiredError"));
+    // Validate full name
+    if (!formData.fullName.trim()) {
+      toast.error(t("fullNameRequired"));
       return;
     }
 
-    if (!formData.message || formData.message.length < 10) {
-      toast.error(t("messageError"));
+    // Validate email
+    if (!formData.email.trim()) {
+      toast.error(t("emailRequired"));
+      return;
+    }
+
+    if (!validateEmail(formData.email)) {
+      toast.error(t("emailInvalid"));
+      return;
+    }
+
+    // Validate message
+    if (!formData.message.trim()) {
+      toast.error(t("messageRequired"));
+      return;
+    }
+
+    if (formData.message.trim().length < 10) {
+      toast.error(t("messageTooShort"));
+      return;
+    }
+
+    if (formData.message.length > 1000) {
+      toast.error(t("messageTooLong"));
       return;
     }
 
@@ -82,36 +109,17 @@ export function ContactForm({
     }
   };
 
-  const handleInvalidFullName = (e: React.FormEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    if (input.validity.valueMissing) {
-      input.setCustomValidity(t("fullNameRequired"));
-    }
-  };
-
-  const handleInvalidEmail = (e: React.FormEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    if (input.validity.valueMissing) {
-      input.setCustomValidity(t("emailRequired"));
-    } else if (input.validity.typeMismatch) {
-      input.setCustomValidity(t("emailInvalid"));
-    }
-  };
-
-  const handleInvalidMessage = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    const input = e.currentTarget;
-    if (input.validity.valueMissing) {
-      input.setCustomValidity(t("messageRequired"));
-    } else if (input.validity.tooShort) {
-      input.setCustomValidity(t("messageTooShort"));
-    }
-  };
-
-  const clearValidity = (
-    e: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    e.currentTarget.setCustomValidity("");
-  };
+  // Loading state while translations load
+  if (!ready) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-10 bg-gray-200 rounded"></div>
+        <div className="h-10 bg-gray-200 rounded"></div>
+        <div className="h-32 bg-gray-200 rounded"></div>
+        <div className="h-10 bg-gray-200 rounded"></div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -123,10 +131,7 @@ export function ContactForm({
           type="text"
           value={formData.fullName}
           onChange={handleChange}
-          onInvalid={handleInvalidFullName}
-          onInput={clearValidity}
           placeholder={t("fullNamePlaceholder")}
-          required
           disabled={isSubmitting}
         />
       </div>
@@ -136,13 +141,10 @@ export function ContactForm({
         <Input
           id="email"
           name="email"
-          type="email"
+          type="text"
           value={formData.email}
           onChange={handleChange}
-          onInvalid={handleInvalidEmail}
-          onInput={clearValidity}
           placeholder={t("emailPlaceholder")}
-          required
           disabled={isSubmitting}
         />
       </div>
@@ -154,13 +156,8 @@ export function ContactForm({
           name="message"
           value={formData.message}
           onChange={handleChange}
-          onInvalid={handleInvalidMessage}
-          onInput={clearValidity}
           placeholder={t("messagePlaceholder")}
           className="min-h-[120px]"
-          minLength={10}
-          maxLength={1000}
-          required
           disabled={isSubmitting}
         />
       </div>

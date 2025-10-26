@@ -35,5 +35,8 @@
   "sending": "Αποστολή...",
   "cancel": "Ακύρωση",
   "resetEmailSent": "Ελέγξτε το email σας! Σας στείλαμε σύνδεσμο επαναφοράς κωδικού.",
-  "errorSendingReset": "Αποτυχία αποστολής email. Παρακαλώ δοκιμάστε ξανά."
+  "errorSendingReset": "Αποτυχία αποστολής email. Παρακαλώ δοκιμάστε ξανά.",
+  "errorEmailRequired": "Το email είναι υποχρεωτικό",
+  "errorEmailInvalid": "Παρακαλώ εισάγετε μια έγκυρη διεύθυνση email",
+  "errorPasswordRequired": "Ο κωδικός είναι υποχρεωτικός"
 }

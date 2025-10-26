@@ -24,10 +24,10 @@
   "tryDifferentEmail": "Try a different email",
   "needInvitation": "Need an invitation? Contact your team administrator.",
   "forgotPassword": "Forgot password?",
-  "errorLoginFailed": "Login failed",
+  "errorLoginFailed": "Login failed. Please try again.",
   "errorUserNotInvited": "Only invited team members can use magic links. Please contact your administrator for an invitation.",
-  "errorMagicLinkFailed": "Failed to send magic link",
-  "errorSocialLoginFailed": "Failed to sign in with",
+  "errorMagicLinkFailed": "Failed to send magic link. Please try again.",
+  "errorSocialLoginFailed": "Failed to sign in. Please try again.",
   "resetPasswordTitle": "Reset Password",
   "resetPasswordDescription": "Enter your email address and we'll send you a link to reset your password.",
   "emailLabel": "Email Address",
@@ -35,5 +35,8 @@
   "sending": "Sending...",
   "cancel": "Cancel",
   "resetEmailSent": "Check your email! We've sent you a password reset link.",
-  "errorSendingReset": "Failed to send reset email. Please try again."
+  "errorSendingReset": "Failed to send reset email. Please try again.",
+  "errorEmailRequired": "Email is required",
+  "errorEmailInvalid": "Please enter a valid email address",
+  "errorPasswordRequired": "Password is required"
 }

@@ -10,22 +10,23 @@
   },
   "right": {
     "badge": "Request a demo",
-    "title": "See it for yourself",
-    "form": {
-      "fullName": "Full name",
-      "email": "Email address",
-      "message": "Message",
-      "submit": "Send request ",
-      "submitting": " Sending... ",
-      "requiredError": "Please fill in all required fields",
-      "fullNameRequired": "Please fill out your name",
-      "emailRequired": "Please fill out your email",
-      "emailInvalid": "Please include an '@' in the email address",
-      "messageRequired": "Please fill out your message",
-      "messageTooShort": "Please lengthen this text to 10 characters or more",
-      "messageError": "Message must be at least 10 characters",
-      "success": "Message sent successfully!",
-      "errorGeneric": "Failed to send message. Please try again."
-    }
-  }
+    "title": "See it for yourself"
+  },
+  "fullName": "Full name",
+  "fullNamePlaceholder": "Enter your full name",
+  "email": "Email address",
+  "emailPlaceholder": "you@example.com",
+  "message": "Message",
+  "messagePlaceholder": "Tell us about your staffing needs...",
+  "submit": "Send request",
+  "submitting": "Sending...",
+  "cancel": "Cancel",
+  "fullNameRequired": "Please fill out your name",
+  "emailRequired": "Please fill out your email",
+  "emailInvalid": "Please include an '@' in the email address",
+  "messageRequired": "Please fill out your message",
+  "messageTooShort": "Please lengthen this text to 10 characters or more",
+  "messageTooLong": "Message is too long",
+  "success": "Message sent successfully!",
+  "errorGeneric": "Failed to send message. Please try again."
 }

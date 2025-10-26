@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -27,16 +26,26 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Lock, Sparkles, CheckCircle, Info } from "lucide-react";
+import { Mail, Lock, Sparkles, CheckCircle } from "lucide-react";
+
+// Email validation regex as a constant (fix for overengineering)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
-  const { t } = useTranslation("login");
-  const languageContext = useLanguage();
+  const { t, i18n, ready } = useTranslation("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [activeTab, setActiveTab] = useState("password");
+
+  // Initialize activeTab from sessionStorage, default to "password"
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("loginTab") || "password";
+    }
+    return "password";
+  });
+
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
@@ -44,8 +53,36 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // Persist activeTab to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("loginTab", activeTab);
+    }
+  }, [activeTab]);
+
+  const validateEmail = (email: string) => {
+    return EMAIL_REGEX.test(email);
+  };
+
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Manual validation
+    if (!email.trim()) {
+      toast.error(t("errorEmailRequired"));
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast.error(t("errorEmailInvalid"));
+      return;
+    }
+
+    if (!password.trim()) {
+      toast.error(t("errorPasswordRequired"));
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -55,12 +92,12 @@ export default function LoginPage() {
       });
 
       if (error) {
-        alert(error.message);
+        toast.error(error.message);
       } else {
-        router.push("/dashboard");
+        router.push(`/${i18n.language}/dashboard`);
       }
     } catch (err) {
-      alert(t("errorLoginFailed"));
+      toast.error(t("errorLoginFailed"));
     } finally {
       setLoading(false);
     }
@@ -68,10 +105,22 @@ export default function LoginPage() {
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Manual validation
+    if (!email.trim()) {
+      toast.error(t("errorEmailRequired"));
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast.error(t("errorEmailInvalid"));
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const currentLanguage = languageContext.language;
+      const currentLanguage = i18n.language;
       console.log("🚀 Submitting with current language:", currentLanguage);
 
       const response = await fetch("/api/auth/magic_link_to_existing", {
@@ -89,9 +138,9 @@ export default function LoginPage() {
 
       if (!response.ok) {
         if (result.code === "USER_NOT_FOUND") {
-          alert(t("errorUserNotInvited"));
+          toast.error(t("errorUserNotInvited"));
         } else {
-          alert(result.error || t("errorMagicLinkFailed"));
+          toast.error(result.error || t("errorMagicLinkFailed"));
         }
         return;
       }
@@ -100,7 +149,7 @@ export default function LoginPage() {
       setMagicLinkSent(true);
     } catch (err) {
       console.error("Magic link error:", err);
-      alert(t("errorMagicLinkFailed"));
+      toast.error(t("errorMagicLinkFailed"));
     } finally {
       setLoading(false);
     }
@@ -118,10 +167,10 @@ export default function LoginPage() {
       });
 
       if (error) {
-        alert(error.message);
+        toast.error(error.message);
       }
     } catch (err) {
-      alert(`${t("errorSocialLoginFailed")} ${provider}`);
+      toast.error(t("errorSocialLoginFailed"));
     } finally {
       setLoading(false);
     }
@@ -129,13 +178,25 @@ export default function LoginPage() {
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Manual validation
+    if (!resetEmail.trim()) {
+      toast.error(t("errorEmailRequired"));
+      return;
+    }
+
+    if (!validateEmail(resetEmail)) {
+      toast.error(t("errorEmailInvalid"));
+      return;
+    }
+
     setResetLoading(true);
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(
         resetEmail.toLowerCase().trim(),
         {
-          redirectTo: `${window.location.origin}/${languageContext.language}/reset-password`,
+          redirectTo: `${window.location.origin}/${i18n.language}/reset-password`,
         }
       );
 
@@ -148,11 +209,31 @@ export default function LoginPage() {
         setResetEmail("");
       }, 3000);
     } catch (err) {
-      alert(t("errorSendingReset"));
+      toast.error(t("errorSendingReset"));
     } finally {
       setResetLoading(false);
     }
   };
+
+  // Loading skeleton while translations load
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-lg shadow-elegant">
+          <CardHeader className="text-center space-y-2">
+            <div className="h-8 bg-gray-200 rounded w-2/3 mx-auto animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+              <div className="h-32 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (magicLinkSent) {
     return (
@@ -200,7 +281,7 @@ export default function LoginPage() {
 
         <CardContent>
           <Tabs
-            defaultValue="password"
+            value={activeTab}
             className="space-y-6"
             onValueChange={setActiveTab}
           >
@@ -230,7 +311,11 @@ export default function LoginPage() {
 
             {/* Password Login */}
             <TabsContent value="password" className="space-y-4">
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
+              <form
+                onSubmit={handlePasswordLogin}
+                noValidate
+                className="space-y-4"
+              >
                 <div className="space-y-2">
                   <Label htmlFor="email">{t("email")}</Label>
                   <Input
@@ -240,7 +325,6 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t("emailPlaceholder")}
                     className="focus-visible:ring-pulse-500"
-                    required
                   />
                 </div>
 
@@ -253,7 +337,6 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t("passwordPlaceholder")}
                     className="focus-visible:ring-pulse-500"
-                    required
                   />
                 </div>
 
@@ -269,7 +352,7 @@ export default function LoginPage() {
 
             {/* Magic Link Login */}
             <TabsContent value="magic" className="space-y-4">
-              <form onSubmit={handleMagicLink} className="space-y-4">
+              <form onSubmit={handleMagicLink} noValidate className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="magic-email">{t("email")}</Label>
                   <Input
@@ -279,7 +362,6 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t("emailPlaceholder")}
                     className="focus-visible:ring-pulse-500"
-                    required
                   />
                 </div>
 
@@ -383,7 +465,7 @@ export default function LoginPage() {
               <AlertDescription>{t("resetEmailSent")}</AlertDescription>
             </Alert>
           ) : (
-            <form onSubmit={handlePasswordReset}>
+            <form onSubmit={handlePasswordReset} noValidate>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="reset-email">{t("emailLabel")}</Label>
@@ -393,7 +475,6 @@ export default function LoginPage() {
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     placeholder={t("emailPlaceholder")}
-                    required
                   />
                 </div>
               </div>

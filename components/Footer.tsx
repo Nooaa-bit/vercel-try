@@ -3,17 +3,10 @@
 
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { usePathname } from "next/navigation";
 
 const Footer = () => {
-  const { t } = useTranslation("footer");
-  const pathname = usePathname();
-
-  // Extract "/en" or "/el" from the current path; default to "/en" if missing
-  const localePrefix = (() => {
-    const match = pathname?.match(/^\/(en|el)(?=\/|$)/);
-    return match ? `/${match[1]}` : "/en";
-  })();
+  const { t, i18n } = useTranslation("footer");
+  const localePrefix = `/${i18n.language}`;
 
   return (
     <footer className="border-t mt-8 pt-4 pb-8">
