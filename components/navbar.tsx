@@ -1,70 +1,23 @@
 // /web/components/Navbar.tsx
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import { Menu, X, LogOut, User, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useRouter, usePathname } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-//Remove i18n and use LanguageContext + JSON
-import { useLanguage } from "@/lib/LanguageContext";
-import navEn from "@/translations/en/nav.json";
-import navEl from "@/translations/el/nav.json";
-
-// Import custom hooks (unchanged)
+// Import custom hooks
 import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/app/hooks/useTheme";
 import { useScrollPosition } from "@/app/hooks/useScrollPosition";
 import { useMobileMenu } from "@/app/hooks/useMobileMenu";
 
-//Lightweight skeleton component
-function NavbarSkeleton() {
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 bg-white/80 backdrop-blur-md">
-      <div className="container flex items-center justify-between px-4 sm:px-6 lg:px-8">
-        <img
-          src="/logo.png"
-          alt="Hype Hire Logo"
-          className="h-8 sm:h-9 md:h-10 lg:h-12 flex-shrink-0"
-        />
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    </header>
-  );
-}
-
-// Keep the main component thin so it can early-return the skeleton if needed later
 const Navbar = () => {
-  // Quick win: derive translations from context instead of i18n
-  const { language } = useLanguage();
-  const translations =
-    language === "el"
-      ? (navEl as Record<string, string>)
-      : (navEn as Record<string, string>);
-  const t = (key: string) => translations[key] ?? key;
-
-  // If you later reintroduce async loading for translations, you can gate here:
-  const translationsReady = true;
-  if (!translationsReady) {
-    return <NavbarSkeleton />;
-  }
-
-  // Defer heavy hooks to the content component
-  return <NavbarContent t={t} lang={language} />;
-};
-
-function NavbarContent({
-  t,
-  lang,
-}: {
-  t: (key: string) => string;
-  lang: "en" | "el";
-}) {
+  const { t, i18n, ready } = useTranslation("nav");
   const { user, loading: authLoading, signIn, signOut } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const isScrolled = useScrollPosition(10);
@@ -74,15 +27,23 @@ function NavbarContent({
     close: closeMenu,
     scrollToTop,
   } = useMobileMenu();
+
   const router = useRouter();
   const pathname = usePathname();
 
+  const lang = i18n.language || "en";
   const homePath = `/${lang}`;
   const isHomePage =
     pathname === "/" || pathname === homePath || pathname === `${homePath}/`;
-  const darkMode = theme === "dark";
-  const isDashboardPage = pathname.toLowerCase().includes("dashboard");
 
+  const darkMode = theme === "dark";
+
+  // Hide nav buttons anywhere "dashboard" appears in the pathname
+  const isDashboardPage =
+    typeof pathname === "string" &&
+    pathname.toLowerCase().includes("dashboard");
+
+  // Smooth scroll to an element id (same-page case)
   const scrollToId = (id: string) => {
     const el =
       typeof document !== "undefined" ? document.getElementById(id) : null;
@@ -101,6 +62,7 @@ function NavbarContent({
     }
   };
 
+  // Click handler factory for hash links
   const handleHashNav =
     (id: "features" | "details") =>
     (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -111,6 +73,7 @@ function NavbarContent({
       }
     };
 
+  // Home click behaves like scroll-to-top when on the homepage
   const handleHomeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isHomePage) {
       e.preventDefault();
@@ -119,22 +82,22 @@ function NavbarContent({
     }
   };
 
-  const navItems = useMemo(() => {
-    if (isDashboardPage) return [];
-    return [
-      { label: t("home"), href: homePath, onClick: handleHomeClick },
-      {
-        label: t("about"),
-        href: `${homePath}#features`,
-        onClick: handleHashNav("features"),
-      },
-      {
-        label: t("contact"),
-        href: `${homePath}#details`,
-        onClick: handleHashNav("details"),
-      },
-    ];
-  }, [isDashboardPage, t, homePath]);
+  // Build nav items only if NOT on any dashboard page
+  const navItems = isDashboardPage
+    ? []
+    : [
+        { label: t("home"), href: homePath, onClick: handleHomeClick },
+        {
+          label: t("about"),
+          href: `${homePath}#features`,
+          onClick: handleHashNav("features"),
+        },
+        {
+          label: t("contact"),
+          href: `${homePath}#details`,
+          onClick: handleHashNav("details"),
+        },
+      ];
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -252,14 +215,33 @@ function NavbarContent({
     );
   };
 
+  if (!ready) {
+    return (
+      <header className="fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 bg-white/80 backdrop-blur-md">
+        <div className="container flex items-center justify-between px-4 sm:px-6 lg:px-8">
+          <img
+            src="/logo.png"
+            alt="Hype Hire Logo"
+            className="h-8 sm:h-9 md:h-10 lg:h-12 flex-shrink-0"
+          />
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <>
       <header
         className={cn(
           "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
           isDashboardPage
-            ? "bg-background shadow-sm"
-            : isScrolled
+            ? // Solid, themed bar on any dashboard URL
+              "bg-background shadow-sm"
+            : // Keep existing behavior elsewhere
+            isScrolled
             ? "bg-white/60 backdrop-blur-lg shadow-sm"
             : "bg-transparent"
         )}
@@ -422,6 +404,6 @@ function NavbarContent({
       </div>
     </>
   );
-}
+};
 
 export default Navbar;
