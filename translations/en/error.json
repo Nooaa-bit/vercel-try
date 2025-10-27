@@ -1,0 +1,8 @@
+{
+  "title": "Oops! Something Went Wrong",
+  "subtitle": "We encountered an unexpected error",
+  "defaultMessage": "An unexpected error occurred. Please try again.",
+  "goHome": "Go to Homepage",
+  "goBack": "Go Back",
+  "helpText": "If this problem persists, please contact support."
+}
