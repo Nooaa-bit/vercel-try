@@ -123,7 +123,7 @@ export default function LoginPage() {
       const currentLanguage = i18n.language;
       console.log("🚀 Submitting with current language:", currentLanguage);
 
-      const response = await fetch("/api/auth/magic_link_to_existing", {
+      const response = await fetch("/api/magic_link_to_existing", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

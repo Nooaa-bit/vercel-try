@@ -5,9 +5,21 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Lock, CheckCircle } from "lucide-react";
 
 export default function ResetPassword() {
-  const { t } = useTranslation("reset-pass");
+  const { t, i18n, ready } = useTranslation("reset-pass");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +28,6 @@ export default function ResetPassword() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Check if this is a valid password recovery session
     const checkSession = async () => {
       const {
         data: { session },
@@ -24,14 +35,12 @@ export default function ResetPassword() {
       if (session) {
         setIsValidSession(true);
       } else {
-        // No valid session, redirect to login
-        router.push("/login");
+        router.push(`/${i18n.language}/login`);
       }
     };
 
     checkSession();
 
-    // Listen for auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -41,121 +50,163 @@ export default function ResetPassword() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth, router]);
+  }, [supabase.auth, router, i18n.language]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      alert(t("errorPasswordMismatch"));
+      toast.error(t("errorPasswordMismatch"));
       return;
     }
 
     if (password.length < 4) {
-      alert(t("errorPasswordTooShort"));
+      toast.error(t("errorPasswordTooShort"));
       return;
     }
 
     setLoading(true);
 
     try {
-      // Step 1: Update the password in auth.users (Supabase handles this)
       const { error: passwordError } = await supabase.auth.updateUser({
         password: password,
       });
 
       if (passwordError) throw passwordError;
 
-      // Step 2: Update has_password field in YOUR public.user table
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (user) {
         const { error: dbError } = await supabase
-          .from("user") // Your public.user table
+          .from("user")
           .update({ has_password: true })
           .eq("auth_user_id", user.id);
 
         if (dbError) {
           console.error("Error updating user table:", dbError);
-          // Don't fail the whole process if this fails
         }
       }
 
-      alert(t("successPasswordUpdated"));
-      router.push("/dashboard");
+      toast.success(t("successPasswordUpdated"));
+      router.push(`/${i18n.language}/dashboard`);
     } catch (error) {
-      alert(t("errorUpdatingPassword") + (error as Error).message);
+      toast.error(t("errorUpdatingPassword") + (error as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
+  // Loading skeleton while translations load
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-elegant">
+          <CardHeader className="text-center space-y-2">
+            <div className="h-8 bg-gray-200 rounded w-2/3 mx-auto animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!isValidSession) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{t("validatingSession")}</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-elegant text-center">
+          <CardContent className="pt-6">
+            <div className="w-16 h-16 bg-pulse-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pulse-500" />
+            </div>
+            <p className="text-muted-foreground">{t("validatingSession")}</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("title")}</h1>
-
-        <form onSubmit={handlePasswordUpdate} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t("newPassword")}
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder={t("newPasswordPlaceholder")}
-              required
-              minLength={4}
-            />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md shadow-elegant">
+        <CardHeader className="text-center space-y-2">
+          <div className="w-16 h-16 bg-pulse-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-pulse-500" />
           </div>
+          <CardTitle className="text-3xl font-display">{t("title")}</CardTitle>
+          <CardDescription>{t("description")}</CardDescription>
+        </CardHeader>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t("confirmPassword")}
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder={t("confirmPasswordPlaceholder")}
-              required
-            />
+        <CardContent>
+          <form onSubmit={handlePasswordUpdate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">{t("newPassword")}</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t("newPasswordPlaceholder")}
+                className="focus-visible:ring-pulse-500"
+                required
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("passwordHint")}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">{t("confirmPassword")}</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t("confirmPasswordPlaceholder")}
+                className="focus-visible:ring-pulse-500"
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-pulse-500 hover:bg-pulse-600"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  {t("updating")}
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  {t("updatePassword")}
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <Button
+              variant="ghost"
+              onClick={() => router.push(`/${i18n.language}/dashboard`)}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("backToDashboard")}
+            </Button>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? t("updating") : t("updatePassword")}
-          </button>
-        </form>
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="text-sm text-gray-600 hover:text-gray-800"
-          >
-            {t("backToDashboard")}
-          </button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

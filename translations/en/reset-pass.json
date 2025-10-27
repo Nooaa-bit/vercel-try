@@ -1,0 +1,17 @@
+{
+  "title": "Reset Password",
+  "description": "Choose a new password for your account",
+  "newPassword": "New Password",
+  "newPasswordPlaceholder": "Enter your new password",
+  "confirmPassword": "Confirm Password",
+  "confirmPasswordPlaceholder": "Confirm your new password",
+  "passwordHint": "Password must be at least 4 characters",
+  "updatePassword": "Update Password",
+  "updating": "Updating...",
+  "backToDashboard": "Back to Dashboard",
+  "validatingSession": "Validating your session...",
+  "errorPasswordMismatch": "Passwords do not match",
+  "errorPasswordTooShort": "Password must be at least 4 characters",
+  "successPasswordUpdated": "Password updated successfully!",
+  "errorUpdatingPassword": "Error updating password: "
+}
