@@ -1,17 +1,64 @@
 {
-  "title": "Settings",
-  "account": {
-    "title": "Account Information",
-    "email": "Email",
-    "userId": "User ID",
-    "created": "Account created"
+  "pageTitle": "Personal Information",
+  "validation": {
+    "required": "Please fill in all required fields",
+    "nameLength": "Names must be at least 2 characters"
   },
-  "profile": {
-    "title": "Profile",
-    "coming": "Profile customization coming soon..."
+  "success": {
+    "profileUpdated": "Profile updated successfully!"
   },
-  "preferences": {
-    "title": "Preferences",
-    "coming": "Language and notification settings coming soon..."
+  "errors": {
+    "updateFailed": "Failed to update profile",
+    "genericError": "An error occurred while saving"
+  },
+  "photo": {
+    "newSelected": "New photo selected. Click Save Changes to upload.",
+    "altText": "Profile",
+    "clickToChange": "Click the pencil icon to change your profile picture.",
+    "cropInstructions": "Crop and position, then click Save Changes below to upload.",
+    "requirements": "Max size: 5MB • Formats: JPG, PNG"
+  },
+  "fields": {
+    "firstName": {
+      "label": "First Name",
+      "placeholder": "Enter your first name"
+    },
+    "lastName": {
+      "label": "Last Name",
+      "placeholder": "Enter your last name"
+    },
+    "email": {
+      "label": "Email"
+    },
+    "phone": {
+      "label": "Phone",
+      "placeholder": "(555) 123-4567"
+    },
+    "dateOfBirth": {
+      "label": "Date of Birth"
+    },
+    "emergencyContact": {
+      "label": "Emergency Contact",
+      "placeholder": "(555) 987-6543"
+    }
+  },
+  "badges": {
+    "comingSoon": "Coming Soon"
+  },
+  "buttons": {
+    "saveChanges": "Save Changes",
+    "saving": "Saving..."
+  },
+  "crop": {
+    "title": "Crop Profile Picture",
+    "zoom": "Zoom",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "processing": "Processing...",
+    "errors": {
+      "invalidType": "Please upload a JPG or PNG image",
+      "tooLarge": "Image must be smaller than 5MB",
+      "cropFailed": "Failed to crop image. Please try again."
+    }
   }
 }

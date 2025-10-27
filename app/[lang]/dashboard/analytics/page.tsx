@@ -1,20 +1,30 @@
+//hype-hire/vercel/app/[lang]/dashboard/analytics/page.tsx
 "use client";
 
-import "mapbox-gl/dist/mapbox-gl.css";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, MapPin, AlertCircle, CheckCircle } from "lucide-react";
-import mapboxgl from "mapbox-gl";
+import {
+  BarChart3,
+  MapPin,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+} from "lucide-react";
 
-// Constants - calculated once
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const GEOAPIFY_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
 
+// ✅ Lazy load function
+const loadMapbox = () => import("mapbox-gl");
+
 export default function AnalyticsPage() {
-  const { activeRole, hasPermission } = useActiveRole();
+  const { activeRole, hasPermission, loading } = useActiveRole();
   const router = useRouter();
+  const pathname = usePathname();
+  const lang = pathname.split("/")[1] || "en";
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
 
@@ -22,16 +32,14 @@ export default function AnalyticsPage() {
     "loading"
   );
   const [errorMessage, setErrorMessage] = useState("");
+  const [mapboxLoaded, setMapboxLoaded] = useState(false);
 
-  // Map initialization and permission check - runs once
+  // Map initialization with lazy loading
   useEffect(() => {
-    // Permission check
-    if (!hasPermission("company_admin")) {
-      router.replace("/dashboard");
+    if (loading || !hasPermission("company_admin")) {
       return;
     }
 
-    // Early returns for invalid states
     if (!MAPBOX_TOKEN) {
       setMapStatus("error");
       setErrorMessage("NEXT_PUBLIC_MAPBOX_TOKEN not found");
@@ -42,38 +50,52 @@ export default function AnalyticsPage() {
       return;
     }
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    // ✅ Dynamically import mapbox-gl
+    loadMapbox()
+      .then((mapboxgl) => {
+        setMapboxLoaded(true);
 
-    try {
-      const map = new mapboxgl.Map({
-        container: mapContainerRef.current,
-        style: "mapbox://styles/mapbox/streets-v12",
-        center: [23.7275, 37.9838], // Athens
-        zoom: 12,
-      });
+        if (!mapContainerRef.current || mapRef.current) {
+          return;
+        }
 
-      map.on("load", () => {
-        setMapStatus("success");
-      });
+        try {
+          const map = new mapboxgl.Map({
+            container: mapContainerRef.current,
+            accessToken: MAPBOX_TOKEN,
+            style: "mapbox://styles/mapbox/streets-v12", //style: "mapbox://styles/mapbox/light-v11", // Lighter, loads faster
+            center: [23.7275, 37.9838], // Athens
+            zoom: 12,
+          });
 
-      map.on("error", (e) => {
-        console.error("Map error:", e);
+          map.on("load", () => {
+            setMapStatus("success");
+          });
+
+          map.on("error", (e: mapboxgl.ErrorEvent) => {
+            console.error("Map error:", e);
+            setMapStatus("error");
+            setErrorMessage(e.error?.message || "Unknown map error");
+          });
+
+          new mapboxgl.Marker({ color: "#ef4444" })
+            .setLngLat([23.7275, 37.9838])
+            .addTo(map);
+
+          mapRef.current = map;
+        } catch (error) {
+          console.error("Map initialization error:", error);
+          setMapStatus("error");
+          setErrorMessage(
+            error instanceof Error ? error.message : "Failed to initialize map"
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load Mapbox:", error);
         setMapStatus("error");
-        setErrorMessage(e.error?.message || "Unknown map error");
+        setErrorMessage("Failed to load map library");
       });
-
-      new mapboxgl.Marker({ color: "#ef4444" })
-        .setLngLat([23.7275, 37.9838])
-        .addTo(map);
-
-      mapRef.current = map;
-    } catch (error) {
-      console.error("Map initialization error:", error);
-      setMapStatus("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to initialize map"
-      );
-    }
 
     return () => {
       if (mapRef.current) {
@@ -81,10 +103,35 @@ export default function AnalyticsPage() {
         mapRef.current = null;
       }
     };
-  }, [hasPermission, router]); // Empty deps - initialize once
+  }, [loading, hasPermission]);
+
+  // Redirect effect
+  useEffect(() => {
+    if (!loading && !hasPermission("company_admin")) {
+      router.replace(`/${lang}/dashboard`);
+    }
+  }, [loading, hasPermission, router, lang]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Permission denied
+  if (!hasPermission("company_admin")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Access denied. Redirecting...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 py-20">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
           Analytics Dashboard
@@ -139,8 +186,12 @@ export default function AnalyticsPage() {
             <div className="flex items-center gap-2">
               {mapStatus === "loading" && (
                 <>
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-blue-500">Loading map...</span>
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                  <span className="text-blue-500">
+                    {!mapboxLoaded
+                      ? "Loading map library..."
+                      : "Loading map..."}
+                  </span>
                 </>
               )}
               {mapStatus === "success" && (
@@ -170,12 +221,49 @@ export default function AnalyticsPage() {
               </div>
             )}
 
-            {/* Map Container - only render if token exists */}
+            {/* Map Container with Placeholder */}
             {MAPBOX_TOKEN ? (
-              <div
-                ref={mapContainerRef}
-                className="w-full h-[400px] rounded-lg border bg-muted"
-              />
+              <div className="relative w-full h-[400px] rounded-lg border bg-muted overflow-hidden">
+                {/* ✅ Animated placeholder while loading */}
+                {mapStatus === "loading" && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/50 to-muted animate-pulse flex flex-col items-center justify-center gap-4 z-10">
+                    <div className="relative">
+                      <MapPin className="w-16 h-16 text-muted-foreground/30" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-pulse-500 animate-spin" />
+                      </div>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {!mapboxLoaded
+                          ? "Initializing map..."
+                          : "Loading Athens..."}
+                      </p>
+                      <div className="flex gap-1 justify-center">
+                        <div
+                          className="w-2 h-2 bg-pulse-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        />
+                        <div
+                          className="w-2 h-2 bg-pulse-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        />
+                        <div
+                          className="w-2 h-2 bg-pulse-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Map container */}
+                <div
+                  ref={mapContainerRef}
+                  className="w-full h-full"
+                  style={{ opacity: mapStatus === "success" ? 1 : 0 }}
+                />
+              </div>
             ) : (
               <div className="w-full h-[400px] rounded-lg border bg-muted flex items-center justify-center">
                 <p className="text-muted-foreground">

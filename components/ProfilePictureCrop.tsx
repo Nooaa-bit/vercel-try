@@ -1,8 +1,19 @@
-//hype-hire/vercel/components/ProfilePictureCrop.tsx
 "use client";
 
-import { useState, useCallback } from "react";
-import Cropper from "react-easy-crop";
+import { useState, useCallback, useEffect } from "react";
+import { toast } from "sonner";
+import dynamic from "next/dynamic";
+import { useTranslation } from "react-i18next";
+
+// ✅ Lazy load cropper library
+const Cropper = dynamic(() => import("react-easy-crop"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  ),
+});
 
 interface ProfilePictureCropProps {
   currentImageUrl: string | null;
@@ -16,10 +27,17 @@ interface CroppedArea {
   height: number;
 }
 
+// ✅ Constants for validation
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+const MAX_DIMENSION = 1024; // Max width/height for profile picture
+
 export default function ProfilePictureCrop({
   currentImageUrl,
   onImageSelected,
 }: ProfilePictureCropProps) {
+  const { t } = useTranslation("settings"); // ✅ Add translation hook
+
   const [isOpen, setIsOpen] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentImageUrl);
@@ -28,82 +46,168 @@ export default function ProfilePictureCrop({
   const [croppedAreaPixels, setCroppedAreaPixels] =
     useState<CroppedArea | null>(null);
   const [fileName, setFileName] = useState("");
+  const [fileType, setFileType] = useState("image/jpeg");
+  const [isProcessing, setIsProcessing] = useState(false);
 
+  // ✅ Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      if (imageSrc && imageSrc.startsWith("blob:")) {
+        URL.revokeObjectURL(imageSrc);
+      }
+    };
+  }, [previewUrl, imageSrc]);
+
+  // ✅ FIXED: Use objectURL instead of base64
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+
+      // Reset input value to allow re-selecting the same file
+      e.target.value = "";
+
+      // ✅ File type validation
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast.error(t("crop.errors.invalidType"));
+        return;
+      }
+
+      // ✅ File size validation
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(t("crop.errors.tooLarge"));
+        return;
+      }
+
       setFileName(file.name);
-      const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        const dataUrl = reader.result as string;
-        setImageSrc(dataUrl);
-        setIsOpen(true);
-      });
-      reader.readAsDataURL(file);
+      setFileType(file.type);
+
+      // ✅ NEW: Use objectURL instead of FileReader
+      const objectUrl = URL.createObjectURL(file);
+      setImageSrc(objectUrl);
+      setIsOpen(true);
     }
   };
 
   const onCropComplete = useCallback(
-    (croppedArea: CroppedArea, croppedAreaPixels: CroppedArea) => {
+    (_: CroppedArea, croppedAreaPixels: CroppedArea) => {
       setCroppedAreaPixels(croppedAreaPixels);
     },
     []
   );
 
-  const createCroppedImage = async () => {
-    if (!imageSrc || !croppedAreaPixels) return;
+  // ✅ Compress and create cropped image
+  const createCroppedImage = async (): Promise<File | null> => {
+    if (!imageSrc || !croppedAreaPixels) return null;
 
-    const image = new Image();
-    image.src = imageSrc;
+    try {
+      const image = new Image();
+      image.src = imageSrc;
 
-    await new Promise((resolve) => {
-      image.onload = resolve;
-    });
+      // ✅ Add error handling for image load
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Failed to load image"));
+      });
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
 
-    if (!ctx) return;
+      if (!ctx) {
+        throw new Error("Failed to get canvas context");
+      }
 
-    canvas.width = croppedAreaPixels.width;
-    canvas.height = croppedAreaPixels.height;
+      // ✅ Calculate dimensions (compress if needed)
+      let finalWidth = croppedAreaPixels.width;
+      let finalHeight = croppedAreaPixels.height;
 
-    ctx.drawImage(
-      image,
-      croppedAreaPixels.x,
-      croppedAreaPixels.y,
-      croppedAreaPixels.width,
-      croppedAreaPixels.height,
-      0,
-      0,
-      croppedAreaPixels.width,
-      croppedAreaPixels.height
-    );
+      if (finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION) {
+        const scale = MAX_DIMENSION / Math.max(finalWidth, finalHeight);
+        finalWidth = Math.round(finalWidth * scale);
+        finalHeight = Math.round(finalHeight * scale);
+      }
 
-    return new Promise<File>((resolve) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], fileName, { type: "image/jpeg" });
-          const croppedPreviewUrl = URL.createObjectURL(blob);
-          setPreviewUrl(croppedPreviewUrl);
-          resolve(file);
-        }
-      }, "image/jpeg");
-    });
+      canvas.width = finalWidth;
+      canvas.height = finalHeight;
+
+      // Draw cropped and resized image
+      ctx.drawImage(
+        image,
+        croppedAreaPixels.x,
+        croppedAreaPixels.y,
+        croppedAreaPixels.width,
+        croppedAreaPixels.height,
+        0,
+        0,
+        finalWidth,
+        finalHeight
+      );
+
+      // ✅ Convert to blob with quality control
+      return new Promise<File>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              // ✅ Revoke old preview URL before creating new one
+              if (previewUrl && previewUrl.startsWith("blob:")) {
+                URL.revokeObjectURL(previewUrl);
+              }
+
+              const file = new File([blob], fileName, { type: fileType });
+              const croppedPreviewUrl = URL.createObjectURL(blob);
+              setPreviewUrl(croppedPreviewUrl);
+              resolve(file);
+            } else {
+              reject(new Error("Failed to create blob"));
+            }
+          },
+          fileType,
+          0.9
+        );
+      });
+    } catch (error) {
+      console.error("Crop error:", error);
+      throw error;
+    }
   };
 
   const handleApply = async () => {
-    const croppedFile = await createCroppedImage();
-    if (croppedFile) {
-      onImageSelected(croppedFile);
-      setIsOpen(false);
-      setImageSrc(null);
+    setIsProcessing(true);
+
+    try {
+      const croppedFile = await createCroppedImage();
+      if (croppedFile) {
+        onImageSelected(croppedFile);
+
+        // ✅ FIXED: Revoke imageSrc URL after processing
+        if (imageSrc && imageSrc.startsWith("blob:")) {
+          URL.revokeObjectURL(imageSrc);
+        }
+
+        setIsOpen(false);
+        setImageSrc(null);
+        setZoom(1);
+        setCrop({ x: 0, y: 0 });
+      }
+    } catch (error) {
+      console.error("Error applying crop:", error);
+      toast.error(t("crop.errors.cropFailed"));
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleCancel = () => {
+    // ✅ FIXED: Cleanup objectURL on cancel
+    if (imageSrc && imageSrc.startsWith("blob:")) {
+      URL.revokeObjectURL(imageSrc);
+    }
     setIsOpen(false);
     setImageSrc(null);
+    setZoom(1);
+    setCrop({ x: 0, y: 0 });
   };
 
   return (
@@ -114,7 +218,7 @@ export default function ProfilePictureCrop({
             {previewUrl ? (
               <img
                 src={previewUrl}
-                alt="Profile"
+                alt={t("photo.altText")}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -151,49 +255,64 @@ export default function ProfilePictureCrop({
             <input
               type="file"
               id="profilePictureInput"
-              accept="image/*"
+              accept="image/jpeg,image/jpg,image/png"
               onChange={onFileChange}
               className="hidden"
             />
           </label>
         </div>
         <div className="text-sm text-muted-foreground">
-          <p>Click the pencil icon to change your profile picture.</p>
-          <p className="mt-1">
-            Crop and position, then click Save Changes below to upload.
-          </p>
+          <p>{t("photo.clickToChange")}</p>
+          <p className="mt-1">{t("photo.cropInstructions")}</p>
+          <p className="mt-2 text-xs">{t("photo.requirements")}</p>
         </div>
       </div>
 
-      {isOpen && (
+      {isOpen && imageSrc && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-card rounded-2xl shadow-elegant max-w-2xl w-full mx-4">
             <div className="p-6 border-b border-border">
               <h2 className="text-xl font-bold text-foreground">
-                Crop Profile Picture
+                {t("crop.title")}
               </h2>
             </div>
 
             <div className="relative h-96 bg-muted">
-              {imageSrc && (
-                <Cropper
-                  image={imageSrc}
-                  crop={crop}
-                  zoom={zoom}
-                  aspect={1}
-                  cropShape="round"
-                  showGrid={false}
-                  onCropChange={setCrop}
-                  onZoomChange={setZoom}
-                  onCropComplete={onCropComplete}
-                />
-              )}
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                onCropChange={setCrop}
+                onCropSizeChange={() => {}}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+                rotation={0}
+                minZoom={1}
+                maxZoom={3}
+                zoomSpeed={1}
+                cropSize={{ width: 400, height: 400 }}
+                onMediaLoaded={() => {}}
+                onTouchRequest={() => true}
+                restrictPosition={true}
+                style={{ containerStyle: {} }}
+                classes={{
+                  containerClassName: "",
+                  mediaClassName: "",
+                  cropAreaClassName: "",
+                }}
+                mediaProps={{}}
+                cropperProps={{}}
+                keyboardStep={5}
+              />
             </div>
 
             <div className="p-6 space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">
-                  Zoom
+                  {t("crop.zoom")}
                 </label>
                 <input
                   type="range"
@@ -203,6 +322,7 @@ export default function ProfilePictureCrop({
                   value={zoom}
                   onChange={(e) => setZoom(Number(e.target.value))}
                   className="w-full"
+                  disabled={isProcessing}
                 />
               </div>
 
@@ -210,16 +330,25 @@ export default function ProfilePictureCrop({
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="px-6 py-2 border border-border rounded-xl hover:bg-muted transition-colors"
+                  disabled={isProcessing}
+                  className="px-6 py-2 border border-border rounded-xl hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Cancel
+                  {t("crop.cancel")}
                 </button>
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="px-6 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
+                  disabled={isProcessing}
+                  className="px-6 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Apply
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground" />
+                      {t("crop.processing")}
+                    </>
+                  ) : (
+                    t("crop.apply")
+                  )}
                 </button>
               </div>
             </div>
