@@ -1,7 +1,6 @@
-// /web/components/Navbar.tsx
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Menu, X, LogOut, User, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { createClient } from "@/lib/supabase/client";
 
 // Custom hooks
 import { useAuth } from "@/app/hooks/useAuth";
@@ -18,10 +18,15 @@ import { useMobileMenu } from "@/app/hooks/useMobileMenu";
 
 const Navbar = () => {
   const { t, i18n, ready } = useTranslation("nav");
-  const { user, loading: authLoading, signIn, signOut } = useAuth();
+  const { user, profile, loading: authLoading, signIn, signOut } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const isScrolled = useScrollPosition(10);
-  const { isOpen: isMenuOpen, toggle: toggleMenu, close: closeMenu, scrollToTop } = useMobileMenu();
+  const {
+    isOpen: isMenuOpen,
+    toggle: toggleMenu,
+    close: closeMenu,
+    scrollToTop,
+  } = useMobileMenu();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -35,11 +40,35 @@ const Navbar = () => {
   const isDashboardPage = pathname.includes("dashboard");
   const darkMode = theme === "dark";
 
+  // ✅ Get profile picture URL (memoized)
+  const profilePictureUrl = useMemo(() => {
+    if (!profile?.profilePicture) return null;
+
+    const supabase = createClient();
+    const { data } = supabase.storage
+      .from("profile-pictures")
+      .getPublicUrl(profile.profilePicture);
+
+    return data.publicUrl;
+  }, [profile?.profilePicture]);
+
+  // ✅ NEW: Handle profile picture click
+  const handleProfileClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(`/${lang}/dashboard/settings`);
+    closeMenu(); // Close mobile menu if open
+  };
+
   // Smooth scroll to an element id (same-page case)
   const scrollToId = (id: "features" | "details") => {
-    const el = typeof document !== "undefined" ? document.getElementById(id) : null;
+    const el =
+      typeof document !== "undefined" ? document.getElementById(id) : null;
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+      inline: "nearest",
+    });
     if (typeof window !== "undefined") {
       const url = `${homePath}#${id}`;
       if (window.location.hash !== `#${id}`) {
@@ -66,12 +95,22 @@ const Navbar = () => {
     requestAnimationFrame(() => scrollToTop());
   };
 
-  // Build nav items only if NOT on any dashboard page - NO USEMEMO
-  const navItems = isDashboardPage ? [] : [
-    { label: t("home"), href: homePath, onClick: handleHomeClick },
-    { label: t("about"), href: `${homePath}#features`, onClick: handleHashNav("features") },
-    { label: t("contact"), href: `${homePath}#details`, onClick: handleHashNav("details") },
-  ];
+  // Build nav items only if NOT on any dashboard page
+  const navItems = isDashboardPage
+    ? []
+    : [
+        { label: t("home"), href: homePath, onClick: handleHomeClick },
+        {
+          label: t("about"),
+          href: `${homePath}#features`,
+          onClick: handleHashNav("features"),
+        },
+        {
+          label: t("contact"),
+          href: `${homePath}#details`,
+          onClick: handleHashNav("details"),
+        },
+      ];
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -92,12 +131,19 @@ const Navbar = () => {
       return (
         <div className="flex items-center justify-center space-x-2">
           <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
-          {isMobile && <span className="text-sm text-gray-600">{t("loading")}</span>}
+          {isMobile && (
+            <span className="text-sm text-gray-600">{t("loading")}</span>
+          )}
         </div>
       );
     }
 
     if (user) {
+      // ✅ Get user initials for fallback
+      const userInitial =
+        user.user_metadata?.first_name?.[0]?.toUpperCase() ||
+        user.email?.[0]?.toUpperCase();
+
       return (
         <div
           className={cn(
@@ -107,15 +153,29 @@ const Navbar = () => {
         >
           {isMobile && (
             <div className="flex items-center space-x-3 justify-center">
-              <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                  {user.user_metadata?.first_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
-                </div>
+              {/* ✅ UPDATED: Clickable profile picture for mobile */}
+              <button
+                onClick={handleProfileClick}
+                className="relative focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:ring-offset-2 rounded-full transition-transform hover:scale-105"
+                aria-label={t("goToSettings") || "Go to Settings"}
+              >
+                {profilePictureUrl ? (
+                  <img
+                    src={profilePictureUrl}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover shadow-md cursor-pointer"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md cursor-pointer">
+                    {userInitial}
+                  </div>
+                )}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm" />
-              </div>
+              </button>
               <div>
                 <div className="text-sm font-medium text-gray-900">
-                  {user.user_metadata?.first_name} {user.user_metadata?.last_name}
+                  {user.user_metadata?.first_name}{" "}
+                  {user.user_metadata?.last_name}
                 </div>
                 <div className="text-xs text-gray-500">{user.email}</div>
               </div>
@@ -124,15 +184,29 @@ const Navbar = () => {
 
           {!isMobile && (
             <>
-              <div className="relative">
-                <div className="w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-xs shadow-md">
-                  {user.user_metadata?.first_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
-                </div>
+              {/* ✅ UPDATED: Clickable profile picture for desktop */}
+              <button
+                onClick={handleProfileClick}
+                className="relative focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:ring-offset-2 rounded-full transition-transform hover:scale-110"
+                aria-label={t("goToSettings") || "Go to Settings"}
+              >
+                {profilePictureUrl ? (
+                  <img
+                    src={profilePictureUrl}
+                    alt="Profile"
+                    className="w-7 h-7 lg:w-8 lg:h-8 rounded-full object-cover shadow-md cursor-pointer"
+                  />
+                ) : (
+                  <div className="w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-xs shadow-md cursor-pointer">
+                    {userInitial}
+                  </div>
+                )}
                 <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 lg:w-2.5 lg:h-2.5 bg-green-500 rounded-full border-2 border-white shadow-sm" />
-              </div>
+              </button>
               <div className="hidden xl:block">
                 <div className="text-sm font-medium text-gray-900">
-                  {user.user_metadata?.first_name} {user.user_metadata?.last_name}
+                  {user.user_metadata?.first_name}{" "}
+                  {user.user_metadata?.last_name}
                 </div>
               </div>
             </>
@@ -141,14 +215,27 @@ const Navbar = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={isMobile ? () => { signOut(); closeMenu(); } : signOut}
+            onClick={
+              isMobile
+                ? () => {
+                    signOut();
+                    closeMenu();
+                  }
+                : signOut
+            }
             className={cn(
               "border-red-300 text-red-600 hover:bg-red-50 hover:border-red-300",
-              isMobile ? "w-full" : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
+              isMobile
+                ? "w-full"
+                : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
             )}
           >
-            <LogOut className={cn("w-3 h-3 lg:w-4 lg:h-4", !isMobile && "lg:mr-2")} />
-            <span className={isMobile ? "" : "hidden lg:inline"}>{t("signOut")}</span>
+            <LogOut
+              className={cn("w-3 h-3 lg:w-4 lg:h-4", !isMobile && "lg:mr-2")}
+            />
+            <span className={isMobile ? "" : "hidden lg:inline"}>
+              {t("signOut")}
+            </span>
           </Button>
         </div>
       );
@@ -158,10 +245,19 @@ const Navbar = () => {
       <Button
         variant="outline"
         size="sm"
-        onClick={isMobile ? () => { signIn(); closeMenu(); } : signIn}
+        onClick={
+          isMobile
+            ? () => {
+                signIn();
+                closeMenu();
+              }
+            : signIn
+        }
         className={cn(
           "border-pulse-500 text-pulse-500 hover:bg-pulse-500 hover:text-white transition-all duration-300",
-          isMobile ? "w-full bg-pulse-500 text-white" : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
+          isMobile
+            ? "w-full bg-pulse-500 text-white"
+            : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
         )}
       >
         <User className={cn("w-3 h-3 lg:w-4 lg:h-4", !isMobile && "lg:mr-2")} />
@@ -174,7 +270,11 @@ const Navbar = () => {
     return (
       <header className="fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 bg-white/80 backdrop-blur-md">
         <div className="container flex items-center justify-between px-4 sm:px-6 lg:px-8">
-          <img src="/logo.png" alt="Hype Hire Logo" className="h-8 sm:h-9 md:h-10 lg:h-12 flex-shrink-0" />
+          <img
+            src="/logo.png"
+            alt="Hype Hire Logo"
+            className="h-8 sm:h-9 md:h-10 lg:h-12 flex-shrink-0"
+          />
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -188,7 +288,11 @@ const Navbar = () => {
       <header
         className={cn(
           "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
-          isDashboardPage ? "bg-background shadow-sm" : isScrolled ? "bg-white/60 backdrop-blur-lg shadow-sm" : "bg-transparent"
+          isDashboardPage
+            ? "bg-background shadow-sm"
+            : isScrolled
+            ? "bg-white/60 backdrop-blur-lg shadow-sm"
+            : "bg-transparent"
         )}
       >
         <div className="container flex items-center justify-between gap-2 md:gap-4 px-4 sm:px-6 lg:px-8">
@@ -199,7 +303,11 @@ const Navbar = () => {
             onClick={handleLogoClick}
             aria-label="Hype Hire"
           >
-            <img src="/logo.png" alt="Hype Hire Logo" className="h-8 sm:h-9 md:h-10 lg:h-12" />
+            <img
+              src="/logo.png"
+              alt="Hype Hire Logo"
+              className="h-8 sm:h-9 md:h-10 lg:h-12"
+            />
           </a>
 
           {/* Desktop Navigation */}
@@ -233,8 +341,16 @@ const Navbar = () => {
             {/* Dark Mode Toggle */}
             {!isHomePage && (
               <div className="flex items-center gap-1.5 lg:gap-2">
-                <Switch checked={darkMode} onCheckedChange={toggleTheme} className="scale-75 lg:scale-100" />
-                {darkMode ? <Moon className="h-3 w-3 lg:h-4 lg:w-4" /> : <Sun className="h-3 w-3 lg:h-4 lg:w-4" />}
+                <Switch
+                  checked={darkMode}
+                  onCheckedChange={toggleTheme}
+                  className="scale-75 lg:scale-100"
+                />
+                {darkMode ? (
+                  <Moon className="h-3 w-3 lg:h-4 lg:w-4" />
+                ) : (
+                  <Sun className="h-3 w-3 lg:h-4 lg:w-4" />
+                )}
               </div>
             )}
 
@@ -262,7 +378,9 @@ const Navbar = () => {
       <div
         className={cn(
           "fixed inset-0 z-[60] bg-muted flex flex-col pt-16 px-6 md:hidden transition-all duration-300 ease-in-out",
-          isMenuOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-full pointer-events-none"
+          isMenuOpen
+            ? "opacity-100 translate-x-0"
+            : "opacity-0 translate-x-full pointer-events-none"
         )}
         style={{ backgroundColor: "hsl(30 23% 93%)" }}
       >
@@ -309,7 +427,11 @@ const Navbar = () => {
             <div className="flex items-center gap-3 py-3 px-6 w-full justify-center rounded-lg hover:bg-white/50 transition-colors">
               <span className="text-sm font-medium">{t("darkMode")}</span>
               <Switch checked={darkMode} onCheckedChange={toggleTheme} />
-              {darkMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              {darkMode ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
             </div>
           )}
 
@@ -319,7 +441,12 @@ const Navbar = () => {
           </div>
 
           {/* Auth Section */}
-          <div className={cn("w-full", isHomePage ? "mt-6 pt-6 border-t border-gray-300/50" : "mt-6")}>
+          <div
+            className={cn(
+              "w-full",
+              isHomePage ? "mt-6 pt-6 border-t border-gray-300/50" : "mt-6"
+            )}
+          >
             {renderAuthSection(true)}
           </div>
         </nav>
