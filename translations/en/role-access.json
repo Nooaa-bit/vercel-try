@@ -1,0 +1,14 @@
+{
+  "loading": {
+    "title": "Loading your workspace",
+    "subtitle": "Please wait while we fetch your access..."
+  },
+  "noAccess": {
+    "title": "No Access Found",
+    "description": "You do not have access to any companies yet.",
+    "whatToDo": "What to do:",
+    "step1": "Contact your administrator for access",
+    "step2": "Check if your invitation has expired",
+    "step3": "Verify you are using the correct email"
+  }
+}

@@ -1,24 +1,10 @@
 //hype-hire/vercel/components/AppSidebar.tsx
 "use client";
 
-import {
-  LayoutDashboard,
-  BarChart3,
-  FileText,
-  UserRoundPlus,
-  Users,
-  Calendar as CalendarIcon,
-  Settings,
-  HelpCircle,
-  Search,
-  ChevronDown,
-  Building2,
-  Plus,
-  MapPinIcon,
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Sidebar,
@@ -31,30 +17,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
+import { NAV_ITEMS, type NavItem } from "@/lib/dash-navigation";
 
-interface AppSidebarProps {
-  user?: {
-    email?: string;
-    user_metadata?: {
-      first_name?: string;
-      last_name?: string;
-    };
-  } | null;
-}
-
-type Role = "superadmin" | "company_admin" | "supervisor" | "talent";
-
-interface NavItem {
-  titleKey: string;
-  url: string;
-  icon: React.ComponentType<{ className?: string }>;
-  requiredRole?: Role;
-}
-
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar() {
   const { t } = useTranslation("sidebar");
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -63,61 +30,62 @@ export function AppSidebar({ user }: AppSidebarProps) {
     useActiveRole();
   const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
 
-  // Define navigation items with translation keys
-  const mainItems: NavItem[] = [
-    { titleKey: "dashboard", url: "/dashboard", icon: LayoutDashboard },
-    { titleKey: "calendar", url: "/dashboard/calendar", icon: CalendarIcon },
-    {titleKey: "locations",url: "/dashboard/locations",icon: MapPinIcon,requiredRole: "company_admin",},
-    {titleKey: "team",url: "/dashboard/team",icon: Users,requiredRole: "company_admin",},
-  ];
+  // Memoized: Strip language from pathname ONCE
+  const pathWithoutLang = useMemo(() => {
+    return pathname.replace(/^\/[^/]+/, "");
+  }, [pathname]);
 
-  const documentItems: NavItem[] = [
-    {
-      titleKey: "invitations",
-      url: "/dashboard/invitations",
-      icon: UserRoundPlus,
-    },
-    {
-      titleKey: "analytics",
-      url: "/dashboard/analytics",
-      icon: BarChart3,
-      requiredRole: "company_admin", 
-    },
-    { titleKey: "contracts", url: "/dashboard/contracts", icon: FileText },
-  ];
+  // Memoized: Filter and group navigation items by section
+  const filteredItems = useMemo(() => {
+    const sections = {
+      main: [] as NavItem[],
+      documents: [] as NavItem[],
+      bottom: [] as NavItem[],
+    };
 
-  const bottomItems: NavItem[] = [
-    { titleKey: "settings", url: "/dashboard/settings", icon: Settings },
-    { titleKey: "getHelp", url: "/dashboard/help", icon: HelpCircle },
-    { titleKey: "search", url: "/dashboard/search", icon: Search },
-  ];
-
-  // Filter navigation items based on user permissions
-  const filterByPermission = (items: NavItem[]) => {
-    return items.filter((item) => {
-      if (!item.requiredRole) return true;
-      return hasPermission(item.requiredRole);
+    NAV_ITEMS.forEach((item) => {
+      if (item.requiredRole && !hasPermission(item.requiredRole)) {
+        return;
+      }
+      sections[item.section].push(item);
     });
-  };
 
-  const visibleMainItems = filterByPermission(mainItems);
-  const visibleDocumentItems = filterByPermission(documentItems);
-  const visibleBottomItems = filterByPermission(bottomItems);
+    return sections;
+  }, [hasPermission]);
 
-  const isActive = (path: string) => {
-    if (path === "/dashboard" && pathname === "/dashboard") return true;
-    if (path !== "/dashboard" && pathname.startsWith(path)) return true;
-    return false;
-  };
+  // Memoized: Other roles for dropdown
+  const otherRoles = useMemo(() => {
+    return availableRoles.filter((r) => r.id !== activeRole?.id);
+  }, [availableRoles, activeRole?.id]);
 
-  const getNavClass = (path: string) => {
-    return cn(
-      "w-full justify-start transition-all duration-200",
-      isActive(path)
-        ? "bg-pulse-500 text-white shadow-sm font-medium"
-        : "hover:bg-secondary text-muted-foreground hover:text-foreground"
-    );
-  };
+  // Memoized: Check if path is active
+  const isActive = useCallback(
+    (path: string) => {
+      if (path === "/dashboard") {
+        return pathWithoutLang === "/dashboard";
+      }
+      return pathWithoutLang === path || pathWithoutLang.startsWith(path + "/");
+    },
+    [pathWithoutLang]
+  );
+
+  // Memoized: Get navigation link classes
+  const getNavClass = useCallback(
+    (path: string) => {
+      return cn(
+        "w-full justify-start transition-all duration-200",
+        isActive(path)
+          ? "bg-pulse-500 text-white shadow-sm font-medium"
+          : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+      );
+    },
+    [isActive]
+  );
+
+  // Safety check
+  if (!activeRole) {
+    return null;
+  }
 
   return (
     <Sidebar
@@ -157,37 +125,34 @@ export function AppSidebar({ user }: AppSidebarProps) {
             </button>
 
             {/* Role Dropdown */}
-            {isRoleSwitcherOpen && availableRoles.length > 1 && (
+            {isRoleSwitcherOpen && otherRoles.length > 0 && (
               <div className="mt-2 space-y-1">
-                {availableRoles
-                  .filter((r) => r.id !== activeRole.id)
-                  .map((role) => (
-                    <button
-                      key={role.id}
-                      onClick={() => {
-                        setActiveRole(role.id);
-                        setIsRoleSwitcherOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium">
-                        {role.companyName[0]}
+                {otherRoles.map((role) => (
+                  <button
+                    key={role.id}
+                    onClick={() => {
+                      setActiveRole(role.id);
+                      setIsRoleSwitcherOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium">
+                      {role.companyName[0]}
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-medium">
+                        {role.companyName}
                       </div>
-                      <div className="text-left">
-                        <div className="text-sm font-medium">
-                          {role.companyName}
-                        </div>
-                        <div className="text-xs text-muted-foreground capitalize">
-                          {role.role}
-                        </div>
+                      <div className="text-xs text-muted-foreground capitalize">
+                        {role.role}
                       </div>
-                    </button>
-                  ))}
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
           </div>
         )}
-
         {/* Quick Create Button 
         <div className="p-4 flex justify-center">
           <Button
@@ -204,7 +169,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           {!collapsed && <SidebarGroupLabel>{t("main")}</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleMainItems.map((item) => (
+              {filteredItems.main.map((item) => (
                 <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className={getNavClass(item.url)}>
@@ -225,7 +190,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleDocumentItems.map((item) => (
+              {filteredItems.documents.map((item) => (
                 <SidebarMenuItem key={item.titleKey}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className={getNavClass(item.url)}>
@@ -244,7 +209,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {visibleBottomItems.map((item) => (
+                {filteredItems.bottom.map((item) => (
                   <SidebarMenuItem key={item.titleKey}>
                     <SidebarMenuButton asChild>
                       <Link href={item.url} className={getNavClass(item.url)}>
@@ -262,3 +227,5 @@ export function AppSidebar({ user }: AppSidebarProps) {
     </Sidebar>
   );
 }
+
+        

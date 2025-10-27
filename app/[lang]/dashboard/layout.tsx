@@ -1,6 +1,7 @@
 //hype-hire/vercel/app/[lang]/dashboard/layout.tsx
 "use client";
 
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   SidebarProvider,
@@ -8,34 +9,22 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ActiveRoleProvider, useActiveRole } from "../../hooks/useActiveRole";
 import { useAuth } from "../../hooks/useAuth";
+import { NAV_ITEMS } from "@/lib/dash-navigation";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation("dash-layout");
   const { t: tSidebar } = useTranslation("sidebar");
   const { user, profile, loading } = useAuth();
   const { activeRole } = useActiveRole();
-  const router = useRouter();
   const pathname = usePathname();
 
-  const allNavItems = [
-    { titleKey: "dashboard", url: "/dashboard" },
-    { titleKey: "calendar", url: "/dashboard/calendar" },
-    { titleKey: "locations", url: "/dashboard/locations" },
-    { titleKey: "team", url: "/dashboard/team" },
-    { titleKey: "invitations", url: "/dashboard/invitations" },
-    { titleKey: "analytics", url: "/dashboard/analytics" },
-    { titleKey: "contracts", url: "/dashboard/contracts" },
-    { titleKey: "settings", url: "/dashboard/settings" },
-    { titleKey: "getHelp", url: "/dashboard/help" },
-    { titleKey: "search", url: "/dashboard/search" },
-  ];
-
-  const getCurrentTitle = () => {
+  // Memoized to avoid recalculating on every render
+  const currentTitle = useMemo(() => {
     const pathWithoutLang = pathname?.replace(/^\/[^/]+/, "") || "";
-    const currentItem = allNavItems.find((item) => {
+    const currentItem = NAV_ITEMS.find((item) => {
       if (item.url === "/dashboard" && pathWithoutLang === "/dashboard")
         return true;
       if (item.url !== "/dashboard" && pathWithoutLang.startsWith(item.url))
@@ -43,7 +32,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       return false;
     });
     return currentItem ? tSidebar(currentItem.titleKey) : tSidebar("dashboard");
-  };
+  }, [pathname, tSidebar]);
 
   if (loading) {
     return (
@@ -53,26 +42,20 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    router.push("/login");
-    return null;
-  }
-
   // Display name priority: profile.firstName > user_metadata > email
-  const displayName = profile?.firstName || 
-                     user.user_metadata?.first_name || 
-                     user.email;
+  const displayName =
+    profile?.firstName || user?.user_metadata?.first_name || user?.email;
 
   return (
     <div>
       <SidebarProvider>
         <div className="min-h-screen flex w-full bg-background">
-          <AppSidebar user={user} />
+          <AppSidebar  />
           <SidebarInset className="flex-1">
             <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-20 z-30">
               <div className="flex items-center gap-2">
                 <SidebarTrigger className="mr-2" />
-                <h1 className="text-lg font-semibold">{getCurrentTitle()}</h1>
+                <h1 className="text-lg font-semibold">{currentTitle}</h1>
                 <span className="text-lg text-muted-foreground hidden sm:block">
                   {activeRole.companyName}
                 </span>

@@ -16,6 +16,8 @@ model user {
   firstName      String?   @map("first_name")
   lastName       String?   @map("last_name")
   hasPassword    Boolean   @default(false) @map("has_password")
+  profilePicture String?   @map("profile_picture")
+
   
   // GDPR: Anonymization support
   isAnonymized   Boolean   @default(false) @map("is_anonymized")
@@ -23,7 +25,7 @@ model user {
   
   // Audit
   createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  updatedAt      DateTime?  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
   deletedBy      Int?      @map("deleted_by")
 
@@ -116,14 +118,14 @@ model invitation {
 
 
 
-model ContactMessage {
+model contact_message {
   id        Int      @id @default(autoincrement())
   fullName  String   @map("full_name")
   email     String
   message   String
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@map("contact_messages")
+  @@map("contact_message")
 }
 
 model Location {
@@ -494,17 +496,7 @@ enum Seniority {
 }
 
 
-enum AssignmentStatus {
-  assigned      // Initial state
-  confirmed     // Talent confirmed
-  checked_in    // Talent checked in
-  working       // Currently working
-  completed     // Finished working
-  cancelled     // Cancelled by talent or admin
-  no_show       // Didn't show up
-  
-  @@map("assignment_status")
-}
+
 
 enum CheckMethod {
   app_self      // Talent checked themselves via app

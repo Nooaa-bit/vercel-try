@@ -5,10 +5,13 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
+  useCallback,
   ReactNode,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
+import { useTranslation } from "react-i18next";
 
 type Role = "superadmin" | "company_admin" | "supervisor" | "talent";
 
@@ -36,145 +39,236 @@ interface ActiveRoleContext {
   loading: boolean;
 }
 
-// Type for the Supabase query result
 interface RoleQueryResult {
   id: number;
   role: Role;
   company_id: number;
-  company: Array<{ name: string }> | null;
+  company: { name: string }[] | null;
 }
-
-// No default role - we'll handle loading state explicitly
 
 const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
   undefined
 );
 
 export function ActiveRoleProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { t, ready } = useTranslation("role-access"); // ✅ ONLY ADDITION
+  const { user, loading: authLoading } = useAuth();
   const [availableRoles, setAvailableRoles] = useState<UserCompanyRole[]>([]);
-  const [activeRoleId, setActiveRoleId] = useState<number | null>(null); // Changed: null instead of 0
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function loadRoles() {
+      if (authLoading) {
+        return;
+      }
+
       if (!user) {
         setAvailableRoles([]);
-        setActiveRoleId(null); // Changed: null instead of 0
-        setLoading(false);
+        setActiveRoleId(null);
+        setRolesLoading(false);
+        setHasAttemptedLoad(true);
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("user")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .is("deleted_at", null)
-        .maybeSingle();
+      try {
+        // Fetch user profile - UNCHANGED
+        const { data: profile, error: profileError } = await supabase
+          .from("user")
+          .select("id")
+          .eq("auth_user_id", user.id)
+          .is("deleted_at", null)
+          .maybeSingle();
 
-      if (!profile) {
-        setLoading(false);
-        return;
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          setAvailableRoles([]);
+          setActiveRoleId(null);
+          setRolesLoading(false);
+          setHasAttemptedLoad(true);
+          return;
+        }
+
+        if (!profile) {
+          setAvailableRoles([]);
+          setActiveRoleId(null);
+          setRolesLoading(false);
+          setHasAttemptedLoad(true);
+          return;
+        }
+
+        // Fetch roles - UNCHANGED
+        const { data: roles, error: rolesError } = await supabase
+          .from("user_company_role")
+          .select("id, role, company_id, company(name)")
+          .eq("user_id", profile.id)
+          .is("revoked_at", null);
+
+        if (rolesError) {
+          console.error("Error fetching roles:", rolesError);
+          setAvailableRoles([]);
+          setActiveRoleId(null);
+          setRolesLoading(false);
+          setHasAttemptedLoad(true);
+          return;
+        }
+
+        if (roles && roles.length > 0) {
+          const formatted = roles.map((r: RoleQueryResult) => {
+            const companyName = r.company?.[0]?.name || "Hype Hire";
+            return {
+              id: r.id,
+              role: r.role as Role,
+              companyId: r.company_id,
+              companyName,
+            };
+          });
+
+          const stored =
+            typeof window !== "undefined"
+              ? localStorage.getItem("activeRoleId")
+              : null;
+          const storedId = stored ? parseInt(stored) : null;
+          const roleExists =
+            storedId && formatted.some((r) => r.id === storedId);
+
+          setAvailableRoles(formatted);
+          setActiveRoleId(roleExists ? storedId : formatted[0].id);
+        } else {
+          setAvailableRoles([]);
+          setActiveRoleId(null);
+        }
+      } catch (error) {
+        console.error("Unexpected error loading roles:", error);
+        setAvailableRoles([]);
+        setActiveRoleId(null);
+      } finally {
+        setRolesLoading(false);
+        setHasAttemptedLoad(true);
       }
-
-      const { data: roles } = await supabase
-        .from("user_company_role")
-        .select("id, role, company_id, company(name)")
-        .eq("user_id", profile.id)
-        .is("revoked_at", null);
-
-      if (roles && roles.length > 0) {
-        const formatted = roles.map((r: RoleQueryResult) => ({
-          id: r.id,
-          role: r.role as Role,
-          companyId: r.company_id,
-          companyName: r.company?.[0]?.name || "Hype Hire",
-        }));
-
-        setAvailableRoles(formatted);
-
-        // Restore from localStorage or use first role
-        const stored = localStorage.getItem("activeRoleId");
-        const storedId = stored ? parseInt(stored) : null;
-        const roleExists = storedId && formatted.some((r) => r.id === storedId);
-
-        setActiveRoleId(roleExists ? storedId : formatted[0].id);
-      }
-
-      setLoading(false);
     }
 
     loadRoles();
-  }, [user, supabase]);
+  }, [user, authLoading, supabase]);
 
-  // Don't render anything until we've finished loading the roles
-  if (loading) {
+  const loading = authLoading || rolesLoading;
+
+  const activeRole = useMemo(() => {
+    if (availableRoles.length === 0) return null;
+    return (
+      availableRoles.find((r) => r.id === activeRoleId) || availableRoles[0]
+    );
+  }, [availableRoles, activeRoleId]);
+
+  const setActiveRole = useCallback((roleId: number) => {
+    setActiveRoleId(roleId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("activeRoleId", roleId.toString());
+    }
+  }, []);
+
+  const hasPermission = useCallback(
+    (requiredRole: Role) => {
+      if (!activeRole) return false;
+      return ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[requiredRole];
+    },
+    [activeRole]
+  );
+
+  const hasAnyRole = useCallback(
+    (requiredRoles: Role[]) => {
+      if (!activeRole) return false;
+      return requiredRoles.some(
+        (role) => ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[role]
+      );
+    },
+    [activeRole]
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      availableRoles,
+      activeRole: activeRole!,
+      activeCompanyId: activeRole?.companyId ?? 0,
+      setActiveRole,
+      hasPermission,
+      hasAnyRole,
+      loading,
+    }),
+    [
+      availableRoles,
+      activeRole,
+      setActiveRole,
+      hasPermission,
+      hasAnyRole,
+      loading,
+    ]
+  );
+
+  // ✅ CHANGED: Added translation loading check and translated text
+  if (loading || !ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm text-muted-foreground">
-            Loading your account...
-          </span>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+          {ready && (
+            <div className="space-y-2 text-center">
+              <div className="text-lg font-semibold">{t("loading.title")}</div>
+              <div className="text-sm text-muted-foreground">
+                {t("loading.subtitle")}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // If we have no roles after loading, something went wrong
-  if (availableRoles.length === 0) {
+  // ✅ CHANGED: Translated text
+  if (hasAttemptedLoad && (availableRoles.length === 0 || !activeRole)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">No roles found</h2>
-          <p className="text-muted-foreground">
-            You do not have access to any companies. Please contact support.
-          </p>
+        <div className="max-w-md text-center space-y-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+            <svg
+              className="w-8 h-8 text-red-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold mb-2">
+              {t("noAccess.title")}
+            </h2>
+            <p className="text-muted-foreground">{t("noAccess.description")}</p>
+          </div>
+          <div className="p-4 bg-muted rounded-lg text-sm text-left">
+            <p className="font-medium mb-1">{t("noAccess.whatToDo")}</p>
+            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+              <li>{t("noAccess.step1")}</li>
+              <li>{t("noAccess.step2")}</li>
+              <li>{t("noAccess.step3")}</li>
+            </ul>
+          </div>
         </div>
       </div>
     );
   }
 
-  // At this point, we know we have at least one role
-  const activeRole = availableRoles.find((r) => r.id === activeRoleId) || availableRoles[0];
-
-  const setActiveRole = (roleId: number) => {
-    setActiveRoleId(roleId);
-    localStorage.setItem("activeRoleId", roleId.toString());
-  };
-
-  const hasPermission = (requiredRole: Role) => {
-    return ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[requiredRole];
-  };
-
-  const providerHasAnyRole = (requiredRoles: Role[]) => {
-    if (loading) return false;
-    return requiredRoles.some((role) => hasPermission(role));
-  };
-
   return (
-    <ActiveRoleContext.Provider
-      value={{
-        availableRoles,
-        activeRole,
-        activeCompanyId: activeRole.companyId,
-        setActiveRole,
-        hasPermission,
-        hasAnyRole: providerHasAnyRole,
-        loading,
-      }}
-    >
-      {loading ? (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm text-muted-foreground">Loading...</span>
-          </div>
-        </div>
-      ) : (
-        children
-      )}
+    <ActiveRoleContext.Provider value={contextValue}>
+      {children}
     </ActiveRoleContext.Provider>
   );
 }
@@ -184,15 +278,5 @@ export function useActiveRole() {
   if (!context) {
     throw new Error("useActiveRole must be used within ActiveRoleProvider");
   }
-
-  // Helper to check if user has any of the required roles
-  const hasAnyRole = (requiredRoles: Role[]) => {
-    if (context.loading) return false; // Don't allow access while loading
-    return requiredRoles.some((role) => context.hasPermission(role));
-  };
-
-  return {
-    ...context,
-    hasAnyRole,
-  };
+  return context;
 }
