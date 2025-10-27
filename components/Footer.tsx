@@ -1,12 +1,19 @@
 // hype-hire/vercel/components/Footer.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 const Footer = () => {
-  const { t, i18n } = useTranslation("footer");
-  const localePrefix = `/${i18n.language}`;
+  const { t, i18n } = useTranslation("footer"); 
+  const [localePrefix, setLocalePrefix] = useState("");
+
+  useEffect(() => {
+    setLocalePrefix(`/${i18n.language || 'en'}`);
+  }, [i18n.language]);
+
+  // Don't render links until client-side
+  if (!localePrefix) return null;
 
   return (
     <footer className="border-t mt-8 pt-4 pb-8">
