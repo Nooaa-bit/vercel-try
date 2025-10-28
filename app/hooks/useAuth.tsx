@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import useSWR from "swr";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -18,9 +19,43 @@ interface UserProfile {
 
 const supabase = createClient();
 
+// SWR fetcher for profile data
+async function fetchProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    const { data, error } = await supabase
+      .from("user")
+      .select(
+        "id, auth_user_id, email, first_name, last_name, profile_picture, has_password, created_at"
+      )
+      .eq("auth_user_id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching profile:", error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      authUserId: data.auth_user_id,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profilePicture: data.profile_picture,
+      hasPassword: data.has_password,
+      createdAt: new Date(data.created_at),
+    };
+  } catch (err) {
+    console.error("Profile fetch error:", err);
+    return null;
+  }
+}
+
 export function useAuth() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const router = useRouter();
@@ -28,6 +63,17 @@ export function useAuth() {
 
   // Extract language from pathname
   const lang = pathname.split("/")[1] === "el" ? "el" : "en";
+
+  // Use SWR for profile fetching with 10-minute cache
+  const {
+    data: profile,
+    mutate: mutateProfile,
+    isLoading: profileLoading,
+  } = useSWR(user ? `profile-${user.id}` : null, () => fetchProfile(user!.id), {
+    dedupingInterval: 600000, // 10 minutes
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+  });
 
   // Main auth state handler
   useEffect(() => {
@@ -74,59 +120,19 @@ export function useAuth() {
 
       if (event === "SIGNED_IN" && session) {
         setUser(session.user);
+        // Trigger profile refetch on sign in
+        mutateProfile();
       } else if (event === "SIGNED_OUT") {
         console.log("🚪 User signed out detected");
         setUser(null);
-        setProfile(null);
+        // Clear profile cache on sign out
+        mutateProfile(null, false);
       }
     });
 
     handleAuthState();
     return () => subscription.unsubscribe();
-  }, [router]);
-
-  // Profile fetching
-  useEffect(() => {
-    if (!user?.id) {
-      setProfile(null);
-      return;
-    }
-
-    const fetchProfile = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("user")
-          .select(
-            "id, auth_user_id, email, first_name, last_name, profile_picture, has_password, created_at"
-          )
-          .eq("auth_user_id", user.id)
-          .is("deleted_at", null)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error fetching profile:", error);
-          return;
-        }
-
-        if (data) {
-          setProfile({
-            id: data.id,
-            authUserId: data.auth_user_id,
-            email: data.email,
-            firstName: data.first_name,
-            lastName: data.last_name,
-            profilePicture: data.profile_picture,
-            hasPassword: data.has_password,
-            createdAt: new Date(data.created_at),
-          });
-        }
-      } catch (err) {
-        console.error("Profile fetch error:", err);
-      }
-    };
-
-    fetchProfile();
-  }, [user?.id]);
+  }, [router, mutateProfile]);
 
   // Dashboard protection - redirect to homepage if not logged in
   useEffect(() => {
@@ -149,7 +155,8 @@ export function useAuth() {
       console.log("🚪 Client-side sign out initiated...");
       await supabase.auth.signOut();
       setUser(null);
-      setProfile(null);
+      // Clear profile cache
+      mutateProfile(null, false);
 
       // Redirect to homepage after sign out
       const pathnameWithoutLang = pathname.replace(/^\/(en|el)/, "");
@@ -159,7 +166,7 @@ export function useAuth() {
     } catch (error) {
       console.error("Sign out error:", error);
       setUser(null);
-      setProfile(null);
+      mutateProfile(null, false);
       router.replace(`/${lang}`);
     }
   };
@@ -171,8 +178,8 @@ export function useAuth() {
 
   return {
     user,
-    profile,
-    loading,
+    profile: profile ?? null,
+    loading: loading || profileLoading,
     signIn,
     signOut,
   };

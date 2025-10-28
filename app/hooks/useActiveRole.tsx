@@ -4,11 +4,11 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   useMemo,
   useCallback,
   ReactNode,
 } from "react";
+import useSWR from "swr";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
 import { useTranslation } from "react-i18next";
@@ -50,111 +50,86 @@ const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
   undefined
 );
 
-export function ActiveRoleProvider({ children }: { children: ReactNode }) {
-  const { t, ready } = useTranslation("role-access"); // ✅ ONLY ADDITION
-  const { user, loading: authLoading } = useAuth();
-  const [availableRoles, setAvailableRoles] = useState<UserCompanyRole[]>([]);
-  const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
-  const [rolesLoading, setRolesLoading] = useState(true);
-  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+// Fetcher function for SWR
+async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
+  const supabase = createClient();
 
-  const supabase = useMemo(() => createClient(), []);
+  try {
+    // Fetch user profile
+    const { data: profile, error: profileError } = await supabase
+      .from("user")
+      .select("id")
+      .eq("auth_user_id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
 
-  useEffect(() => {
-    async function loadRoles() {
-      if (authLoading) {
-        return;
-      }
-
-      if (!user) {
-        setAvailableRoles([]);
-        setActiveRoleId(null);
-        setRolesLoading(false);
-        setHasAttemptedLoad(true);
-        return;
-      }
-
-      try {
-        // Fetch user profile - UNCHANGED
-        const { data: profile, error: profileError } = await supabase
-          .from("user")
-          .select("id")
-          .eq("auth_user_id", user.id)
-          .is("deleted_at", null)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          setAvailableRoles([]);
-          setActiveRoleId(null);
-          setRolesLoading(false);
-          setHasAttemptedLoad(true);
-          return;
-        }
-
-        if (!profile) {
-          setAvailableRoles([]);
-          setActiveRoleId(null);
-          setRolesLoading(false);
-          setHasAttemptedLoad(true);
-          return;
-        }
-
-        // Fetch roles - UNCHANGED
-        const { data: roles, error: rolesError } = await supabase
-          .from("user_company_role")
-          .select("id, role, company_id, company(name)")
-          .eq("user_id", profile.id)
-          .is("revoked_at", null);
-
-        if (rolesError) {
-          console.error("Error fetching roles:", rolesError);
-          setAvailableRoles([]);
-          setActiveRoleId(null);
-          setRolesLoading(false);
-          setHasAttemptedLoad(true);
-          return;
-        }
-
-        if (roles && roles.length > 0) {
-          const formatted = roles.map((r: RoleQueryResult) => {
-            const companyName = r.company?.[0]?.name || "Hype Hire";
-            return {
-              id: r.id,
-              role: r.role as Role,
-              companyId: r.company_id,
-              companyName,
-            };
-          });
-
-          const stored =
-            typeof window !== "undefined"
-              ? localStorage.getItem("activeRoleId")
-              : null;
-          const storedId = stored ? parseInt(stored) : null;
-          const roleExists =
-            storedId && formatted.some((r) => r.id === storedId);
-
-          setAvailableRoles(formatted);
-          setActiveRoleId(roleExists ? storedId : formatted[0].id);
-        } else {
-          setAvailableRoles([]);
-          setActiveRoleId(null);
-        }
-      } catch (error) {
-        console.error("Unexpected error loading roles:", error);
-        setAvailableRoles([]);
-        setActiveRoleId(null);
-      } finally {
-        setRolesLoading(false);
-        setHasAttemptedLoad(true);
-      }
+    if (profileError || !profile) {
+      console.error("Error fetching profile:", profileError);
+      return [];
     }
 
-    loadRoles();
-  }, [user, authLoading, supabase]);
+    // Fetch roles
+    const { data: roles, error: rolesError } = await supabase
+      .from("user_company_role")
+      .select("id, role, company_id, company(name)")
+      .eq("user_id", profile.id)
+      .is("revoked_at", null);
+
+    if (rolesError || !roles) {
+      console.error("Error fetching roles:", rolesError);
+      return [];
+    }
+
+    return roles.map((r: RoleQueryResult) => ({
+      id: r.id,
+      role: r.role as Role,
+      companyId: r.company_id,
+      companyName: r.company?.[0]?.name || "Hype Hire",
+    }));
+  } catch (error) {
+    console.error("Unexpected error loading roles:", error);
+    return [];
+  }
+}
+
+export function ActiveRoleProvider({ children }: { children: ReactNode }) {
+  const { t, ready } = useTranslation("role-access");
+  const { user, loading: authLoading } = useAuth();
+  const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
+
+  // Use SWR with conditional fetching and 10-minute cache
+  const {
+    data: availableRoles = [],
+    isLoading: rolesLoading,
+    error,
+  } = useSWR(
+    user ? `roles-${user.id}` : null, // Conditional: only fetch if user exists
+    () => fetchUserRoles(user!.id),
+    {
+      dedupingInterval: 600000, // 10 minutes in milliseconds
+      revalidateOnFocus: false, // Don't refetch on window focus
+      revalidateOnReconnect: true, // Refetch on reconnect
+      shouldRetryOnError: true,
+    }
+  );
+
+  // Set initial active role when roles are loaded
+  useMemo(() => {
+    if (availableRoles.length > 0 && activeRoleId === null) {
+      const stored =
+        typeof window !== "undefined"
+          ? localStorage.getItem("activeRoleId")
+          : null;
+      const storedId = stored ? parseInt(stored) : null;
+      const roleExists =
+        storedId && availableRoles.some((r) => r.id === storedId);
+
+      setActiveRoleId(roleExists ? storedId : availableRoles[0].id);
+    }
+  }, [availableRoles, activeRoleId]);
 
   const loading = authLoading || rolesLoading;
+  const hasAttemptedLoad = !authLoading && !rolesLoading;
 
   const activeRole = useMemo(() => {
     if (availableRoles.length === 0) return null;
@@ -208,7 +183,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  // ✅ CHANGED: Added translation loading check and translated text
   if (loading || !ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -227,7 +201,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  // ✅ CHANGED: Translated text
   if (hasAttemptedLoad && (availableRoles.length === 0 || !activeRole)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
