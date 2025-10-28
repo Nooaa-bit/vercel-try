@@ -213,7 +213,7 @@ export default function ProfilePictureCrop({
   return (
     <>
       <div className="flex items-start gap-6">
-        <div className="relative">
+        <div className="relative group">
           <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center overflow-hidden">
             {previewUrl ? (
               <img
@@ -260,11 +260,21 @@ export default function ProfilePictureCrop({
               className="hidden"
             />
           </label>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          <p>{t("photo.clickToChange")}</p>
-          <p className="mt-1">{t("photo.cropInstructions")}</p>
-          <p className="mt-2 text-xs">{t("photo.requirements")}</p>
+
+          {/* ✅ Tooltip on hover */}
+          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-10">
+            <div className="bg-popover text-popover-foreground rounded-lg shadow-lg p-4 min-w-[280px] max-w-[320px] border border-border">
+              <div className="text-sm space-y-2">
+                <p>{t("photo.clickToChange")}</p>
+                <p>{t("photo.cropInstructions")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("photo.requirements")}
+                </p>
+              </div>
+              {/* Arrow pointing to the button */}
+              <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-r-popover"></div>
+            </div>
+          </div>
         </div>
       </div>
 

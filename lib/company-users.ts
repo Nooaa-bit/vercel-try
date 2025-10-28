@@ -1,3 +1,4 @@
+//hype-hire/vercel/lib/company-users.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -20,6 +21,7 @@ export async function getCompanyUsers(companyId: number) {
             email: true,
             firstName: true,
             lastName: true,
+            profilePicture: true, // ✅ Add profile picture
             createdAt: true,
           },
         },
@@ -37,6 +39,7 @@ export async function getCompanyUsers(companyId: number) {
       email: ur.user.email,
       firstName: ur.user.firstName,
       lastName: ur.user.lastName,
+      profilePicture: ur.user.profilePicture, // ✅ Include in return
       role: ur.role,
       roleId: ur.id,
       joinedAt: ur.createdAt,

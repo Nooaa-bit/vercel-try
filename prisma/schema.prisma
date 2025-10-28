@@ -57,6 +57,8 @@ model user {
   userConsents             UserConsent[]       @relation("UserConsents")
   dataAccessLogs           DataAccessLog[]     @relation("DataAccessSubject")
   dataAccessesMade         DataAccessLog[]     @relation("DataAccessActor")
+
+  @@index([deletedAt, firstName], map: "idx_user_active_sorted")
   @@map("user")
 }
 
@@ -70,6 +72,7 @@ model company {
   invitation       invitation[]
   locations        Location[]
   jobs        Job[]
+
 
   @@map("company")
 }
@@ -89,6 +92,7 @@ model user_company_role {
   revokedByUser user?   @relation("UserCompanyRoleRevokedBy", fields: [revokedBy], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_company_role_revoked_by_fkey")
 
   @@unique([userId, companyId, role], map: "user_company_unique")
+  @@index([companyId, revokedAt], map: "idx_ucr_company_active")
   @@map("user_company_role")
 }
 
@@ -111,8 +115,8 @@ model invitation {
   deleter user?   @relation("InvitationDeletedBy", fields: [deletedBy], references: [id], map: "invitation_deleter_fkey")
 
 
-//  @@index([email])
- // @@index([companyId])
+ @@index([companyId, status, deletedAt], map: "idx_invitation_active")
+  @@index([email, status], map: "idx_invitation_lookup")
   @@map("invitation")
 }
 
@@ -166,7 +170,7 @@ model Location {
    jobs        Job[]
 
 
-//  @@index([companyId, deletedAt])
+  @@index([companyId, deletedAt])
 //  @@index([latitude, longitude])
   @@map("location")
 }
@@ -204,8 +208,8 @@ model Job {
   
   shifts        Shift[]
   ratings       JobRating[]
-  
-//  @@index([companyId, deletedAt])
+
+  @@index([companyId, deletedAt, startDate], map: "idx_job_active")
 //  @@index([startDate, endDate])
   @@map("job")
 }
@@ -233,7 +237,7 @@ model Shift {
   job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   assignments     ShiftAssignment[]
   
-//  @@index([jobId, shiftDate, deletedAt])
+@@index([jobId, shiftDate, deletedAt], map: "idx_shift_schedule")
   @@map("shift")
 }
 
@@ -272,8 +276,8 @@ model ShiftAssignment {
   checkIns        CheckInOut[]
   
   @@unique([shiftId, userId], map: "shift_user_unique") // One assignment per user per shift
-//  @@index([userId, status])
-//  @@index([shiftId, status, deletedAt])
+@@index([userId, cancelledAt, markedNoShowAt], map: "idx_assignment_user_status")
+  @@index([shiftId, cancelledAt, deletedAt], map: "idx_assignment_shift_active")
   @@map("shift_assignment")
 }
 

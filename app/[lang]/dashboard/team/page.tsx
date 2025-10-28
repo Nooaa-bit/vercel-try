@@ -1,17 +1,20 @@
+//hype-hire/vercel/app/[lang]/dashboard/team/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Filter } from "lucide-react";
 import { getCompanyUsers } from "@/lib/company-users";
+import { createClient } from "@/lib/supabase/client";
 
 type Employee = {
   userId: number;
   email: string;
   firstName: string | null;
   lastName: string | null;
+  profilePicture: string | null; // ✅ Add profile picture
   role: string;
   roleId: number;
   joinedAt: Date;
@@ -26,6 +29,24 @@ export default function ProtectedPage() {
   const [loading, setLoading] = useState(true);
 
   const hasAccess = hasPermission("company_admin");
+
+  // ✅ Memoize Supabase client
+  const supabase = useMemo(() => createClient(), []);
+
+  // ✅ Helper to get profile picture URL
+  const getProfilePictureUrl = (profilePicture: string | null) => {
+    if (!profilePicture) return null;
+    const { data } = supabase.storage
+      .from("profile-pictures")
+      .getPublicUrl(profilePicture);
+    return data.publicUrl;
+  };
+
+  // ✅ Helper to get user initials
+  const getUserInitial = (employee: Employee) => {
+    if (employee.firstName) return employee.firstName[0].toUpperCase();
+    return employee.email[0].toUpperCase();
+  };
 
   // Fetch employees when component mounts
   useEffect(() => {
@@ -69,13 +90,9 @@ export default function ProtectedPage() {
   const availableRoles = Array.from(new Set(employees.map((emp) => emp.role)));
 
   return (
-    <div className="space-y-6 py-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Team Directory</h1>
-          <p className="text-muted-foreground mt-1">{activeRole.companyName}</p>
-        </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Users className="h-4 w-4" />
           {filteredEmployees.length} employees
@@ -131,41 +148,68 @@ export default function ProtectedPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEmployees.map((employee) => (
-            <Card
-              key={employee.roleId}
-              className="hover:border-pulse-500 transition-colors"
-            >
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {employee.firstName && employee.lastName
-                    ? `${employee.firstName} ${employee.lastName}`
-                    : employee.email}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {employee.email}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Role:</span>
-                    <span className="text-sm font-medium capitalize px-2 py-1 bg-muted rounded">
-                      {employee.role.replace("_", " ")}
-                    </span>
+          {filteredEmployees.map((employee) => {
+            const profilePictureUrl = getProfilePictureUrl(
+              employee.profilePicture
+            );
+            const userInitial = getUserInitial(employee);
+
+            return (
+              <Card
+                key={employee.roleId}
+                className="hover:border-pulse-500 transition-colors"
+              >
+                <CardHeader>
+                  {/* ✅ Profile Picture Section */}
+                  <div className="flex items-center gap-3 mb-2">
+                    {profilePictureUrl ? (
+                      <img
+                        src={profilePictureUrl}
+                        alt={`${
+                          employee.firstName || employee.email
+                        }'s profile`}
+                        className="w-12 h-12 rounded-full object-cover shadow-md"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-md">
+                        {userInitial}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate">
+                        {employee.firstName && employee.lastName
+                          ? `${employee.firstName} ${employee.lastName}`
+                          : employee.email}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {employee.email}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Joined:
-                    </span>
-                    <span className="text-sm">
-                      {new Date(employee.joinedAt).toLocaleDateString()}
-                    </span>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Role:
+                      </span>
+                      <span className="text-sm font-medium capitalize px-2 py-1 bg-muted rounded">
+                        {employee.role.replace("_", " ")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Joined:
+                      </span>
+                      <span className="text-sm">
+                        {new Date(employee.joinedAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
