@@ -1,0 +1,72 @@
+{
+  "pageTitle": "Διαχείριση τοποθεσιών και χώρων της εταιρείας σας",
+  "card": {
+    "title": "Οι Τοποθεσίες Σας",
+    "description_one": "{{count}} τοποθεσία καταχωρημένη",
+    "description_other": "{{count}} τοποθεσίες καταχωρημένες",
+    "addButton": "Προσθήκη Τοποθεσίας",
+    "editButton": "Επεξεργασία",
+    "deleteButton": "Διαγραφή"
+  },
+  "emptyState": {
+    "title": "Δεν υπάρχουν ακόμα τοποθεσίες",
+    "description": "Κάντε κλικ στο Προσθήκη Τοποθεσίας για να δημιουργήσετε τον πρώτο σας χώρο"
+  },
+  "dialog": {
+    "titleCreate": "Δημιουργία Νέου Χώρου",
+    "titleEdit": "Επεξεργασία Χώρου",
+    "descriptionCreate": "Προσθέστε μια νέα τοποθεσία για την εταιρεία σας",
+    "descriptionEdit": "Ενημερώστε τα στοιχεία της τοποθεσίας"
+  },
+  "form": {
+    "venueName": "Όνομα Χώρου *",
+    "venueType": "Τύπος Χώρου",
+    "address": "Διεύθυνση *",
+    "locationOnMap": "Τοποθεσία στο Χάρτη",
+    "accessInstructions": "Οδηγίες Πρόσβασης (Προαιρετικό)",
+    "placeholders": {
+      "venueName": "π.χ., Κεντρικό Γραφείο",
+      "address": "Αρχίστε να πληκτρολογείτε μια διεύθυνση...",
+      "accessInstructions": "Πληροφορίες στάθμευσης, κωδικοί πύλης, κλπ."
+    },
+    "mapInstructions": {
+      "gettingAddress": "🔄 Λήψη διεύθυνσης από το χάρτη...",
+      "dragMarker": "📍 Σύρετε τον κόκκινο δείκτη για να ενημερώσετε τη διεύθυνση"
+    },
+    "addressConfirmed": "✓ {{address}}"
+  },
+  "buttons": {
+    "cancel": "Ακύρωση",
+    "createLocation": "Δημιουργία Τοποθεσίας",
+    "updateLocation": "Ενημέρωση Τοποθεσίας",
+    "saving": "Αποθήκευση...",
+    "updating": "Ενημέρωση..."
+  },
+  "locationTypes": {
+    "Office": "Γραφείο",
+    "Warehouse": "Αποθήκη",
+    "RetailStore": "Κατάστημα Λιανικής",
+    "Restaurant": "Εστιατόριο",
+    "EventSpace": "Χώρος Εκδηλώσεων",
+    "ConstructionSite": "Εργοτάξιο",
+    "Factory": "Εργοστάσιο",
+    "HealthcareFacility": "Ιατρική Μονάδα",
+    "Hotel": "Ξενοδοχείο",
+    "Educational": "Εκπαιδευτικό",
+    "Other": "Άλλο"
+  },
+  "toast": {
+    "addressSearchNotConfigured": "Η αναζήτηση διευθύνσεων δεν έχει ρυθμιστεί",
+    "failedToSearchAddresses": "Αποτυχία αναζήτησης διευθύνσεων",
+    "addressUpdatedFromMap": "Η διεύθυνση ενημερώθηκε από το χάρτη",
+    "provideNameAndAddress": "Παρακαλώ δώστε ένα όνομα και επιλέξτε μια διεύθυνση",
+    "updateSuccess": "Η τοποθεσία ενημερώθηκε επιτυχώς",
+    "createSuccess": "Η τοποθεσία δημιουργήθηκε επιτυχώς",
+    "deletingLocation": "Διαγραφή {{name}}...",
+    "deleteSuccess": "Το {{name}} διαγράφηκε επιτυχώς",
+    "deleteFailed": "Αποτυχία διαγραφής τοποθεσίας",
+    "updateFailed": "Αποτυχία: {{message}}",
+    "createFailed": "Αποτυχία: {{message}}",
+    "mapNotConfigured": "Ο χάρτης δεν έχει ρυθμιστεί"
+  }
+}

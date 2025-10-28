@@ -1,0 +1,72 @@
+{
+  "pageTitle": "Manage your company locations and venues",
+  "card": {
+    "title": "Your Locations",
+    "description_one": "{{count}} location registered",
+    "description_other": "{{count}} locations registered",
+    "addButton": "Add Location",
+    "editButton": "Edit",
+    "deleteButton": "Delete"
+  },
+  "emptyState": {
+    "title": "No locations yet",
+    "description": "Click Add Location to create your first venue"
+  },
+  "dialog": {
+    "titleCreate": "Create New Venue",
+    "titleEdit": "Edit Venue",
+    "descriptionCreate": "Add a new location for your company",
+    "descriptionEdit": "Update the location details"
+  },
+  "form": {
+    "venueName": "Venue Name *",
+    "venueType": "Venue Type",
+    "address": "Address *",
+    "locationOnMap": "Location on Map",
+    "accessInstructions": "Access Instructions (Optional)",
+    "placeholders": {
+      "venueName": "e.g., Downtown Office",
+      "address": "Start typing an address...",
+      "accessInstructions": "Parking info, gate codes, etc."
+    },
+    "mapInstructions": {
+      "gettingAddress": "🔄 Getting address from map...",
+      "dragMarker": "📍 Drag the red marker to update the address"
+    },
+    "addressConfirmed": "✓ {{address}}"
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "createLocation": "Create Location",
+    "updateLocation": "Update Location",
+    "saving": "Saving...",
+    "updating": "Updating..."
+  },
+  "locationTypes": {
+    "Office": "Office",
+    "Warehouse": "Warehouse",
+    "RetailStore": "Retail Store",
+    "Restaurant": "Restaurant",
+    "EventSpace": "Event Space",
+    "ConstructionSite": "Construction Site",
+    "Factory": "Factory",
+    "HealthcareFacility": "Healthcare Facility",
+    "Hotel": "Hotel",
+    "Educational": "Educational",
+    "Other": "Other"
+  },
+  "toast": {
+    "addressSearchNotConfigured": "Address search not configured",
+    "failedToSearchAddresses": "Failed to search addresses",
+    "addressUpdatedFromMap": "Address updated from map",
+    "provideNameAndAddress": "Please provide a name and select an address",
+    "updateSuccess": "Location updated successfully",
+    "createSuccess": "Location created successfully",
+    "deletingLocation": "Deleting {{name}}...",
+    "deleteSuccess": "{{name}} deleted successfully",
+    "deleteFailed": "Failed to delete location",
+    "updateFailed": "Failed: {{message}}",
+    "createFailed": "Failed: {{message}}",
+    "mapNotConfigured": "Map not configured"
+  }
+}
