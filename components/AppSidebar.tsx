@@ -23,7 +23,7 @@ import { NAV_ITEMS, type NavItem } from "@/lib/dash-navigation";
 import { User } from "@supabase/supabase-js";
 
 interface AppSidebarProps {
-  user: User;
+  user: User | null;
 }
 
 export function AppSidebar({ user }: AppSidebarProps) {

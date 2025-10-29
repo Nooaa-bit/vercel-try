@@ -50,7 +50,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     <div>
       <SidebarProvider>
         <div className="min-h-screen flex w-full bg-background">
-          <AppSidebar  />
+          <AppSidebar user={user} />
           <SidebarInset className="flex-1">
             <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-20 z-30">
               <div className="flex items-center gap-2">
