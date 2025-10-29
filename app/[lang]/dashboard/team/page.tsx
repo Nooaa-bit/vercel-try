@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { use, useEffect, useState, useMemo, useCallback } from "react"; // ✅ Import 'use'
 import { useRouter } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,14 +27,14 @@ type Employee = {
   joinedAt: Date;
 };
 
-// ✅ Correct Next.js page props structure
+// ✅ Next.js 15: params is now Promise<{ lang: string }>
 interface PageProps {
-  params: { lang: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params: Promise<{ lang: string }>; // ✅ Changed to Promise
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default function TeamPage({ params }: PageProps) {
-  const { lang } = params; // ✅ Extract lang from params
+  const { lang } = use(params); // ✅ Use React.use() to unwrap Promise
   const { t, ready } = useTranslation("team");
   const { activeRole, hasPermission } = useActiveRole();
   const router = useRouter();
