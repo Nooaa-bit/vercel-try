@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Users, Filter, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
-import { getCompanyUsers } from "@/lib/company-users";
+import { getCompanyUsers } from "@/lib/company-users-serverVersion";
 import SettingsForm from "@/app/[lang]/dashboard/settings/SettingsForm";
 import { useTranslation } from "react-i18next";
 
