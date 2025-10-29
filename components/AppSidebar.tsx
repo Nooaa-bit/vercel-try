@@ -20,8 +20,13 @@ import {
 import { cn } from "@/lib/utils";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { NAV_ITEMS, type NavItem } from "@/lib/dash-navigation";
+import { User } from "@supabase/supabase-js";
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  user: User;
+}
+
+export function AppSidebar({ user }: AppSidebarProps) {
   const { t } = useTranslation("sidebar");
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -29,6 +34,9 @@ export function AppSidebar() {
   const { activeRole, availableRoles, setActiveRole, hasPermission } =
     useActiveRole();
   const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
+  
+  // Use the user prop to get the user's email for display
+  const userEmail = user?.email || '';
 
   // Memoized: Strip language from pathname ONCE
   const pathWithoutLang = useMemo(() => {
