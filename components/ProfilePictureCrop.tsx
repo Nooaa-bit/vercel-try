@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { useTranslation } from "react-i18next";
+import heic2any from "heic2any"; // ✅ ADD THIS
 
 // ✅ Lazy load cropper library
 const Cropper = dynamic(() => import("react-easy-crop"), {
@@ -28,15 +29,22 @@ interface CroppedArea {
 }
 
 // ✅ Constants for validation
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+];
 const MAX_DIMENSION = 1024; // Max width/height for profile picture
 
 export default function ProfilePictureCrop({
   currentImageUrl,
   onImageSelected,
 }: ProfilePictureCropProps) {
-  const { t } = useTranslation("settings"); // ✅ Add translation hook
+  const { t } = useTranslation("settings");
 
   const [isOpen, setIsOpen] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -48,6 +56,7 @@ export default function ProfilePictureCrop({
   const [fileName, setFileName] = useState("");
   const [fileType, setFileType] = useState("image/jpeg");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isConverting, setIsConverting] = useState(false); // ✅ NEW: Track HEIC conversion
 
   // ✅ Cleanup blob URLs on unmount
   useEffect(() => {
@@ -61,8 +70,25 @@ export default function ProfilePictureCrop({
     };
   }, [previewUrl, imageSrc]);
 
-  // ✅ FIXED: Use objectURL instead of base64
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ✅ NEW: Convert HEIC to JPEG for browser display
+  const convertHeicToJpeg = async (file: File): Promise<Blob> => {
+    try {
+      const convertedBlob = await heic2any({
+        blob: file,
+        toType: "image/jpeg",
+        quality: 0.9,
+      });
+
+      // heic2any can return Blob or Blob[], handle both cases
+      return Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+    } catch (error) {
+      console.error("HEIC conversion error:", error);
+      throw new Error("Failed to convert HEIC image");
+    }
+  };
+
+  // ✅ UPDATED: Handle HEIC conversion before display
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
 
@@ -82,12 +108,31 @@ export default function ProfilePictureCrop({
       }
 
       setFileName(file.name);
-      setFileType(file.type);
 
-      // ✅ NEW: Use objectURL instead of FileReader
-      const objectUrl = URL.createObjectURL(file);
-      setImageSrc(objectUrl);
-      setIsOpen(true);
+      // ✅ NEW: Handle HEIC conversion
+      if (file.type === "image/heic" || file.type === "image/heif") {
+        setIsConverting(true);
+        try {
+          const convertedBlob = await convertHeicToJpeg(file);
+          const objectUrl = URL.createObjectURL(convertedBlob);
+          setImageSrc(objectUrl);
+          setFileType("image/jpeg"); // ✅ Set as JPEG after conversion
+          setIsOpen(true);
+        } catch (error) {
+          console.error("Error converting HEIC:", error);
+          toast.error(
+            "Failed to load HEIC image. Please try a different format."
+          );
+        } finally {
+          setIsConverting(false);
+        }
+      } else {
+        // For other formats, use as-is
+        setFileType(file.type);
+        const objectUrl = URL.createObjectURL(file);
+        setImageSrc(objectUrl);
+        setIsOpen(true);
+      }
     }
   };
 
@@ -239,25 +284,31 @@ export default function ProfilePictureCrop({
             htmlFor="profilePictureInput"
             className="absolute bottom-0 right-0 w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shadow-md cursor-pointer"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-              />
-            </svg>
+            {/* ✅ NEW: Show spinner during HEIC conversion */}
+            {isConverting ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground" />
+            ) : (
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                />
+              </svg>
+            )}
             <input
               type="file"
               id="profilePictureInput"
-              accept="image/jpeg,image/jpg,image/png"
+              accept="image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp"
               onChange={onFileChange}
               className="hidden"
+              disabled={isConverting} // ✅ NEW: Disable during conversion
             />
           </label>
 

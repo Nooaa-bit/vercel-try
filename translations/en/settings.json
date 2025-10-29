@@ -16,7 +16,7 @@
     "altText": "Profile",
     "clickToChange": "Click the pencil icon to change your profile picture.",
     "cropInstructions": "Crop and position, then click Save Changes below to upload.",
-    "requirements": "Max size: 5MB • Formats: JPG, PNG"
+    "requirements": "Max size: 10MB • Formats: JPG, PNG, HEIC"
   },
   "fields": {
     "firstName": {

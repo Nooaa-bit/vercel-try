@@ -13,25 +13,31 @@ interface SettingsFormProps {
     email: string;
     profilePictureUrl: string | null;
   };
+  targetUserId?: number; // ✅ NEW: if provided, editing someone else
+  onSuccess?: () => void; // ✅ NEW: callback after successful save
 }
 
-export default function SettingsForm({ user }: SettingsFormProps) {
+export default function SettingsForm({
+  user,
+  targetUserId,
+  onSuccess,
+}: SettingsFormProps) {
   const { t } = useTranslation("settings");
   const [saving, setSaving] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [firstName, setFirstName] = useState(user.firstName);
   const [lastName, setLastName] = useState(user.lastName);
-
   const [displayPictureUrl, setDisplayPictureUrl] = useState(
     user.profilePictureUrl
   );
-
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // ✅ Sync with prop changes (fixes photo not showing)
+  // ✅ Sync with prop changes
   useEffect(() => {
+    setFirstName(user.firstName);
+    setLastName(user.lastName);
     setDisplayPictureUrl(user.profilePictureUrl);
-  }, [user.profilePictureUrl]);
+  }, [user.firstName, user.lastName, user.profilePictureUrl]);
 
   const handleImageSelected = (file: File) => {
     setSelectedFile(file);
@@ -72,11 +78,22 @@ export default function SettingsForm({ user }: SettingsFormProps) {
       const formData = new FormData();
       formData.append("firstName", firstName.trim());
       formData.append("lastName", lastName.trim());
+
+      // ✅ If targetUserId provided, we're editing someone else
+      if (targetUserId) {
+        formData.append("userId", targetUserId.toString());
+      }
+
       if (selectedFile) {
         formData.append("profilePicture", selectedFile);
       }
 
-      const response = await fetch("/api/update-profile", {
+      // ✅ Use different API based on context
+      const apiUrl = targetUserId
+        ? "/api/update-user"
+        : "/api/update-profile";
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         body: formData,
       });
@@ -95,6 +112,9 @@ export default function SettingsForm({ user }: SettingsFormProps) {
         if (data.profilePictureUrl) {
           setDisplayPictureUrl(data.profilePictureUrl);
         }
+
+        // ✅ Call success callback if provided
+        onSuccess?.();
       } else {
         toast.error(data.error || t("errors.updateFailed"));
         setSelectedFile(null);

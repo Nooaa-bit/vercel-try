@@ -40,10 +40,16 @@ const Navbar = () => {
   const isDashboardPage = pathname.includes("dashboard");
   const darkMode = theme === "dark";
 
-  // ✅ Get profile picture URL (memoized)
+  // ✅ UPDATED: Get profile picture URL - handle both URL and path formats
   const profilePictureUrl = useMemo(() => {
     if (!profile?.profilePicture) return null;
 
+    // Check if it's already a full URL (new format)
+    if (profile.profilePicture.startsWith("http")) {
+      return profile.profilePicture;
+    }
+
+    // Legacy format: it's a path, generate URL
     const supabase = createClient();
     const { data } = supabase.storage
       .from("profile-pictures")
@@ -52,7 +58,7 @@ const Navbar = () => {
     return data.publicUrl;
   }, [profile?.profilePicture]);
 
-  // ✅ NEW: Handle profile picture click
+  // ✅ Handle profile picture click
   const handleProfileClick = (e: React.MouseEvent) => {
     e.preventDefault();
     router.push(`/${lang}/dashboard/settings`);
@@ -153,7 +159,7 @@ const Navbar = () => {
         >
           {isMobile && (
             <div className="flex items-center space-x-3 justify-center">
-              {/* ✅ UPDATED: Clickable profile picture for mobile */}
+              {/* ✅ Clickable profile picture for mobile */}
               <button
                 onClick={handleProfileClick}
                 className="relative focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:ring-offset-2 rounded-full transition-transform hover:scale-105"
@@ -184,7 +190,7 @@ const Navbar = () => {
 
           {!isMobile && (
             <>
-              {/* ✅ UPDATED: Clickable profile picture for desktop */}
+              {/* ✅ Clickable profile picture for desktop */}
               <button
                 onClick={handleProfileClick}
                 className="relative focus:outline-none focus:ring-2 focus:ring-pulse-500 focus:ring-offset-2 rounded-full transition-transform hover:scale-110"

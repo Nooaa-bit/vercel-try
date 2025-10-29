@@ -1,0 +1,34 @@
+{
+  "header": {
+    "employees": "employees",
+    "loading": "Loading employees...",
+    "noEmployees": "No employees found"
+  },
+  "filter": {
+    "title": "Filter by Role",
+    "all": "All"
+  },
+  "roles": {
+    "superadmin": "Super Admin",
+    "company_admin": "Company Admin",
+    "supervisor": "Supervisor",
+    "talent": "Talent"
+  },
+  "card": {
+    "role": "Role:",
+    "joined": "Joined:",
+    "edit": "Edit",
+    "profileAlt": "'s profile"
+  },
+  "pagination": {
+    "page": "Page",
+    "of": "of",
+    "showing": "Showing",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "dialog": {
+    "editTitle": "Edit",
+    "editTitleSuffix": "'s Profile"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "header": {
+    "employees": "εργαζόμενοι",
+    "loading": "Φόρτωση εργαζομένων...",
+    "noEmployees": "Δεν βρέθηκαν εργαζόμενοι"
+  },
+  "filter": {
+    "title": "Φιλτράρισμα ανά Ρόλο",
+    "all": "Όλοι"
+  },
+  "roles": {
+    "superadmin": "Υπερ Διαχειριστής",
+    "company_admin": "Διαχειριστής Εταιρείας",
+    "supervisor": "Επόπτης",
+    "talent": "Ταλέντο"
+  },
+  "card": {
+    "role": "Ρόλος:",
+    "joined": "Εγγραφή:",
+    "edit": "Επεξεργασία",
+    "profileAlt": " προφίλ"
+  },
+  "pagination": {
+    "page": "Σελίδα",
+    "of": "από",
+    "showing": "Εμφάνιση",
+    "previous": "Προηγούμενο",
+    "next": "Επόμενο"
+  },
+  "dialog": {
+    "editTitle": "Επεξεργασία προφίλ",
+    "editTitleSuffix": ""
+  }
+}

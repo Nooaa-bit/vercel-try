@@ -1,9 +1,9 @@
-//hype-hire/vercel/app/api/update-profile/route.ts
+//hype-hire/vercel/app/api/update-user/route.ts
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
+import sharp from "sharp"; // ✅ ADD THIS
 
 // Validation constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -14,28 +14,150 @@ const ALLOWED_TYPES = [
   "image/heic",
   "image/heif",
   "image/webp",
-];
+]; // ✅ UPDATED
 const MAX_NAME_LENGTH = 100;
 
 export async function POST(request: NextRequest) {
   try {
-    // ✅ Use regular client to get authenticated user
+    // ✅ Get authenticated admin user
     const supabase = await createClient();
 
     const {
-      data: { user },
+      data: { user: adminAuthUser },
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!adminAuthUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const formData = await request.formData();
+    const userId = formData.get("userId") as string;
     const firstName = formData.get("firstName") as string;
     const lastName = formData.get("lastName") as string;
     const file = formData.get("profilePicture") as File | null;
 
-    // Server-side validation
+    // ✅ Validate userId is provided
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const targetUserId = parseInt(userId);
+    if (isNaN(targetUserId)) {
+      return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+    }
+
+    // ✅ Get admin user with their roles
+    const adminUser = await prisma.user.findUnique({
+      where: { authUserId: adminAuthUser.id },
+      select: {
+        id: true,
+        userCompanyRoles: {
+          where: {
+            revokedAt: null,
+          },
+          select: {
+            role: true,
+            companyId: true,
+          },
+        },
+      },
+    });
+
+    if (!adminUser) {
+      return NextResponse.json(
+        { error: "Admin user not found" },
+        { status: 404 }
+      );
+    }
+
+    // ✅ Check if admin is a superadmin
+    const isSuperAdmin = adminUser.userCompanyRoles.some(
+      (r) => r.role === "superadmin"
+    );
+
+    // ✅ Get target user with their roles
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        authUserId: true,
+        profilePicture: true,
+        userCompanyRoles: {
+          where: {
+            revokedAt: null,
+          },
+          select: {
+            role: true,
+            companyId: true,
+          },
+        },
+      },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json(
+        { error: "Target user not found" },
+        { status: 404 }
+      );
+    }
+
+    // ✅ Check if target user is a superadmin
+    const targetIsSuperAdmin = targetUser.userCompanyRoles.some(
+      (r) => r.role === "superadmin"
+    );
+
+    // ✅ Permission Logic
+    let hasPermission = false;
+
+    if (isSuperAdmin) {
+      // Superadmins can edit everyone
+      hasPermission = true;
+    } else {
+      // Company admins cannot edit superadmins
+      if (targetIsSuperAdmin) {
+        return NextResponse.json(
+          { error: "You don't have permission to edit superadmins" },
+          { status: 403 }
+        );
+      }
+
+      // Check if admin has company_admin role
+      const adminCompanyAdminRoles = adminUser.userCompanyRoles.filter(
+        (r) => r.role === "company_admin"
+      );
+
+      if (adminCompanyAdminRoles.length === 0) {
+        return NextResponse.json(
+          { error: "You don't have admin permissions" },
+          { status: 403 }
+        );
+      }
+
+      // Get company IDs where admin is company_admin
+      const adminCompanyIds = adminCompanyAdminRoles.map((r) => r.companyId);
+
+      // Get company IDs where target user works
+      const targetCompanyIds = targetUser.userCompanyRoles.map(
+        (r) => r.companyId
+      );
+
+      // Check if there's any overlap
+      hasPermission = adminCompanyIds.some((id) =>
+        targetCompanyIds.includes(id)
+      );
+    }
+
+    if (!hasPermission) {
+      return NextResponse.json(
+        { error: "You don't have permission to edit this user" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ Validate names
     if (!firstName?.trim() || firstName.length > MAX_NAME_LENGTH) {
       return NextResponse.json(
         {
@@ -54,9 +176,9 @@ export async function POST(request: NextRequest) {
 
     let profilePictureUrl: string | null = null;
 
-    // Handle file upload if present
+    // ✅ Handle file upload if present
     if (file) {
-      // Validate file
+      // Validate file type
       if (!ALLOWED_TYPES.includes(file.type)) {
         return NextResponse.json(
           { error: "Only JPG, PNG, WebP, and HEIC images are allowed" },
@@ -64,6 +186,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Validate file size
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json(
           { error: "Image must be smaller than 5MB" },
@@ -71,13 +194,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Get current profile picture to delete old one
-      const currentUser = await prisma.user.findUnique({
-        where: { authUserId: user.id },
-        select: { profilePicture: true },
-      });
-
-      // ✅ Convert HEIC/HEIF to JPEG, use other formats as-is
+      // ✅ NEW: Convert HEIC/HEIF to JPEG
       let fileToUpload: Buffer;
       let finalContentType: string;
       let fileExtension: string;
@@ -107,13 +224,13 @@ export async function POST(request: NextRequest) {
         fileExtension = file.name.split(".").pop() || "jpg";
       }
 
-      // ✅ Use timestamped filename for cache busting
+      // Use target user's authUserId for storage path with timestamp
       const timestamp = Date.now();
-      const fileName = `${user.id}/profile-${timestamp}.${fileExtension}`;
+      const fileName = `${targetUser.authUserId}/profile-${timestamp}.${fileExtension}`;
 
-      // ✅ Use admin client for storage (needs elevated permissions)
       const adminClient = createAdminClient();
 
+      // ✅ UPDATED: Upload buffer instead of file
       const { error: uploadError } = await adminClient.storage
         .from("profile-pictures")
         .upload(fileName, fileToUpload, {
@@ -129,40 +246,39 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // ✅ Extract old path from URL if it exists (for cleanup)
+      // Extract old path from URL if it exists (for cleanup)
       let oldFilePath: string | null = null;
-      if (currentUser?.profilePicture) {
-        // If it's a full URL, extract the path; if it's already a path, use as-is
+      if (targetUser.profilePicture) {
         if (
-          currentUser.profilePicture.includes(
+          targetUser.profilePicture.includes(
             "/storage/v1/object/public/profile-pictures/"
           )
         ) {
-          oldFilePath = currentUser.profilePicture.split(
+          oldFilePath = targetUser.profilePicture.split(
             "/storage/v1/object/public/profile-pictures/"
           )[1];
         } else {
-          oldFilePath = currentUser.profilePicture;
+          oldFilePath = targetUser.profilePicture;
         }
       }
 
-      // ✅ Delete old file if it exists
+      // Delete old file if it exists
       if (oldFilePath) {
         await adminClient.storage
           .from("profile-pictures")
           .remove([oldFilePath]);
       }
 
-      // ✅ Generate and store the full public URL
+      // Generate and store the full public URL
       const { data } = adminClient.storage
         .from("profile-pictures")
         .getPublicUrl(fileName);
       profilePictureUrl = data.publicUrl;
     }
 
-    // ✅ Store the full URL instead of the path
+    // ✅ Update target user's profile
     await prisma.user.update({
-      where: { authUserId: user.id },
+      where: { id: targetUserId },
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -175,7 +291,7 @@ export async function POST(request: NextRequest) {
       profilePictureUrl,
     });
   } catch (error) {
-    console.error("Error updating profile:", error);
+    console.error("Error updating user profile:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

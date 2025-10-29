@@ -1,101 +1,153 @@
 //hype-hire/vercel/app/[lang]/dashboard/team/page.tsx
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Users, Filter, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { getCompanyUsers } from "@/lib/company-users";
-import { createClient } from "@/lib/supabase/client";
+import SettingsForm from "@/app/[lang]/dashboard/settings/SettingsForm";
+import { useTranslation } from "react-i18next";
 
 type Employee = {
   userId: number;
   email: string;
   firstName: string | null;
   lastName: string | null;
-  profilePicture: string | null; // ✅ Add profile picture
+  profilePicture: string | null;
   role: string;
   roleId: number;
   joinedAt: Date;
 };
 
-export default function ProtectedPage() {
+type AvailableRole = {
+  role: string;
+  count: number;
+};
+
+export default function TeamPage() {
+  const { t, ready } = useTranslation("team");
   const { activeRole, hasPermission } = useActiveRole();
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [availableRoles, setAvailableRoles] = useState<AvailableRole[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const hasAccess = hasPermission("company_admin");
+  // ✅ Dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
 
-  // ✅ Memoize Supabase client
-  const supabase = useMemo(() => createClient(), []);
+  const hasAccess = hasPermission("company_admin");
+  const pageSize = 50;
 
   // ✅ Helper to get profile picture URL
-  const getProfilePictureUrl = (profilePicture: string | null) => {
+  const getProfilePictureUrl = useCallback((profilePicture: string | null) => {
     if (!profilePicture) return null;
-    const { data } = supabase.storage
-      .from("profile-pictures")
-      .getPublicUrl(profilePicture);
-    return data.publicUrl;
-  };
+    if (profilePicture.trim() === "") return null;
+    if (profilePicture.startsWith("http")) return profilePicture;
+    return null;
+  }, []);
 
   // ✅ Helper to get user initials
-  const getUserInitial = (employee: Employee) => {
+  const getUserInitial = useCallback((employee: Employee) => {
     if (employee.firstName) return employee.firstName[0].toUpperCase();
     return employee.email[0].toUpperCase();
-  };
+  }, []);
 
-  // Fetch employees when component mounts
-  useEffect(() => {
-    async function loadEmployees() {
-      if (activeRole.companyId) {
-        setLoading(true);
-        const users = await getCompanyUsers(activeRole.companyId);
-        setEmployees(users);
-        setFilteredEmployees(users);
-        setLoading(false);
-      }
-    }
+  // ✅ Helper to get translated role name
+  const getRoleName = useCallback(
+    (role: string) => {
+      const roleKey = role as keyof typeof t;
+      return t(`roles.${role}`, { defaultValue: role.replace("_", " ") });
+    },
+    [t]
+  );
 
-    if (hasAccess) {
-      loadEmployees();
-    }
-  }, [activeRole.companyId, hasAccess]);
+  // ✅ Handle edit button click
+  const handleEditUser = useCallback((employee: Employee) => {
+    setSelectedUser(employee);
+    setEditDialogOpen(true);
+  }, []);
 
-  // Filter employees when role selection changes
-  useEffect(() => {
-    if (selectedRole === "all") {
-      setFilteredEmployees(employees);
-    } else {
-      setFilteredEmployees(
-        employees.filter((emp) => emp.role === selectedRole)
+  // ✅ Refresh employees after edit
+  const refreshEmployees = useCallback(async () => {
+    if (activeRole.companyId) {
+      setLoading(true);
+      const result = await getCompanyUsers(
+        activeRole.companyId,
+        currentPage,
+        pageSize,
+        selectedRole
       );
+      setEmployees(result.employees);
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
+      setAvailableRoles(result.availableRoles);
+      setLoading(false);
     }
-  }, [selectedRole, employees]);
+  }, [activeRole.companyId, currentPage, selectedRole]);
 
+  // ✅ Fetch employees when page or role changes
+  useEffect(() => {
+    if (hasAccess) {
+      refreshEmployees();
+    }
+  }, [hasAccess, refreshEmployees]);
+
+  // ✅ Handle role filter change (reset to page 1)
+  const handleRoleChange = useCallback((role: string) => {
+    setSelectedRole(role);
+    setCurrentPage(1);
+  }, []);
+
+  // ✅ Access control
   useEffect(() => {
     if (!hasAccess) {
       router.push("/dashboard");
     }
   }, [hasAccess, router]);
 
+  // ✅ Memoized total count
+  const totalAllCount = useMemo(
+    () => availableRoles.reduce((sum, r) => sum + r.count, 0),
+    [availableRoles]
+  );
+
+  // ✅ Show loading state while translations load
+  if (!ready) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   if (!hasAccess) {
     return null;
   }
 
-  // Get unique roles from employees
-  const availableRoles = Array.from(new Set(employees.map((emp) => emp.role)));
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 py-16">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Users className="h-4 w-4" />
-          {filteredEmployees.length} employees
+          {totalCount}{" "}
+          {selectedRole === "all"
+            ? t("header.employees")
+            : getRoleName(selectedRole)}
         </div>
       </div>
 
@@ -104,33 +156,32 @@ export default function ProtectedPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filter by Role
+            {t("filter.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setSelectedRole("all")}
+              onClick={() => handleRoleChange("all")}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 selectedRole === "all"
                   ? "bg-pulse-500 text-white"
                   : "bg-muted hover:bg-muted/80"
               }`}
             >
-              All ({employees.length})
+              {t("filter.all")} ({totalAllCount})
             </button>
-            {availableRoles.map((role) => (
+            {availableRoles.map((roleInfo) => (
               <button
-                key={role}
-                onClick={() => setSelectedRole(role)}
+                key={roleInfo.role}
+                onClick={() => handleRoleChange(roleInfo.role)}
                 className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
-                  selectedRole === role
+                  selectedRole === roleInfo.role
                     ? "bg-pulse-500 text-white"
                     : "bg-muted hover:bg-muted/80"
                 }`}
               >
-                {role.replace("_", " ")} (
-                {employees.filter((e) => e.role === role).length})
+                {getRoleName(roleInfo.role)} ({roleInfo.count})
               </button>
             ))}
           </div>
@@ -140,77 +191,158 @@ export default function ProtectedPage() {
       {/* Employee Cards */}
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">
-          Loading employees...
+          {t("header.loading")}
         </div>
-      ) : filteredEmployees.length === 0 ? (
+      ) : employees.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          No employees found
+          {t("header.noEmployees")}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEmployees.map((employee) => {
-            const profilePictureUrl = getProfilePictureUrl(
-              employee.profilePicture
-            );
-            const userInitial = getUserInitial(employee);
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {employees.map((employee) => {
+              const profilePictureUrl = getProfilePictureUrl(
+                employee.profilePicture
+              );
+              const userInitial = getUserInitial(employee);
 
-            return (
-              <Card
-                key={employee.roleId}
-                className="hover:border-pulse-500 transition-colors"
-              >
-                <CardHeader>
-                  {/* ✅ Profile Picture Section */}
-                  <div className="flex items-center gap-3 mb-2">
-                    {profilePictureUrl ? (
-                      <img
-                        src={profilePictureUrl}
-                        alt={`${
-                          employee.firstName || employee.email
-                        }'s profile`}
-                        className="w-12 h-12 rounded-full object-cover shadow-md"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-md">
-                        {userInitial}
+              return (
+                <Card
+                  key={employee.roleId}
+                  className="hover:shadow-md transition-shadow"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3 mb-2">
+                      {profilePictureUrl ? (
+                        <img
+                          src={profilePictureUrl}
+                          alt={`${employee.firstName || employee.email}${t(
+                            "card.profileAlt"
+                          )}`}
+                          className="w-12 h-12 rounded-full object-cover shadow-md"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-md">
+                          {userInitial}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg truncate">
+                          {employee.firstName && employee.lastName
+                            ? `${employee.firstName} ${employee.lastName}`
+                            : employee.email}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {employee.email}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">
-                        {employee.firstName && employee.lastName
-                          ? `${employee.firstName} ${employee.lastName}`
-                          : employee.email}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {employee.email}
-                      </p>
                     </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {t("card.role")}
+                        </span>
+                        <span className="text-xs bg-muted px-2 py-1 rounded capitalize">
+                          {getRoleName(employee.role)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {t("card.joined")}
+                        </span>
+                        <span className="text-sm">
+                          {new Date(employee.joinedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleEditUser(employee)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        {t("card.edit")}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {t("pagination.page")} {currentPage} {t("pagination.of")}{" "}
+                    {totalPages} • {t("pagination.showing")} {employees.length}{" "}
+                    {t("pagination.of")} {totalCount}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Role:
-                      </span>
-                      <span className="text-sm font-medium capitalize px-2 py-1 bg-muted rounded">
-                        {employee.role.replace("_", " ")}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Joined:
-                      </span>
-                      <span className="text-sm">
-                        {new Date(employee.joinedAt).toLocaleDateString()}
-                      </span>
-                    </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      {t("pagination.previous")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                    >
+                      {t("pagination.next")}
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ✅ Edit User Dialog */}
+      {selectedUser && (
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {t("dialog.editTitle")}{" "}
+                {selectedUser.firstName || selectedUser.email}
+                {t("dialog.editTitleSuffix")}
+              </DialogTitle>
+            </DialogHeader>
+
+            <SettingsForm
+              user={{
+                firstName: selectedUser.firstName || "",
+                lastName: selectedUser.lastName || "",
+                email: selectedUser.email,
+                profilePictureUrl: getProfilePictureUrl(
+                  selectedUser.profilePicture
+                ),
+              }}
+              targetUserId={selectedUser.userId}
+              onSuccess={() => {
+                refreshEmployees();
+                setEditDialogOpen(false);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/settings/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -36,13 +37,20 @@ export default async function SettingsPage({
     redirect(`/${lang}/error?message=profile_not_found`);
   }
 
+  // ✅ CHANGE: profilePicture now stores full URL, use it directly
   let profilePictureUrl: string | null = null;
   if (user.profilePicture) {
-    const { data } = supabase.storage
-      .from("profile-pictures")
-      .getPublicUrl(user.profilePicture);
-
-    profilePictureUrl = data.publicUrl;
+    // Check if it's already a full URL or legacy path format
+    if (user.profilePicture.startsWith("http")) {
+      // New format: full URL stored in database
+      profilePictureUrl = user.profilePicture;
+    } else {
+      // Legacy format: path stored, generate URL (backward compatibility)
+      const { data } = supabase.storage
+        .from("profile-pictures")
+        .getPublicUrl(user.profilePicture);
+      profilePictureUrl = data.publicUrl;
+    }
   }
 
   // ✅ Get translations on server
