@@ -1,5 +1,6 @@
 //hype-hire/vercel/app/[lang]/layout.tsx
 import type { Metadata } from "next";
+import { type ReactNode } from "react";
 import { Inter } from "next/font/google";
 import "../globals.css";
 import Navbar from "@/components/navbar";
@@ -24,10 +25,10 @@ export default async function RootLayout({
   children,
   params,
 }: {
-  children: React.ReactNode;
-  params: { lang: string };
+  children: ReactNode;
+  params: Promise<{ lang: string }>; // ✅ Changed to Promise
 }) {
-  const { lang } = await  params; // trust middleware
+  const { lang } = await params; // ✅ Await the params
 
   return (
     <html lang={lang}>
