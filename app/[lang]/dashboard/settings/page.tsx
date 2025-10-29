@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import SettingsForm from "./SettingsForm";
+import SettingsForm from "@/app/[lang]/dashboard/settings/SettingsForm";
 
 export default async function SettingsPage({
   params,

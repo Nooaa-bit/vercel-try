@@ -9,10 +9,10 @@
     "all": "Όλοι"
   },
   "roles": {
-    "superadmin": "Υπερ Διαχειριστής",
-    "company_admin": "Διαχειριστής Εταιρείας",
-    "supervisor": "Επόπτης",
-    "talent": "Ταλέντο"
+    "superadmin": "Superadmin",
+    "company_admin": "Διαχειριστής",
+    "supervisor": "Supervisor",
+    "talent": "Talent"
   },
   "card": {
     "role": "Ρόλος:",
