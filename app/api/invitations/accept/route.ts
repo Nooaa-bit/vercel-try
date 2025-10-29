@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/api/invitations/accept/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@supabase/supabase-js";

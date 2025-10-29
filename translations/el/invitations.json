@@ -1,0 +1,104 @@
+{
+  "tabs": {
+    "drafts": "Πρόχειρα",
+    "sent": "Απεσταλμένα"
+  },
+  "buttons": {
+    "addDraft": "Προσθήκη Προχείρου",
+    "scanAll": "Έλεγχος Όλων",
+    "sendAll": "Αποστολή Όλων",
+    "deleteAll": "Διαγραφή Όλων",
+    "send": "Αποστολή",
+    "updateRole": "Ενημέρωση Ρόλου",
+    "sendAnyway": "Αποστολή Ούτως ή Άλλως",
+    "revoke": "Ανάκληση",
+    "previous": "Προηγούμενο",
+    "next": "Επόμενο",
+    "clear": "Καθαρισμός"
+  },
+  "company": {
+    "select": "Επιλογή εταιρείας...",
+    "searchPlaceholder": "Αναζήτηση εταιρείας...",
+    "noCompanyFound": "Δεν βρέθηκε εταιρεία."
+  },
+  "filters": {
+    "searchPlaceholder": "Αναζήτηση με email...",
+    "allRoles": "Όλοι οι ρόλοι",
+    "allStatuses": "Όλες οι καταστάσεις"
+  },
+  "roles": {
+    "talent": "Ταλέντο",
+    "supervisor": "Επόπτης",
+    "company_admin": "Διαχειριστής Εταιρείας",
+    "superadmin": "Υπερ-Διαχειριστής"
+  },
+  "status": {
+    "pending": "Εκκρεμεί",
+    "expired": "Έληξε",
+    "accepted": "Αποδεκτή",
+    "declined": "Απορρίφθηκε",
+    "revoked": "Ανακλήθηκε",
+    "sending": "Αποστολή...",
+    "sent": "Στάλθηκε",
+    "failed": "Απέτυχε"
+  },
+  "problematic": {
+    "title": "Προβληματικές Προσκλήσεις",
+    "alreadyMember": "Ήδη μέλος εταιρείας με ρόλο:",
+    "cannotUpdateSuperadmin": "Δεν είναι δυνατή η ενημέρωση υπερ-διαχειριστή"
+  },
+  "messages": {
+    "notAuthenticated": "Δεν έχετε πιστοποιηθεί",
+    "noDrafts": "Δεν υπάρχουν πρόχειρα. Κάντε κλικ στην Προσθήκη Προχείρου για να ξεκινήσετε.",
+    "loadingInvitations": "Φόρτωση προσκλήσεων...",
+    "noMatchingFilters": "Δεν υπάρχουν προσκλήσεις που να ταιριάζουν με τα φίλτρα σας",
+    "noPendingOrExpired": "Δεν υπάρχουν εκκρεμείς ή ληγμένες προσκλήσεις"
+  },
+  "pagination": {
+    "page": "Σελίδα",
+    "of": "από",
+    "showing": "Εμφάνιση",
+    "filteredFrom": "φιλτραρισμένα από",
+    "total": "σύνολο",
+    "invitations": "προσκλήσεις"
+  },
+  "placeholders": {
+    "email": "Email"
+  },
+  "toasts": {
+    "duplicatesRemoved": "Αφαιρέθηκαν {{count}} διπλότυπα πρόχειρα",
+    "conflictsDetected": "Εντοπίστηκαν συγκρούσεις",
+    "conflictsDescription": "{{count}} πρόσκληση/εις απαιτούν προσοχή στις Προβληματικές Προσκλήσεις.",
+    "allClear": "Όλα εντάξει",
+    "allClearDescription": "Δεν εντοπίστηκαν συγκρούσεις. Έτοιμο για αποστολή.",
+    "failedToLoad": "Αποτυχία φόρτωσης προσκλήσεων",
+    "invitationRevoked": "Η πρόσκληση ανακλήθηκε",
+    "failedToRevoke": "Αποτυχία ανάκλησης πρόσκλησης",
+    "selectCompanyFirst": "Παρακαλώ επιλέξτε πρώτα μια εταιρεία",
+    "conflictDetected": "Εντοπίστηκε σύγκρουση",
+    "conflictDescription": "Χρησιμοποιήστε το κουμπί στις Προβληματικές Προσκλήσεις για παράκαμψη.",
+    "alreadyMember": "Ήδη μέλος",
+    "alreadyMemberDescription": "Ο/Η {{email}} είναι ήδη μέλος αυτής της εταιρείας.",
+    "failedToUpdateRole": "Αποτυχία ενημέρωσης ρόλου",
+    "roleUpdated": "Ο ρόλος ενημερώθηκε",
+    "roleUpdatedDescription": "Ενημερώθηκε ο ρόλος για τον/την {{email}}",
+    "failedToSend": "Αποτυχία αποστολής πρόσκλησης",
+    "invitationSent": "Η πρόσκληση στάλθηκε",
+    "invitationSentDescription": "Στάλθηκε στον/στην {{email}}",
+    "invitationCreatedEmailFailed": "Η πρόσκληση δημιουργήθηκε αλλά το email απέτυχε",
+    "invitationCreatedEmailFailedDescription": "Η πρόσκληση αποθηκεύτηκε αλλά το email δεν μπόρεσε να σταλεί.",
+    "draftsDeleted": "Διαγράφηκαν {{count}} πρόχειρα",
+    "invitationsProcessed": "Οι προσκλήσεις επεξεργάστηκαν",
+    "sentCount": "Στάλθηκαν {{count}} πρόσκληση/εις",
+    "alreadyMemberCount": "{{count}} ήδη μέλος/η",
+    "failedCount": "{{count}} απέτυχαν",
+    "noInvitationsToSend": "Δεν υπάρχουν προσκλήσεις για αποστολή",
+    "allInvitationsSent": "Όλες οι προσκλήσεις στάλθηκαν",
+    "allInvitationsSentDescription": "Στάλθηκαν με επιτυχία {{count}} πρόσκληση/εις",
+    "partialSuccess": "Μερική επιτυχία",
+    "partialSuccessDescription": "Στάλθηκαν {{count}} πρόσκληση/εις. {{problematic}} μεταφέρθηκαν στις Προβληματικές Προσκλήσεις.",
+    "someFailed": "Κάποιες προσκλήσεις απέτυχαν",
+    "someFailedDescription": "Στάλθηκαν {{sent}}, απέτυχαν {{failed}}. Ελέγξτε την κονσόλα για λεπτομέρειες.",
+    "sending": "Αποστολή σε {{email}}..."
+  }
+}
