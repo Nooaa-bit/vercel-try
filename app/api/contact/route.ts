@@ -28,13 +28,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const contactMessage = await prisma.contactMessage.create({
-      data: {
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        message: message.trim(),
-      },
-    });
+const contactMessage = await prisma.contact_message.create({
+  data: {
+    fullName: fullName.trim(),
+    email: email.trim().toLowerCase(),
+    message: message.trim(),
+  },
+});
 
     return NextResponse.json(
       { success: true, id: contactMessage.id },
