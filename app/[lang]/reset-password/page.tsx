@@ -59,8 +59,8 @@ export default function ResetPassword() {
       toast.error(t("errorPasswordMismatch"));
       return;
     }
-
-    if (password.length < 4) {
+// Supabase requires a minimum password length of 6 characters
+    if (password.length < 6) {
       toast.error(t("errorPasswordTooShort"));
       return;
     }
@@ -156,8 +156,6 @@ export default function ResetPassword() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("newPasswordPlaceholder")}
                 className="focus-visible:ring-pulse-500"
-                required
-                minLength={6}
               />
               <p className="text-xs text-muted-foreground">
                 {t("passwordHint")}
@@ -173,7 +171,6 @@ export default function ResetPassword() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder={t("confirmPasswordPlaceholder")}
                 className="focus-visible:ring-pulse-500"
-                required
               />
             </div>
 

@@ -5,13 +5,13 @@
   "newPasswordPlaceholder": "Εισάγετε τον νέο κωδικό σας",
   "confirmPassword": "Επιβεβαίωση Κωδικού",
   "confirmPasswordPlaceholder": "Επιβεβαιώστε τον νέο κωδικό σας",
-  "passwordHint": "Ο κωδικός πρέπει να είναι τουλάχιστον 4 χαρακτήρες",
+  "passwordHint": "Ο κωδικός πρέπει να είναι τουλάχιστον 6 χαρακτήρες",
   "updatePassword": "Ενημέρωση Κωδικού",
   "updating": "Ενημέρωση...",
   "backToDashboard": "Επιστροφή στον Πίνακα Ελέγχου",
   "validatingSession": "Επικύρωση της συνεδρίας σας...",
   "errorPasswordMismatch": "Οι κωδικοί δεν ταιριάζουν",
-  "errorPasswordTooShort": "Ο κωδικός πρέπει να είναι τουλάχιστον 4 χαρακτήρες",
+  "errorPasswordTooShort": "Ο κωδικός πρέπει να είναι τουλάχιστον 6 χαρακτήρες",
   "successPasswordUpdated": "Ο κωδικός ενημερώθηκε με επιτυχία!",
   "errorUpdatingPassword": "Σφάλμα ενημέρωσης κωδικού: "
 }

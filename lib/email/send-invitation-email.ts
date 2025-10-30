@@ -1,3 +1,4 @@
+//hype-hire/vercel/lib/email/send-invitation-email.ts
 import nodemailer, { SentMessageInfo } from "nodemailer";
 import fs from "fs";
 import path from "path";

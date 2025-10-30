@@ -1,0 +1,22 @@
+{
+  "loading": {
+    "title": "Accepting Invitation",
+    "description": "Please wait while we set up your account..."
+  },
+  "success": {
+    "title": "Welcome!",
+    "description": "Invitation accepted successfully. Redirecting to your dashboard..."
+  },
+  "error": {
+    "title": "Something Went Wrong",
+    "generic": "We couldn't process your invitation.",
+    "redirecting": "Redirecting to home page..."
+  },
+  "errors": {
+    "noToken": "No invitation token provided.",
+    "invalidToken": "Invalid invitation link.",
+    "processingFailed": "Failed to process invitation.",
+    "sessionCreationFailed": "Failed to create your session.",
+    "unexpectedError": "An unexpected error occurred."
+  }
+}

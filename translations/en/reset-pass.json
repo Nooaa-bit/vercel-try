@@ -5,13 +5,13 @@
   "newPasswordPlaceholder": "Enter your new password",
   "confirmPassword": "Confirm Password",
   "confirmPasswordPlaceholder": "Confirm your new password",
-  "passwordHint": "Password must be at least 4 characters",
+  "passwordHint": "Password must be at least 6 characters",
   "updatePassword": "Update Password",
   "updating": "Updating...",
   "backToDashboard": "Back to Dashboard",
   "validatingSession": "Validating your session...",
   "errorPasswordMismatch": "Passwords do not match",
-  "errorPasswordTooShort": "Password must be at least 4 characters",
+  "errorPasswordTooShort": "Password must be at least 6 characters",
   "successPasswordUpdated": "Password updated successfully!",
   "errorUpdatingPassword": "Error updating password: "
 }

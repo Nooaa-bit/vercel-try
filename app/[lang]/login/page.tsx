@@ -92,7 +92,11 @@ export default function LoginPage() {
       });
 
       if (error) {
-        toast.error(error.message);
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error(t("errorInvalidCredentials")); // Add this to your login.json
+        } else {
+          toast.error(error.message);
+        }
       } else {
         router.push(`/${i18n.language}/dashboard`);
       }

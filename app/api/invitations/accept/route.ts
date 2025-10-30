@@ -39,31 +39,36 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "expired" }, { status: 400 });
     }
 
-    // 2. Find or create auth user
-    let authUserId: string;
-
+    // ✅ 2. Check if auth user exists
     const { data: authListData } = await supabaseAdmin.auth.admin.listUsers();
     const existingAuthUser = authListData.users.find(
       (u) => u.email === invitation.email
     );
 
+    let authUserId: string;
+
     if (existingAuthUser) {
+      // User exists in Supabase Auth
       authUserId = existingAuthUser.id;
     } else {
-      const { data: newAuthUser, error } =
-        await supabaseAdmin.auth.admin.createUser({
+      // ✅ NEW APPROACH: Generate magic link which will create user
+      // This is better because Supabase handles user creation correctly
+      const { data: linkData, error: linkError } =
+        await supabaseAdmin.auth.admin.generateLink({
+          type: "magiclink",
           email: invitation.email,
-          email_confirm: true,
         });
 
-      if (error || !newAuthUser.user) {
-        throw new Error(`Auth creation failed: ${error?.message}`);
+      if (linkError || !linkData) {
+        throw new Error(`Token generation failed: ${linkError?.message}`);
       }
 
-      authUserId = newAuthUser.user.id;
+      // ✅ Extract user ID from the generated link data
+      // When generateLink is called for a new user, it creates them
+      authUserId = linkData.user.id;
     }
 
-    // 3. Find or create database user
+    // ✅ 3. Find or create database user
     let user = await prisma.user.findFirst({
       where: {
         OR: [{ email: invitation.email }, { authUserId: authUserId }],
@@ -80,7 +85,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // 4. Update invitation and create role
+    // ✅ 4. Update invitation and create role
     await prisma.$transaction(async (tx) => {
       await tx.invitation.update({
         where: { id: invitation.id },
@@ -109,7 +114,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // 5. Generate hashed token for verification
+    // ✅ 5. Generate fresh magic link for this session
     const { data: linkData, error: linkError } =
       await supabaseAdmin.auth.admin.generateLink({
         type: "magiclink",

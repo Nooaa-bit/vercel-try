@@ -38,5 +38,6 @@
   "errorSendingReset": "Failed to send reset email. Please try again.",
   "errorEmailRequired": "Email is required",
   "errorEmailInvalid": "Please enter a valid email address",
+  "errorInvalidCredentials": "Invalid login credentials",
   "errorPasswordRequired": "Password is required"
 }

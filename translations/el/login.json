@@ -38,5 +38,6 @@
   "errorSendingReset": "Αποτυχία αποστολής email. Παρακαλώ δοκιμάστε ξανά.",
   "errorEmailRequired": "Το email είναι υποχρεωτικό",
   "errorEmailInvalid": "Παρακαλώ εισάγετε μια έγκυρη διεύθυνση email",
+  "errorInvalidCredentials": "Λάθος κωδικός ή email",
   "errorPasswordRequired": "Ο κωδικός είναι υποχρεωτικός"
 }
