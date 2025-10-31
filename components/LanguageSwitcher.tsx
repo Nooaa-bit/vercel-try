@@ -2,6 +2,7 @@
 "use client";
 
 import { useLanguage } from "@/lib/LanguageContext";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,10 +25,29 @@ export default function LanguageSwitcher({
   variant = "dropdown",
 }: LanguageSwitcherProps) {
   const { language, setLanguage, loading } = useLanguage();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const switchLanguage = (newLocale: "en" | "el") => {
     if (newLocale === language) return;
+
+    // Extract current language from pathname
+    const pathMatch = pathname.match(/^\/(en|el)(?=\/|$)/);
+    const currentLang = (pathMatch?.[1] as "en" | "el") ?? "en";
+
+    // Replace language in pathname
+    const newPathname = pathname.replace(/^\/(en|el)/, `/${newLocale}`);
+
+    // Preserve all query parameters
+    const queryString = searchParams.toString();
+    const fullUrl = queryString ? `${newPathname}?${queryString}` : newPathname;
+
+    // Update language context
     setLanguage(newLocale);
+
+    // Navigate to new URL with preserved query params
+    router.push(fullUrl);
   };
 
   const currentLocale = locales.find((l) => l.code === language);

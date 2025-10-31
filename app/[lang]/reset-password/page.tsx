@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,191 +16,315 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Lock, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 
-export default function ResetPassword() {
-  const { t, i18n, ready } = useTranslation("reset-pass");
+export default function ResetPasswordPage() {
+  const { t, ready } = useTranslation("reset-password");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
+  // Extract language from pathname
+  const pathMatch = pathname.match(/^\/(en|el)(?=\/|$)/);
+  const lang = (pathMatch?.[1] as "en" | "el") ?? "en";
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isValidSession, setIsValidSession] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
 
+  // Validate token on page load
   useEffect(() => {
-    const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        setIsValidSession(true);
-      } else {
-        router.push(`/${i18n.language}/login`);
+    const validateToken = async () => {
+      if (!token) {
+        toast.error(t("errorInvalidLink") || "Invalid or missing reset link");
+        router.push("/");
+        return;
+      }
+
+      try {
+        // Call API to validate the token
+        const response = await fetch("/api/password-reset/validate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          if (result.code === "TOKEN_EXPIRED") {
+            toast.error(
+              t("errorTokenExpired") ||
+                "This reset link has expired. Please request a new one."
+            );
+          } else if (result.code === "TOKEN_NOT_FOUND") {
+            toast.error(
+              t("errorInvalidLink") ||
+                "This reset link is invalid. Please request a new one."
+            );
+          } else {
+            toast.error(result.error || "Invalid reset link");
+          }
+          setTokenValid(false);
+          router.push("/");
+          return;
+        }
+
+        // Token is valid
+        setTokenValid(true);
+      } catch (err) {
+        console.error("Token validation error:", err);
+        toast.error("Failed to validate reset link");
+        setTokenValid(false);
+        router.push("/");
       }
     };
 
-    checkSession();
+    validateToken();
+  }, [token, router, t]);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setIsValidSession(true);
-      }
-    });
+  // Loading skeleton while translations load or token validates
+  if (!ready || tokenValid === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-lg shadow-elegant">
+          <CardHeader className="text-center space-y-2">
+            <div className="h-8 bg-gray-200 rounded w-2/3 mx-auto animate-pulse" />
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+              <div className="h-32 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-    return () => subscription.unsubscribe();
-  }, [supabase.auth, router, i18n.language]);
+  // Token is invalid, don't show the form
+  if (!tokenValid) {
+    return null; // Redirecting in useEffect
+  }
 
-  const handlePasswordUpdate = async (e: React.FormEvent) => {
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-pulse-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-pulse-500" />
+            </div>
+            <CardTitle className="text-2xl">
+              {t("successTitle") || "Password Reset"}
+            </CardTitle>
+            <CardDescription>
+              {t("successMessage") ||
+                "Your password has been reset successfully"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {t("redirectingMessage") || "Redirecting to login page..."}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (password !== confirmPassword) {
-      toast.error(t("errorPasswordMismatch"));
+    // Validation
+    if (!password.trim()) {
+      toast.error(t("errorPasswordRequired") || "Password is required");
       return;
     }
-// Supabase requires a minimum password length of 6 characters
+
     if (password.length < 6) {
-      toast.error(t("errorPasswordTooShort"));
+      toast.error(
+        t("errorPasswordTooShort") || "Password must be at least 6 characters"
+      );
+      return;
+    }
+
+    if (!confirmPassword.trim()) {
+      toast.error(
+        t("errorConfirmPasswordRequired") || "Please confirm your password"
+      );
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error(t("errorPasswordMismatch") || "Passwords do not match");
       return;
     }
 
     setLoading(true);
 
     try {
-      const { error: passwordError } = await supabase.auth.updateUser({
-        password: password,
+      // Call the verify API to update password
+      const response = await fetch("/api/password-reset/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token,
+          newPassword: password,
+        }),
       });
 
-      if (passwordError) throw passwordError;
+      const result = await response.json();
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { error: dbError } = await supabase
-          .from("user")
-          .update({ has_password: true })
-          .eq("auth_user_id", user.id);
-
-        if (dbError) {
-          console.error("Error updating user table:", dbError);
+      if (!response.ok) {
+        if (result.code === "TOKEN_EXPIRED") {
+          toast.error(
+            t("errorTokenExpired") ||
+              "This reset link has expired. Please request a new one."
+          );
+          router.push("/");
+        } else if (result.code === "TOKEN_NOT_FOUND") {
+          toast.error(
+            t("errorInvalidLink") ||
+              "This reset link is invalid. Please request a new one."
+          );
+          router.push("/");
+        } else {
+          toast.error(result.error || t("errorResettingPassword"));
         }
+        return;
       }
 
-      toast.success(t("successPasswordUpdated"));
-      router.push(`/${i18n.language}/dashboard`);
-    } catch (error) {
-      toast.error(t("errorUpdatingPassword") + (error as Error).message);
+      // Success!
+      setSuccess(true);
+      console.log("✅ Password reset successful");
+
+      // Redirect to login after 1 seconds using current language
+      setTimeout(() => {
+        router.push(`/${lang}/login`);
+      }, 1000);
+    } catch (err) {
+      console.error("Password reset error:", err);
+      toast.error(t("errorResettingPassword") || "Failed to reset password");
     } finally {
       setLoading(false);
     }
   };
 
-  // Loading skeleton while translations load
-  if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md shadow-elegant">
-          <CardHeader className="text-center space-y-2">
-            <div className="h-8 bg-gray-200 rounded w-2/3 mx-auto animate-pulse" />
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="h-10 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!isValidSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md shadow-elegant text-center">
-          <CardContent className="pt-6">
-            <div className="w-16 h-16 bg-pulse-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pulse-500" />
-            </div>
-            <p className="text-muted-foreground">{t("validatingSession")}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-elegant">
+      <Card className="w-full max-w-lg shadow-elegant">
         <CardHeader className="text-center space-y-2">
-          <div className="w-16 h-16 bg-pulse-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-pulse-500" />
-          </div>
-          <CardTitle className="text-3xl font-display">{t("title")}</CardTitle>
-          <CardDescription>{t("description")}</CardDescription>
+          <CardTitle className="text-3xl font-display">
+            {t("title") || "Reset Your Password"}
+          </CardTitle>
+          <CardDescription>
+            {t("description") || "Enter your new password below"}
+          </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handlePasswordUpdate} className="space-y-4">
+          <form onSubmit={handlePasswordReset} noValidate className="space-y-4">
+            {/* New Password */}
             <div className="space-y-2">
-              <Label htmlFor="password">{t("newPassword")}</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t("newPasswordPlaceholder")}
-                className="focus-visible:ring-pulse-500"
-              />
+              <Label htmlFor="password">
+                {t("passwordLabel") || "New Password"}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t("passwordPlaceholder") || "Enter new password"}
+                  className="focus-visible:ring-pulse-500 pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                {t("passwordHint")}
+                {t("passwordHint") || "At least 8 characters"}
               </p>
             </div>
 
+            {/* Confirm Password */}
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">{t("confirmPassword")}</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder={t("confirmPasswordPlaceholder")}
-                className="focus-visible:ring-pulse-500"
-              />
+              <Label htmlFor="confirm-password">
+                {t("confirmLabel") || "Confirm Password"}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirm ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder={
+                    t("confirmPlaceholder") || "Confirm new password"
+                  }
+                  className="focus-visible:ring-pulse-500 pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  tabIndex={-1}
+                >
+                  {showConfirm ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <Button
               type="submit"
-              disabled={loading}
               className="w-full bg-pulse-500 hover:bg-pulse-600"
+              disabled={loading}
             >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  {t("updating")}
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  {t("updatePassword")}
-                </>
-              )}
+              {loading
+                ? t("resetting") || "Resetting..."
+                : t("resetButton") || "Reset Password"}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
-            <Button
-              variant="ghost"
-              onClick={() => router.push(`/${i18n.language}/dashboard`)}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t("backToDashboard")}
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              {t("rememberedPassword") || "Remember your password?"}{" "}
+              <Link
+                href={`/${lang}/login`}
+                className="text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                {t("backToLogin") || "Back to login"}
+              </Link>
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -1,24 +1,11 @@
 //hype-hire/vercel/lib/email/send-invitation-email.ts
-import nodemailer, { SentMessageInfo } from "nodemailer";
+import { TransactionalEmailsApi, SendSmtpEmail } from "@getbrevo/brevo";
 import fs from "fs";
 import path from "path";
 
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.GMAIL_USER!,
-      pass: process.env.GMAIL_APP_PASSWORD!,
-    },
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateDelta: 1000,
-    rateLimit: 5,
-  });
-};
+// ============================================================
+// BREVO EMAIL SENDER
+// ============================================================
 
 function replaceTemplateVars(
   text: string,
@@ -48,13 +35,6 @@ interface SendInvitationEmailParams {
   language: "en" | "el";
 }
 
-interface NodemailerError extends Error {
-  code?: string;
-  command?: string;
-  response?: string;
-  responseCode?: number;
-}
-
 export async function sendInvitationEmail({
   to,
   invitationToken,
@@ -67,11 +47,10 @@ export async function sendInvitationEmail({
   console.log("📧 Preparing invitation email for:", to);
 
   const translations = loadTranslations(language);
-  const transporter = createTransporter();
-
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const invitationLink = `${baseUrl}/${language}/accept-invitation?token=${invitationToken}`;
 
+  // Format expiration date
   const expirationDate = new Date(expiresAt);
   const locale = language === "el" ? "el-GR" : "en-US";
   const expirationString = expirationDate.toLocaleDateString(locale, {
@@ -83,6 +62,7 @@ export async function sendInvitationEmail({
     minute: "2-digit",
   });
 
+  // Translate role
   const roleTranslations: Record<string, Record<string, string>> = {
     en: {
       talent: "Talent",
@@ -109,6 +89,7 @@ export async function sendInvitationEmail({
   const t = (key: string) =>
     replaceTemplateVars(translations[key] || key, vars);
 
+  // Build HTML content (same as before)
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="${language}">
@@ -137,9 +118,7 @@ export async function sendInvitationEmail({
             <p>${t("invitedBy")}</p>
             <p>${t("clickButton")}</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="${invitationLink}" class="button">${t(
-    "buttonText"
-  )}</a>
+                <a href="${invitationLink}" class="button">${t("buttonText")}</a>
             </div>
             <div class="security-note">
                 <strong style="color: #991b1b;">${t("securityTitle")}</strong>
@@ -162,9 +141,7 @@ export async function sendInvitationEmail({
         <div class="footer">
             <p><strong>${t("footerTitle")}</strong></p>
             <p>${t("footerSentTo")}</p>
-            <p style="font-size: 12px; margin-top: 15px;">${t(
-              "footerQuestions"
-            )}</p>
+            <p style="font-size: 12px; margin-top: 15px;">${t("footerQuestions")}</p>
         </div>
     </div>
 </body>
@@ -180,56 +157,39 @@ export async function sendInvitationEmail({
     "feature4"
   )}`;
 
-  const mailOptions = {
-    from: {
-      name: process.env.GMAIL_FROM_NAME || companyName,
-      address: process.env.GMAIL_USER!,
-    },
-    to,
-    subject: t("subject"),
-    text: textContent,
-    html: htmlContent,
-    headers: {
-      "x-priority": "3",
-      "x-msmail-priority": "Normal",
-      importance: "Normal",
-      "message-id": `<${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)}@${process.env.GMAIL_USER?.split("@")[1]}>`,
-      "list-unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=Unsubscribe>`,
-      "reply-to": process.env.GMAIL_USER || "",
-    },
-    envelope: {
-      from: process.env.GMAIL_USER!,
-      to,
-    },
-  };
-
   try {
-    console.log("📤 Sending email...");
-    const info = (await transporter.sendMail(mailOptions)) as SentMessageInfo;
+    // ✅ Initialize Brevo API
+    const emailAPI = new TransactionalEmailsApi();
+    emailAPI.setApiKey(
+      0, // apiKey index
+      process.env.BREVO_API_KEY!
+    );
+
+    // ✅ Build the message
+    const message = new SendSmtpEmail();
+    message.subject = t("subject");
+    message.htmlContent = htmlContent;
+    message.textContent = textContent;
+    message.sender = {
+      name: companyName,
+      email: process.env.BREVO_SENDER_EMAIL || "noreply@yourdomain.com",
+    };
+    message.to = [{ email: to }];
+
+    console.log("📤 Sending email via Brevo...");
+
+    // ✅ Send the email
+    const response = await emailAPI.sendTransacEmail(message);
+
     console.log("✅ Email sent successfully!");
-    console.log("📧 Message ID:", info.messageId);
+    console.log("📧 Message ID:", response.body.messageId);
 
     return {
       success: true,
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
+      messageId: response.body.messageId,
     };
   } catch (error) {
-    console.error("❌ Email sending failed:", error);
-
-    if (error instanceof Error) {
-      const nodemailerError = error as NodemailerError;
-      console.error("Error details:", {
-        message: nodemailerError.message,
-        code: nodemailerError.code,
-        command: nodemailerError.command,
-        response: nodemailerError.response,
-      });
-    }
-
+    console.error("❌ Brevo email sending failed:", error);
     throw new Error(
       `Failed to send email: ${
         error instanceof Error ? error.message : "Unknown error"

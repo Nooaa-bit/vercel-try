@@ -9,6 +9,20 @@ datasource db {
   relationMode = "foreignKeys"
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String   @map("email")
+  userId    Int   @map("user_id")
+  token     String   @unique @map("token")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+    user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("password_reset_token")
+}
+
 model user {
   id             Int       @id @default(autoincrement()) @map("id")
   authUserId     String    @unique @map("auth_user_id")
@@ -57,6 +71,8 @@ model user {
   userConsents             UserConsent[]       @relation("UserConsents")
   dataAccessLogs           DataAccessLog[]     @relation("DataAccessSubject")
   dataAccessesMade         DataAccessLog[]     @relation("DataAccessActor")
+
+   passwordResetTokens   PasswordResetToken[]
 
   @@index([deletedAt, firstName], map: "idx_user_active_sorted")
   @@map("user")

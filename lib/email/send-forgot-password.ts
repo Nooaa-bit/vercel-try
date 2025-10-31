@@ -1,85 +1,72 @@
-//hype-hire/vercel/lib/email/send-magic-link.ts
+//hype-hire/vercel/lib/email/send-forgot-password.ts
 import { TransactionalEmailsApi, SendSmtpEmail } from "@getbrevo/brevo";
 
 // ============================================================
-// BREVO MAGIC LINK EMAIL SENDER
+// BREVO FORGOT PASSWORD EMAIL SENDER
 // ============================================================
 
-interface SendSignInLinkParams {
+interface SendForgotPasswordEmailParams {
   to: string;
-  magicLink: string;
+  resetLink: string;
   companyName?: string;
-  role?: string;
   expiresAt: string;
-  userType: "existing" | "new";
   language?: string;
 }
 
-export async function sendSignInLinkEmail({
+export async function sendForgotPasswordEmail({
   to,
-  magicLink,
+  resetLink,
   companyName = "Your Company",
   expiresAt,
-  userType = "existing",
   language = "en",
-}: SendSignInLinkParams) {
-  console.log("📧 Preparing to send sign-in email to:", to);
+}: SendForgotPasswordEmailParams) {
+  console.log("📧 Preparing to send forgot password email to:", to);
   console.log("🌐 Language:", language);
-   console.log("🏢 Company Name received:", companyName);
+  console.log("🏢 Company Name received:", companyName);
 
   // Translation dictionary for email content
   const translations = {
     en: {
-      title: "Sign in to Hype Hire",
+      title: "Reset Your Password",
       greeting: "Hello!",
       mainMessage:
-        "You requested a sign-in link for your <strong>Hype Hire</strong> account. Click the button below to sign in securely:",
-      buttonText: "Sign In Securely",
+        "We received a request to reset the password for your <strong>Hype Hire</strong> account. Click the button below to set a new password:",
+      buttonText: "Reset Password",
       securityTitle: "Security Information:",
-      expiresOn: "This sign-in link expires on",
+      expiresOn: "This reset link expires on",
       singleUse: "The link can only be used once",
       didntRequest:
         "If you didn't request this, you can safely ignore this email",
-      accessTitle: "After signing in, you'll have access to:",
-      accessDashboard: "Your Hype Hire dashboard",
-      accessFeatures: "All your account features and data",
-      accessResources: "Company resources and tools",
       buttonNotWork:
         "If the button doesn't work, you can copy and paste this link into your browser:",
-      footerCompany: "<strong>Hype Hire</strong> - Secure Sign-In",
+      footerCompany: "<strong>Hype Hire</strong> - Secure Password Reset",
       footerSentTo: "This email was sent to",
-      footerReason: "because you requested a sign-in link.",
+      footerReason: "because you requested a password reset.",
       footerContact:
         "If you have any questions, please contact your administrator.",
-      subjectLine: "🔐 Sign in to Hype Hire",
-      welcomeBack: "Welcome back! Click below to access your account",
+      subjectLine: "🔐 Reset Your Password",
+      subtitle: "Secure password reset for your account",
     },
     el: {
-      title: "Σύνδεση στο Hype Hire",
-      greeting: "Γεια σας!",
+      title: "Επαναφορά του Κωδικού Σας",
+      greeting: "Γεία σας!",
       mainMessage:
-        "Ζητήσατε έναν σύνδεσμο σύνδεσης για τον λογαριασμό σας στο <strong>Hype Hire</strong>. Κάντε κλικ στο κουμπί παρακάτω για ασφαλή σύνδεση:",
-      buttonText: "Ασφαλής Σύνδεση",
+        "Λάβαμε ένα αίτημα επαναφοράς του κωδικού πρόσβασης για τον λογαριασμό σας στο <strong>Hype Hire</strong>. Κάντε κλικ στο κουμπί παρακάτω για να ορίσετε έναν νέο κωδικό:",
+      buttonText: "Επαναφορά Κωδικού",
       securityTitle: "Πληροφορίες Ασφαλείας:",
-      expiresOn: "Ο σύνδεσμος σύνδεσης λήγει στις",
+      expiresOn: "Ο σύνδεσμος επαναφοράς λήγει στις",
       singleUse: "Ο σύνδεσμος μπορεί να χρησιμοποιηθεί μόνο μία φορά",
       didntRequest:
         "Αν δεν ζητήσατε αυτό, μπορείτε να αγνοήσετε με ασφάλεια αυτό το email",
-      accessTitle: "Μετά τη σύνδεση, θα έχετε πρόσβαση σε:",
-      accessDashboard: "Τον πίνακα ελέγχου του Hype Hire",
-      accessFeatures:
-        "Όλες τις λειτουργίες και τα δεδομένα του λογαριασμού σας",
-      accessResources: "Πόρους και εργαλεία της εταιρείας",
       buttonNotWork:
         "Αν το κουμπί δεν λειτουργεί, μπορείτε να αντιγράψετε και να επικολλήσετε αυτόν τον σύνδεσμο στον browser σας:",
-      footerCompany: "<strong>Hype Hire</strong> - Ασφαλής Σύνδεση",
+      footerCompany: "<strong>Hype Hire</strong> - Ασφαλής Επαναφορά Κωδικού",
       footerSentTo: "Αυτό το email στάλθηκε στο",
-      footerReason: "επειδή ζητήσατε σύνδεσμο σύνδεσης.",
+      footerReason: "επειδή ζητήσατε επαναφορά κωδικού.",
       footerContact:
         "Αν έχετε ερωτήσεις, επικοινωνήστε με τον διαχειριστή σας.",
-      subjectLine: "🔐 Σύνδεση στο Hype Hire",
-      welcomeBack:
-        "Καλώς ήρθατε πίσω! Κάντε κλικ παρακάτω για να αποκτήσετε πρόσβαση στον λογαριασμό σας",
+      subjectLine: "🔐 Επαναφορά του Κωδικού Σας",
+      subtitle: "Ασφαλής επαναφορά κωδικού για τον λογαριασμό σας",
     },
   };
 
@@ -165,7 +152,7 @@ export async function sendSignInLinkEmail({
     <div class="container">
         <div class="header">
             <h1>🔐 ${t.title}</h1>
-            <p>${t.welcomeBack}</p>
+            <p>${t.subtitle}</p>
         </div>
         
         <div class="content">
@@ -174,7 +161,7 @@ export async function sendSignInLinkEmail({
             <p>${t.mainMessage}</p>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="${magicLink}" class="button">${t.buttonText}</a>
+                <a href="${resetLink}" class="button">${t.buttonText}</a>
             </div>
             
             <div class="security-note">
@@ -186,16 +173,9 @@ export async function sendSignInLinkEmail({
                 </ul>
             </div>
             
-            <p>${t.accessTitle}</p>
-            <ul>
-                <li>${t.accessDashboard}</li>
-                <li>${t.accessFeatures}</li>
-                <li>${t.accessResources}</li>
-            </ul>
-            
             <p>${t.buttonNotWork}</p>
             <p style="word-break: break-all; background: #f0ebe8; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
-                ${magicLink}
+                ${resetLink}
             </p>
         </div>
         
@@ -215,16 +195,21 @@ export async function sendSignInLinkEmail({
   const textContent = `
 ${t.title}
 
+
 ${t.greeting}
+
 
 ${t.mainMessage.replace(/<[^>]*>/g, "")}
 
-${t.buttonText}: ${magicLink}
+
+${t.buttonText}: ${resetLink}
+
 
 ${t.securityTitle}
 - ${t.expiresOn} ${expirationString}
 - ${t.singleUse}
 - ${t.didntRequest}
+
 
 ---
 ${t.footerCompany.replace(/<[^>]*>/g, "")}
@@ -247,12 +232,12 @@ ${t.footerSentTo} ${to} ${t.footerReason}
     };
     message.to = [{ email: to }];
 
-    console.log("📤 Sending sign-in email via Brevo...");
+    console.log("📤 Sending forgot password email via Brevo...");
 
     // ✅ Send the email
     const response = await emailAPI.sendTransacEmail(message);
 
-    console.log("✅ Sign-in email sent successfully!");
+    console.log("✅ Forgot password email sent successfully!");
     console.log("📧 Message ID:", response.body.messageId);
 
     return {
@@ -260,9 +245,9 @@ ${t.footerSentTo} ${to} ${t.footerReason}
       messageId: response.body.messageId,
     };
   } catch (error) {
-    console.error("❌ Brevo sign-in email sending failed:", error);
+    console.error("❌ Brevo forgot password email sending failed:", error);
     throw new Error(
-      `Failed to send sign-in email: ${
+      `Failed to send forgot password email: ${
         error instanceof Error ? error.message : "Unknown error"
       }`
     );

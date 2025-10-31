@@ -95,11 +95,11 @@ export async function POST(request: Request) {
     const emailResult = await sendSignInLinkEmail({
       to: email,
       magicLink: linkData.properties.action_link,
-      companyName: "Your Organization", // Simple default
-      role: "team member", // Simple default
+      companyName: "Hype Hire", // Simple default
+      //role: "team member", // Simple default
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       userType: "existing",
-      language: language, 
+      language: language,
     });
 
     return NextResponse.json({

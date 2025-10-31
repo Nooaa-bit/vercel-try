@@ -15,20 +15,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Lock, Sparkles, CheckCircle } from "lucide-react";
+import { ForgotPasswordDialog } from "./ForgotPassword";
 
-// Email validation regex as a constant (fix for overengineering)
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
@@ -37,8 +29,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
 
-  // Initialize activeTab from sessionStorage, default to "password"
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return sessionStorage.getItem("loginTab") || "password";
@@ -46,14 +38,9 @@ export default function LoginPage() {
     return "password";
   });
 
-  const [showResetDialog, setShowResetDialog] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
-  // Persist activeTab to sessionStorage whenever it changes
   useEffect(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("loginTab", activeTab);
@@ -67,7 +54,6 @@ export default function LoginPage() {
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Manual validation
     if (!email.trim()) {
       toast.error(t("errorEmailRequired"));
       return;
@@ -93,7 +79,7 @@ export default function LoginPage() {
 
       if (error) {
         if (error.message.includes("Invalid login credentials")) {
-          toast.error(t("errorInvalidCredentials")); // Add this to your login.json
+          toast.error(t("errorInvalidCredentials"));
         } else {
           toast.error(error.message);
         }
@@ -110,7 +96,6 @@ export default function LoginPage() {
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Manual validation
     if (!email.trim()) {
       toast.error(t("errorEmailRequired"));
       return;
@@ -180,46 +165,6 @@ export default function LoginPage() {
     }
   };
 
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Manual validation
-    if (!resetEmail.trim()) {
-      toast.error(t("errorEmailRequired"));
-      return;
-    }
-
-    if (!validateEmail(resetEmail)) {
-      toast.error(t("errorEmailInvalid"));
-      return;
-    }
-
-    setResetLoading(true);
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        resetEmail.toLowerCase().trim(),
-        {
-          redirectTo: `${window.location.origin}/${i18n.language}/reset-password`,
-        }
-      );
-
-      if (error) throw error;
-
-      setResetSuccess(true);
-      setTimeout(() => {
-        setShowResetDialog(false);
-        setResetSuccess(false);
-        setResetEmail("");
-      }, 3000);
-    } catch (err) {
-      toast.error(t("errorSendingReset"));
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
-  // Loading skeleton while translations load
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -313,7 +258,6 @@ export default function LoginPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Password Login */}
             <TabsContent value="password" className="space-y-4">
               <form
                 onSubmit={handlePasswordLogin}
@@ -354,7 +298,6 @@ export default function LoginPage() {
               </form>
             </TabsContent>
 
-            {/* Magic Link Login */}
             <TabsContent value="magic" className="space-y-4">
               <form onSubmit={handleMagicLink} noValidate className="space-y-4">
                 <div className="space-y-2">
@@ -379,7 +322,6 @@ export default function LoginPage() {
               </form>
             </TabsContent>
 
-            {/* Social Login */}
             <TabsContent value="social" className="space-y-4">
               <div className="space-y-3">
                 <Button
@@ -453,53 +395,24 @@ export default function LoginPage() {
         </CardContent>
       </Card>
 
-      {/* Password Reset Dialog */}
-      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("resetPasswordTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("resetPasswordDescription")}
-            </DialogDescription>
-          </DialogHeader>
-
-          {resetSuccess ? (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{t("resetEmailSent")}</AlertDescription>
-            </Alert>
-          ) : (
-            <form onSubmit={handlePasswordReset} noValidate>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="reset-email">{t("emailLabel")}</Label>
-                  <Input
-                    id="reset-email"
-                    type="email"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder={t("emailPlaceholder")}
-                  />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowResetDialog(false)}
-                  disabled={resetLoading}
-                >
-                  {t("cancel")}
-                </Button>
-                <Button type="submit" disabled={resetLoading}>
-                  {resetLoading ? t("sending") : t("sendResetLink")}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ForgotPasswordDialog
+        open={showResetDialog}
+        onOpenChange={setShowResetDialog}
+        language={i18n.language}
+        translations={{
+          resetPasswordTitle: t("resetPasswordTitle"),
+          resetPasswordDescription: t("resetPasswordDescription"),
+          emailLabel: t("emailLabel"),
+          emailPlaceholder: t("emailPlaceholder"),
+          cancel: t("cancel"),
+          sendResetLink: t("sendResetLink"),
+          sending: t("sending"),
+          resetEmailSent: t("resetEmailSent"),
+          errorEmailRequired: t("errorEmailRequired"),
+          errorEmailInvalid: t("errorEmailInvalid"),
+          errorSendingReset: t("errorSendingReset"),
+        }}
+      />
     </div>
   );
 }
