@@ -1,7 +1,7 @@
 {
   "subject": "🎉Έχετε πρόσκληση να συμμετάσχετε στην {{companyName}}",
   "headerTitle": "Γίνετε μέλος της ομάδας!",
-  "headerSubtitle": "Λάβατε πρόσκληση στην {{companyName}} από:{{inviterName}}",
+  "headerSubtitle": "Λάβατε πρόσκληση από:{{inviterName}}",
   "greeting": "Γεια σας!",
   "invitedBy": "Συμμετάσχετε στην {{companyName}}.",
   "clickButton": "Για να αποδεχτείτε αυτήν την πρόσκληση και να ρυθμίσετε τον λογαριασμό σας, πατήστε το παρακάτω κουμπί:",

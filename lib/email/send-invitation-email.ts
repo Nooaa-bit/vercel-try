@@ -110,7 +110,12 @@ export async function sendInvitationEmail({
 <body>
     <div class="container">
         <div class="header">
-            <h1>${t("headerTitle")}</h1>
+         <img 
+        src="https://hypehire.me/logo-white.png" 
+        alt="Company Logo"
+        style="max-width: 150px; height: auto; display: block; margin: 0 auto 15px;"
+    />
+            <h2>${t("headerTitle")}</h2>
             <p>${t("headerSubtitle")}</p>
         </div>
         <div class="content">
@@ -118,7 +123,9 @@ export async function sendInvitationEmail({
             <p>${t("invitedBy")}</p>
             <p>${t("clickButton")}</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="${invitationLink}" class="button">${t("buttonText")}</a>
+                <a href="${invitationLink}" class="button">${t(
+    "buttonText"
+  )}</a>
             </div>
             <div class="security-note">
                 <strong style="color: #991b1b;">${t("securityTitle")}</strong>
@@ -141,7 +148,9 @@ export async function sendInvitationEmail({
         <div class="footer">
             <p><strong>${t("footerTitle")}</strong></p>
             <p>${t("footerSentTo")}</p>
-            <p style="font-size: 12px; margin-top: 15px;">${t("footerQuestions")}</p>
+            <p style="font-size: 12px; margin-top: 15px;">${t(
+              "footerQuestions"
+            )}</p>
         </div>
     </div>
 </body>

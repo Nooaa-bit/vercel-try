@@ -156,7 +156,7 @@ export async function sendForgotPasswordEmail({
         alt="Company Logo"
         style="max-width: 150px; height: auto; display: block; margin: 0 auto 15px;"
     />
-            <h1>🔐 ${t.title}</h1>
+            <h2>🔐 ${t.title}</h2>
             <p>${t.subtitle}</p>
         </div>
         

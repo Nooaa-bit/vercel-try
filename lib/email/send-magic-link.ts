@@ -164,7 +164,12 @@ export async function sendSignInLinkEmail({
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔐 ${t.title}</h1>
+         <img 
+        src="https://hypehire.me/logo-white.png" 
+        alt="Company Logo"
+        style="max-width: 150px; height: auto; display: block; margin: 0 auto 15px;"
+    />
+            <h2>🔐 ${t.title}</h2>
             <p>${t.welcomeBack}</p>
         </div>
         
