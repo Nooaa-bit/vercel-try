@@ -151,6 +151,11 @@ export async function sendForgotPasswordEmail({
 <body>
     <div class="container">
         <div class="header">
+        <img 
+        src="https://hypehire.me/logo-white.png" 
+        alt="Company Logo"
+        style="max-width: 150px; height: auto; display: block; margin: 0 auto 15px;"
+    />
             <h1>🔐 ${t.title}</h1>
             <p>${t.subtitle}</p>
         </div>
