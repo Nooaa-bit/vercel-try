@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/api/password-reset/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendForgotPasswordEmail } from "@/lib/email/send-forgot-password";
