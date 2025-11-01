@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/hooks/useActiveRole.tsx
 "use client";
 
 import {
@@ -197,6 +196,20 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ NEW: Skip error screen if user is logging out (user === null)
+  if (hasAttemptedLoad && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+          <div className="text-sm text-muted-foreground">
+            {t("loading.subtitle")}
+          </div>
         </div>
       </div>
     );
