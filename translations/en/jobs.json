@@ -42,5 +42,13 @@
      "deleteSuccess": "{{position}} deleted",
      "deleteFailed": "Failed to delete job",
      "saveFailed": "Failed to save job"
+   },
+   "tabs": {
+     "job_management": "Jobs Management",
+     "calendar": "Calendar"
+   },
+   "calendar": {
+     "title": "Calendar & Events",
+     "noJobs": "No events scheduled"
    }
  }

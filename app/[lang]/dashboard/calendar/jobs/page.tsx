@@ -17,7 +17,7 @@ import {
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Briefcase, Trash2, Pencil, Calendar, Users } from "lucide-react";
 import { toast } from "sonner";
-import JobDialog from "./JobDialog";
+import JobDialog from "../JobDialog";
 
 interface Job {
   id: number;
@@ -136,12 +136,8 @@ export default function JobsPage() {
   }
 
   return (
-    <ProtectedPage requiredRole="company_admin">
-      <div className="space-y-6 py-20">
-        <div className="flex items-center justify-between">
-          <h1 className="text-l font-semibold">{t("pageTitle")}</h1>
-        </div>
-
+    <ProtectedPage requiredRole="company_admin" redirectTo="/dashboard/calendar">
+      <div className="space-y-6 py-0">
         <Card>
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">

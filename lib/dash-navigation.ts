@@ -32,8 +32,9 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     titleKey: "calendar",
-    url: "/dashboard/jobs",
+    url: "/dashboard/calendar",
     icon: CalendarIcon,
+   // requiredRole: "company_admin", this is about the visibility of the tab in Appsidebar
     section: "main",
   },
   {

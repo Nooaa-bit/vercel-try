@@ -11,6 +11,7 @@ interface ProtectedPageProps {
   children: ReactNode;
   requiredRole?: Role;
   requiredAnyRole?: Role[];
+  redirectTo?: string; // Custom redirect path
 }
 
 // Translations object
@@ -31,6 +32,7 @@ export function ProtectedPage({
   children,
   requiredRole,
   requiredAnyRole,
+  redirectTo,
 }: ProtectedPageProps) {
   const { hasPermission, hasAnyRole, loading } = useActiveRole();
   const router = useRouter();
@@ -39,6 +41,10 @@ export function ProtectedPage({
 
   // Get translations for current language
   const t = translations[lang] || translations.en;
+
+  // Determine where to redirect (defaults to dashboard)
+  const defaultRedirect = `/${lang}/dashboard`;
+  const redirectPath = redirectTo || defaultRedirect;
 
   useEffect(() => {
     if (loading) return;
@@ -52,7 +58,7 @@ export function ProtectedPage({
     }
 
     if (!hasAccess) {
-      router.replace(`/${lang}/dashboard`);
+      router.replace(redirectPath);
     }
   }, [
     loading,
@@ -61,7 +67,7 @@ export function ProtectedPage({
     requiredRole,
     requiredAnyRole,
     router,
-    lang,
+    redirectPath,
   ]);
 
   // Show loading while checking permissions
