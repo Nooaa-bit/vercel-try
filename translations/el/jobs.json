@@ -1,0 +1,46 @@
+{
+  "pageTitle": "Θέσεις Εργασίας",
+  "card": {
+    "title": "Ανακοινώσεις Θέσεων",
+    "description": "Διαχειριστείτε τις ανακοινώσεις θέσεων σας ({{count}})",
+    "addButton": "Δημιουργία Θέσης",
+    "editButton": "Επεξεργασία",
+    "workersNeeded": "εργάτες που χρειάζονται"
+  },
+  "emptyState": {
+    "title": "Καμία θέση ακόμα",
+    "description": "Δημιουργήστε την πρώτη ανακοίνωση θέσης για να ξεκινήσετε"
+  },
+  "dialog": {
+    "createTitle": "Δημιουργία Νέας Θέσης",
+    "createDescription": "Ανακοίνωση νέας θέσης για την εταιρεία σας",
+    "editTitle": "Επεξεργασία Θέσης",
+    "editDescription": "Ενημέρωση λεπτομερειών θέσης",
+    "cancelButton": "Ακύρωση",
+    "saveButton": "Αποθήκευση Θέσης",
+    "saving": "Αποθήκευση..."
+  },
+  "fields": {
+    "position": "Θέση",
+    "positionPlaceholder": "π.χ., Συνεργάτης Αποθήκης",
+    "seniority": "Επίπεδο Εμπειρίας",
+    "junior": "Junior",
+    "senior": "Senior",
+    "location": "Τοποθεσία",
+    "selectLocation": "Επιλέξτε τοποθεσία",
+    "description": "Περιγραφή",
+    "descriptionPlaceholder": "Περιγραφή θέσης και απαιτήσεις...",
+    "workersNeeded": "Εργάτες που Χρειάζονται",
+    "startDate": "Ημερομηνία Έναρξης",
+    "endDate": "Ημερομηνία Λήξης"
+  },
+  "toast": {
+    "provideName": "Παρακαλώ εισαγάγετε θέση και ημερομηνίες",
+    "createSuccess": "Η θέση δημιουργήθηκε με επιτυχία",
+    "updateSuccess": "Η θέση ενημερώθηκε με επιτυχία",
+    "deletingJob": "Διαγραφή {{position}}...",
+    "deleteSuccess": "Η {{position}} διαγράφηκε",
+    "deleteFailed": "Αποτυχία διαγραφής θέσης",
+    "saveFailed": "Αποτυχία αποθήκευσης θέσης"
+  }
+}

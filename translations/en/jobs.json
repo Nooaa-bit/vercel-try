@@ -1,0 +1,46 @@
+ {
+   "pageTitle": "Jobs",
+   "card": {
+     "title": "Job Postings",
+     "description": "Manage your job postings ({{count}})",
+     "addButton": "Create Job",
+     "editButton": "Edit",
+     "workersNeeded": "workers needed"
+   },
+   "emptyState": {
+     "title": "No jobs yet",
+     "description": "Create your first job posting to get started"
+   },
+   "dialog": {
+     "createTitle": "Create New Job",
+     "createDescription": "Post a new job for your company",
+     "editTitle": "Edit Job",
+     "editDescription": "Update job details",
+     "cancelButton": "Cancel",
+     "saveButton": "Save Job",
+     "saving": "Saving..."
+   },
+   "fields": {
+     "position": "Position",
+     "positionPlaceholder": "e.g., Warehouse Associate",
+     "seniority": "Seniority Level",
+     "junior": "Junior",
+     "senior": "Senior",
+     "location": "Location",
+     "selectLocation": "Select a location",
+     "description": "Description",
+     "descriptionPlaceholder": "Job description and requirements...",
+     "workersNeeded": "Workers Needed",
+     "startDate": "Start Date",
+     "endDate": "End Date"
+   },
+   "toast": {
+     "provideName": "Please enter position and dates",
+     "createSuccess": "Job created successfully",
+     "updateSuccess": "Job updated successfully",
+     "deletingJob": "Deleting {{position}}...",
+     "deleteSuccess": "{{position}} deleted",
+     "deleteFailed": "Failed to delete job",
+     "saveFailed": "Failed to save job"
+   }
+ }

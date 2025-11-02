@@ -1,9 +1,9 @@
-//hype-hire/vercel/app/[lang]/dashboard/analytics/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
+import { ProtectedPage } from "@/components/ProtectedPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart3,
@@ -16,12 +16,10 @@ import {
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const GEOAPIFY_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
 
-// ✅ Lazy load function
 const loadMapbox = () => import("mapbox-gl");
 
-export default function AnalyticsPage() {
-  const { activeRole, hasPermission, loading } = useActiveRole();
-  const router = useRouter();
+function AnalyticsContent() {
+  const { activeRole } = useActiveRole();
   const pathname = usePathname();
   const lang = pathname.split("/")[1] || "en";
 
@@ -34,12 +32,8 @@ export default function AnalyticsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [mapboxLoaded, setMapboxLoaded] = useState(false);
 
-  // Map initialization with lazy loading
+  // Map initialization
   useEffect(() => {
-    if (loading || !hasPermission("company_admin")) {
-      return;
-    }
-
     if (!MAPBOX_TOKEN) {
       setMapStatus("error");
       setErrorMessage("NEXT_PUBLIC_MAPBOX_TOKEN not found");
@@ -50,7 +44,6 @@ export default function AnalyticsPage() {
       return;
     }
 
-    // ✅ Dynamically import mapbox-gl
     loadMapbox()
       .then((mapboxgl) => {
         setMapboxLoaded(true);
@@ -63,8 +56,8 @@ export default function AnalyticsPage() {
           const map = new mapboxgl.Map({
             container: mapContainerRef.current,
             accessToken: MAPBOX_TOKEN,
-            style: "mapbox://styles/mapbox/streets-v12", //style: "mapbox://styles/mapbox/light-v11", // Lighter, loads faster
-            center: [23.7275, 37.9838], // Athens
+            style: "mapbox://styles/mapbox/streets-v12",
+            center: [23.7275, 37.9838],
             zoom: 12,
           });
 
@@ -103,32 +96,7 @@ export default function AnalyticsPage() {
         mapRef.current = null;
       }
     };
-  }, [loading, hasPermission]);
-
-  // Redirect effect
-  useEffect(() => {
-    if (!loading && !hasPermission("company_admin")) {
-      router.replace(`/${lang}/dashboard`);
-    }
-  }, [loading, hasPermission, router, lang]);
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-pulse-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  // Permission denied
-  if (!hasPermission("company_admin")) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Access denied. Redirecting...</p>
-      </div>
-    );
-  }
+  }, []);
 
   return (
     <div className="space-y-6 py-16">
@@ -224,7 +192,6 @@ export default function AnalyticsPage() {
             {/* Map Container with Placeholder */}
             {MAPBOX_TOKEN ? (
               <div className="relative w-full h-[400px] rounded-lg border bg-muted overflow-hidden">
-                {/* ✅ Animated placeholder while loading */}
                 {mapStatus === "loading" && (
                   <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/50 to-muted animate-pulse flex flex-col items-center justify-center gap-4 z-10">
                     <div className="relative">
@@ -257,7 +224,6 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Map container */}
                 <div
                   ref={mapContainerRef}
                   className="w-full h-full"
@@ -293,5 +259,13 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AnalyticsPage() {
+  return (
+    <ProtectedPage requiredRole="company_admin">
+      <AnalyticsContent />
+    </ProtectedPage>
   );
 }

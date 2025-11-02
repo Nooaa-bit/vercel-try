@@ -32,7 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     titleKey: "calendar",
-    url: "/dashboard/calendar",
+    url: "/dashboard/jobs",
     icon: CalendarIcon,
     section: "main",
   },
