@@ -7,32 +7,66 @@ import { createClient } from "@/lib/supabase/server";
 // ============================================================
 // SIMPLE IN-MEMORY RATE LIMITER
 // ============================================================
-// ⚠️ NOTE: This resets on server restart. For production, consider:
-// - Upstash Redis: npm install @upstash/redis @upstash/ratelimit
-// - https://upstash.com (free tier: 10,000 requests/day)
-// ============================================================
 
 const rateLimitMap = new Map<string, number[]>();
 
 function checkRateLimit(
   userId: string,
-  maxRequests = 50, // ✅ CHANGED: Increased from 5 to 50 for bulk operations
+  maxRequests = 50,
   windowMs = 60000
 ): boolean {
   const now = Date.now();
   const userRequests = rateLimitMap.get(userId) || [];
 
-  // Remove requests older than the time window
   const recentRequests = userRequests.filter((time) => now - time < windowMs);
 
   if (recentRequests.length >= maxRequests) {
-    return false; // Rate limit exceeded
+    return false;
   }
 
-  // Add current request timestamp
   recentRequests.push(now);
   rateLimitMap.set(userId, recentRequests);
   return true;
+}
+
+// ============================================================
+// HELPER FUNCTION: Format date for email
+// ============================================================
+
+function formatDateForEmail(date: Date, language: "en" | "el"): string {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  };
+  return new Intl.DateTimeFormat(
+    language === "el" ? "el-GR" : "en-US",
+    options
+  ).format(date);
+}
+
+// ============================================================
+// HELPER FUNCTION: Translate role for email
+// ============================================================
+
+function translateRole(role: string, language: "en" | "el"): string {
+  const roleMap: Record<"en" | "el", Record<string, string>> = {
+    en: {
+      talent: "Talent",
+      supervisor: "Supervisor",
+      company_admin: "Company Admin",
+      superadmin: "Super Admin",
+    },
+    el: {
+      talent: "Ταλέντο",
+      supervisor: "Επιβλέπων",
+      company_admin: "Διαχειριστής Εταιρείας",
+      superadmin: "Διαχειριστής Συστήματος",
+    },
+  };
+
+  return roleMap[language][role] || role;
 }
 
 // ============================================================
@@ -133,21 +167,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ 6. Send email
+    // ✅ 6. Prepare email variables
+    const inviterName =
+      `${invitation.inviter.firstName || ""} ${
+        invitation.inviter.lastName || ""
+      }`.trim() || "Team";
+
+    const expirationDate = formatDateForEmail(
+      invitation.expiresAt,
+      language as "en" | "el"
+    );
+
+    const translatedRole = translateRole(
+      invitation.role,
+      language as "en" | "el"
+    );
+
+    // ✅ 7. Send email with all variables
     await sendInvitationEmail({
       to: invitation.email,
       invitationToken: invitation.token,
       companyName: invitation.company.name,
-      role: invitation.role,
+      role: translatedRole,
       expiresAt: invitation.expiresAt.toISOString(),
-      inviterName:
-        `${invitation.inviter.firstName || ""} ${
-          invitation.inviter.lastName || ""
-        }`.trim() || "Team",
+      inviterName: inviterName,
       language: language as "en" | "el",
     });
 
-    // ✅ 7. Return success
+    // ✅ 8. Return success
     return NextResponse.json({
       success: true,
       message: "Invitation sent successfully",
@@ -155,7 +202,6 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Email sending error:", error);
 
-    // Don't expose internal errors to users
     return NextResponse.json(
       { error: "Failed to send invitation. Please try again." },
       { status: 500 }

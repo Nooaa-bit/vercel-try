@@ -3,7 +3,7 @@
   "headerTitle": "You're Invited!",
   "headerSubtitle": "Join {{companyName}} on our platform",
   "greeting": "Hello!",
-  "invitedBy": "{{inviterName}} has invited you to join {{companyName}}.",
+  "invitedBy": "{{inviterName}} has invited you to join {{companyName}} as {{role}}.",
   "clickButton": "To accept this invitation and set up your account, click the button below:",
   "buttonText": "Accept Invitation",
   "securityTitle": "Security Information:",

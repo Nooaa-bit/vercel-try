@@ -39,18 +39,23 @@ interface ActiveRoleContext {
   loading: boolean;
 }
 
-interface RoleQueryResult {
+// ✅ NEW: Proper types for database queries
+interface RoleRow {
   id: number;
   role: Role;
   company_id: number;
-  company: { name: string }[] | null;
+}
+
+interface CompanyRow {
+  id: number;
+  name: string;
 }
 
 const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
   undefined
 );
 
-// Fetcher function for SWR
+// ✅ FIXED: Type-safe fetcher function
 async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
   const supabase = createClient();
 
@@ -68,10 +73,10 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
-    // Fetch roles
+    // ✅ Fetch roles WITHOUT the company join
     const { data: roles, error: rolesError } = await supabase
       .from("user_company_role")
-      .select("id, role, company_id, company(name)")
+      .select("id, role, company_id")
       .eq("user_id", profile.id)
       .is("revoked_at", null);
 
@@ -80,11 +85,28 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
-    return roles.map((r: RoleQueryResult) => ({
+    // ✅ Fetch all companies separately
+    const { data: companies, error: companiesError } = await supabase
+      .from("company")
+      .select("id, name")
+      .is("deleted_at", null);
+
+    if (companiesError) {
+      console.error("Error fetching companies:", companiesError);
+      return [];
+    }
+
+    // ✅ Create a map for quick lookup with proper typing
+    const companyMap = new Map<number, string>(
+      (companies as CompanyRow[]).map((c) => [c.id, c.name])
+    );
+
+    // ✅ Combine data with proper typing
+    return (roles as RoleRow[]).map((r) => ({
       id: r.id,
-      role: r.role as Role,
+      role: r.role,
       companyId: r.company_id,
-      companyName: r.company?.[0]?.name || "Hype Hire",
+      companyName: companyMap.get(r.company_id) || "Unknown Company",
     }));
   } catch (error) {
     console.error("Unexpected error loading roles:", error);
@@ -120,9 +142,9 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
         typeof window !== "undefined"
           ? localStorage.getItem("activeRoleId")
           : null;
-      const storedId = stored ? parseInt(stored) : null;
+      const storedId = stored ? parseInt(stored, 10) : null;
       const roleExists =
-        storedId && availableRoles.some((r) => r.id === storedId);
+        storedId !== null && availableRoles.some((r) => r.id === storedId);
 
       setActiveRoleId(roleExists ? storedId : availableRoles[0].id);
     }
@@ -201,7 +223,7 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  // ✅ NEW: Skip error screen if user is logging out (user === null)
+  // ✅ Skip error screen if user is logging out (user === null)
   if (hasAttemptedLoad && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

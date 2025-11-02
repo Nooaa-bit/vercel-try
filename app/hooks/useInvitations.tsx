@@ -1,9 +1,10 @@
-//hype-hire/vercel/app/hooks/useInvitations.tsx
 import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useActiveRole } from "@/app/hooks/useActiveRole";
+import { useAuth } from "@/app/hooks/useAuth";
 
 // ============================================================
 // TYPE DEFINITIONS & CONSTANTS
@@ -40,7 +41,7 @@ interface Draft {
   conflictType?: "member" | "pending" | "expired";
   userId?: number;
   existingRole?: Role;
-  status?: "idle" | "sending" | "sent" | "failed"; // ✅ NEW
+  status?: "idle" | "sending" | "sent" | "failed";
 }
 
 interface SentInvitation {
@@ -65,11 +66,11 @@ export function useInvitations() {
   const supabase = createClient();
   const pathname = usePathname();
   const { t } = useTranslation("invitations");
+  const { activeRole, activeCompanyId, availableRoles } = useActiveRole();
+  const { user: authUser } = useAuth();
 
   // State
-  const [user, setUser] = useState<User | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sending, setSending] = useState(false);
   const [activeView, setActiveView] = useState<"draft" | "sent">("draft");
@@ -81,9 +82,38 @@ export function useInvitations() {
   const [searchEmail, setSearchEmail] = useState("");
   const [filterRole, setFilterRole] = useState<Role | "all">("all");
   const [filterStatus, setFilterStatus] = useState<InvitationStatus>("all");
+  const [userId, setUserId] = useState<number | null>(null);
 
   const currentLanguage = pathname.split("/")[1] as "en" | "el";
   const language = currentLanguage === "el" ? "el" : "en";
+
+  // ✅ Fetch actual user.id from user table when authUser changes
+  useEffect(() => {
+    if (authUser?.id) {
+      (async () => {
+        const { data: profile } = await supabase
+          .from("user")
+          .select("id")
+          .eq("auth_user_id", authUser.id)
+          .maybeSingle();
+
+        if (profile) {
+          setUserId(profile.id);
+        }
+      })();
+    }
+  }, [authUser?.id, supabase]);
+
+  // ✅ Derive user from activeRole, authUser, and userId
+  const user: User | null =
+    activeRole && authUser && userId
+      ? {
+          id: userId,
+          email: authUser.email || "",
+          companyId: activeRole.companyId,
+          role: activeRole.role,
+        }
+      : null;
 
   // ✅ Memoized computed values
   const allowedRoles = useMemo(
@@ -91,9 +121,10 @@ export function useInvitations() {
     [user]
   );
 
-  const isSuperAdmin = user?.role === "superadmin";
-  const isCompanyAdmin = user?.role === "company_admin";
-  const isRegularUser = user?.role === "talent" || user?.role === "supervisor";
+  const isSuperAdmin = activeRole?.role === "superadmin";
+  const isCompanyAdmin = activeRole?.role === "company_admin";
+  const isRegularUser =
+    activeRole?.role === "talent" || activeRole?.role === "supervisor";
   const canManageInvitations = isSuperAdmin || isCompanyAdmin;
 
   const problematicDrafts = useMemo(
@@ -122,52 +153,25 @@ export function useInvitations() {
     searchEmail !== "" || filterRole !== "all" || filterStatus !== "all";
 
   // ============================================================
-  // USER AUTHENTICATION & DATA LOADING
+  // INITIALIZATION
   // ============================================================
 
+  // ✅ Initialize companies for superadmin (if not already loaded)
   useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: u } = await supabase
-        .from("user")
-        .select("id, email, auth_user_id")
-        .eq("auth_user_id", data.user.id)
-        .single();
-
-      const { data: roleRow } = await supabase
-        .from("user_company_role")
-        .select("role, company_id")
-        .eq("user_id", u!.id)
-        .is("revoked_at", null)
-        .single();
-
-      setUser({
-        id: u!.id,
-        email: u!.email,
-        companyId: roleRow!.company_id,
-        role: roleRow!.role,
-      });
-
-      if (roleRow!.role === "superadmin") {
+    if (isSuperAdmin && companies.length === 0) {
+      (async () => {
         const { data: companiesData } = await supabase
           .from("company")
           .select("id, name")
           .order("name");
 
         setCompanies(companiesData || []);
-        if (companiesData && companiesData.length > 0) {
+        if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
           setSelectedCompanyId(companiesData[0].id);
         }
-      }
-
-      setLoading(false);
-    })();
-  }, []);
+      })();
+    }
+  }, [isSuperAdmin, companies.length, selectedCompanyId, supabase]);
 
   // ============================================================
   // HELPER FUNCTIONS
@@ -337,7 +341,7 @@ export function useInvitations() {
   };
 
   useEffect(() => {
-    if (activeView === "sent" && canManageInvitations) {
+    if (activeView === "sent" && canManageInvitations && user) {
       fetchSentInvitations();
     }
   }, [activeView, user, selectedCompanyId]);
@@ -444,7 +448,6 @@ export function useInvitations() {
         .is("revoked_at", null);
 
       if (error) {
-        // ✅ Set status to failed
         setDrafts((d) =>
           d.map((dr) => (dr.id === draft.id ? { ...dr, status: "failed" } : dr))
         );
@@ -459,7 +462,6 @@ export function useInvitations() {
           }),
           id: loadingToast,
         });
-        // ✅ Remove draft on success
         setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
       }
     } else {
@@ -479,7 +481,6 @@ export function useInvitations() {
         .single();
 
       if (error) {
-        // ✅ Set status to failed
         setDrafts((d) =>
           d.map((dr) => (dr.id === draft.id ? { ...dr, status: "failed" } : dr))
         );
@@ -508,11 +509,9 @@ export function useInvitations() {
             }),
             id: loadingToast,
           });
-          // ✅ Remove draft on success
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
           console.error("Email sending error:", emailError);
-          // ✅ Set status to failed
           setDrafts((d) =>
             d.map((dr) =>
               dr.id === draft.id ? { ...dr, status: "failed" } : dr
@@ -557,7 +556,6 @@ export function useInvitations() {
     }
 
     if (isRegularUser) {
-      // ✅ Set all drafts to sending
       setDrafts((d) =>
         d.map((dr) =>
           validDrafts.find((vd) => vd.id === dr.id)
@@ -650,7 +648,6 @@ export function useInvitations() {
         }
       });
 
-      // ✅ Remove sent and skipped, mark failed
       setDrafts((d) =>
         d
           .filter(
@@ -700,7 +697,6 @@ export function useInvitations() {
       );
     }
 
-    // ✅ Set clean drafts to sending
     setDrafts((d) =>
       d.map((dr) =>
         cleanDrafts.find((cd) => cd.id === dr.id)
@@ -757,7 +753,6 @@ export function useInvitations() {
       .filter((draft) => !sentDraftIds.includes(draft.id))
       .map((draft) => draft.id);
 
-    // ✅ Remove sent drafts, mark failed
     setDrafts((d) =>
       d
         .filter((dr) => !sentDraftIds.includes(dr.id))
@@ -807,7 +802,7 @@ export function useInvitations() {
   return {
     user,
     companies,
-    loading,
+    loading: !activeRole || !authUser || !userId,
     drafts,
     setDrafts,
     sending,
