@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -91,21 +91,38 @@ export function useInvitations() {
   useEffect(() => {
     if (authUser?.id) {
       (async () => {
-        const { data: profile } = await supabase
-          .from("user")
-          .select("id")
-          .eq("auth_user_id", authUser.id)
-          .maybeSingle();
+        try {
+          console.log(
+            "🔐 Fetching user profile for auth_user_id:",
+            authUser.id
+          );
+          const { data: profile, error } = await supabase
+            .from("user")
+            .select("id")
+            .eq("auth_user_id", authUser.id)
+            .maybeSingle();
 
-        if (profile) {
-          setUserId(profile.id);
+          if (error) {
+            console.error("❌ Error fetching user profile:", error);
+            return;
+          }
+
+          if (profile) {
+            console.log("✅ User profile found, id:", profile.id);
+            setUserId(profile.id);
+          } else {
+            console.warn("⚠️ No user profile found");
+          }
+        } catch (err) {
+          console.error("❌ Exception fetching user profile:", err);
         }
       })();
     }
   }, [authUser?.id, supabase]);
 
   // ✅ Derive user from activeRole, authUser, and userId
-  const user: User | null =
+const user: User | null = useMemo(
+  () =>
     activeRole && authUser && userId
       ? {
           id: userId,
@@ -113,7 +130,21 @@ export function useInvitations() {
           companyId: activeRole.companyId,
           role: activeRole.role,
         }
-      : null;
+      : null,
+  [activeRole, authUser, userId]
+);
+
+
+  useEffect(() => {
+    if (user) {
+      console.log("👤 User object updated:", {
+        id: user.id,
+        email: user.email,
+        companyId: user.companyId,
+        role: user.role,
+      });
+    }
+  }, [user]);
 
   // ✅ Memoized computed values
   const allowedRoles = useMemo(
@@ -126,6 +157,15 @@ export function useInvitations() {
   const isRegularUser =
     activeRole?.role === "talent" || activeRole?.role === "supervisor";
   const canManageInvitations = isSuperAdmin || isCompanyAdmin;
+
+  useEffect(() => {
+    console.log("🔑 Roles updated:", {
+      isSuperAdmin,
+      isCompanyAdmin,
+      isRegularUser,
+      canManageInvitations,
+    });
+  }, [isSuperAdmin, isCompanyAdmin, isRegularUser, canManageInvitations]);
 
   const problematicDrafts = useMemo(
     () => drafts.filter((d) => d.conflictType),
@@ -159,19 +199,31 @@ export function useInvitations() {
   // ✅ Initialize companies for superadmin (if not already loaded)
   useEffect(() => {
     if (isSuperAdmin && companies.length === 0) {
+      console.log("🏢 Fetching companies for superadmin");
       (async () => {
-        const { data: companiesData } = await supabase
-          .from("company")
-          .select("id, name")
-          .order("name");
+        try {
+          const { data: companiesData, error } = await supabase
+            .from("company")
+            .select("id, name")
+            .order("name");
 
-        setCompanies(companiesData || []);
-        if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
-          setSelectedCompanyId(companiesData[0].id);
+          if (error) {
+            console.error("❌ Error fetching companies:", error);
+            return;
+          }
+
+          console.log("✅ Companies loaded:", companiesData?.length || 0);
+          setCompanies(companiesData || []);
+          if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
+            console.log("📍 Setting default company:", companiesData[0].id);
+            setSelectedCompanyId(companiesData[0].id);
+          }
+        } catch (err) {
+          console.error("❌ Exception fetching companies:", err);
         }
       })();
     }
-  }, [isSuperAdmin, companies.length, selectedCompanyId, supabase]);
+  }, [isSuperAdmin, supabase, companies.length, selectedCompanyId]);
 
   // ============================================================
   // HELPER FUNCTIONS
@@ -315,39 +367,96 @@ export function useInvitations() {
   // SENT INVITATIONS
   // ============================================================
 
-  const fetchSentInvitations = async () => {
-    if (!user) return;
+  // ✅ Memoized fetchSentInvitations with comprehensive debugging
+  const fetchSentInvitations = useCallback(async () => {
+    console.log("🔄 fetchSentInvitations called");
+    console.log("📊 State:", { user: !!user, isSuperAdmin, selectedCompanyId });
+
+    if (!user) {
+      console.log("❌ No user, skipping fetch");
+      return;
+    }
 
     const targetCompanyId = isSuperAdmin ? selectedCompanyId : user.companyId;
-    if (!targetCompanyId) return;
+    console.log(
+      "🎯 Target Company ID:",
+      targetCompanyId,
+      "isSuperAdmin:",
+      isSuperAdmin
+    );
+
+    if (!targetCompanyId) {
+      console.log("❌ No target company ID, skipping fetch");
+      return;
+    }
 
     setLoadingSentInvitations(true);
-    const { data, error } = await supabase
-      .from("invitation")
-      .select(
-        "id, email, role, status, expires_at, invited_by, deleted_at, deleted_by"
-      )
-      .eq("company_id", targetCompanyId)
-      .is("deleted_at", null)
-      .in("status", ["pending", "expired"])
-      .order("expires_at", { ascending: false });
 
-    if (error) {
-      toast.error(t("toasts.failedToLoad"), { description: error.message });
-    } else {
-      setSentInvitations(data || []);
+    try {
+      console.log("📡 Querying Supabase for invitations...");
+      console.log("   company_id:", targetCompanyId);
+      console.log("   status: ['pending', 'expired']");
+      console.log("   deleted_at: null");
+
+      const { data, error } = await supabase
+        .from("invitation")
+        .select(
+          "id, email, role, status, expires_at, invited_by, deleted_at, deleted_by"
+        )
+        .eq("company_id", targetCompanyId)
+        .is("deleted_at", null)
+        .in("status", ["pending", "expired"])
+        .order("expires_at", { ascending: false });
+
+      if (error) {
+        console.error("❌ Supabase Error:", error.message, error.details);
+        toast.error("Failed to load invitations", {
+          description: `${error.message}${
+            error.details ? ` - ${error.details}` : ""
+          }`,
+        });
+        setSentInvitations([]);
+      } else {
+        console.log("✅ Invitations loaded successfully:", {
+          count: data?.length || 0,
+          data: data,
+        });
+        setSentInvitations(data || []);
+      }
+    } catch (err) {
+      console.error("❌ Exception in fetchSentInvitations:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      toast.error("Exception loading invitations", {
+        description: errorMsg,
+      });
+      setSentInvitations([]);
+    } finally {
+      setLoadingSentInvitations(false);
+      console.log("✅ fetchSentInvitations completed");
     }
-    setLoadingSentInvitations(false);
-  };
+  }, [user, isSuperAdmin, selectedCompanyId, supabase]);
 
+  // ✅ Fixed useEffect with all required dependencies
   useEffect(() => {
+    console.log("🔍 useEffect triggered with activeView:", activeView);
+    console.log("   canManageInvitations:", canManageInvitations);
+    console.log("   user:", !!user);
+
     if (activeView === "sent" && canManageInvitations && user) {
+      console.log("✓ Conditions met, calling fetchSentInvitations");
       fetchSentInvitations();
+    } else {
+      console.log("✗ Conditions NOT met:");
+      console.log("   activeView === 'sent':", activeView === "sent");
+      console.log("   canManageInvitations:", canManageInvitations);
+      console.log("   user:", !!user);
     }
-  }, [activeView, user, selectedCompanyId]);
+  }, [activeView, canManageInvitations, user, fetchSentInvitations]);
 
   const revokeSentInvitation = async (invitationId: number) => {
     if (!user) return;
+
+    console.log("🗑️ Revoking invitation:", invitationId);
 
     const { error } = await supabase
       .from("invitation")
@@ -358,10 +467,12 @@ export function useInvitations() {
       .eq("id", invitationId);
 
     if (error) {
+      console.error("❌ Error revoking invitation:", error);
       toast.error(t("toasts.failedToRevoke"), {
         description: error.message,
       });
     } else {
+      console.log("✅ Invitation revoked successfully");
       toast.success(t("toasts.invitationRevoked"));
       setSentInvitations((prev) =>
         prev.filter((inv) => inv.id !== invitationId)
@@ -490,6 +601,7 @@ export function useInvitations() {
         });
       } else if (invitation) {
         try {
+          console.log("📧 Sending email for invitation:", invitation.id);
           const response = await fetch("/api/invitations/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -499,8 +611,14 @@ export function useInvitations() {
             }),
           });
 
+          console.log("📬 Email API response status:", response.status);
+
           if (!response.ok) {
-            throw new Error("Failed to send email");
+            const responseText = await response.text();
+            console.error("❌ Email API error response:", responseText);
+            throw new Error(
+              `Email API error: ${response.status} ${responseText}`
+            );
           }
 
           toast.success(t("toasts.invitationSent"), {
@@ -511,7 +629,7 @@ export function useInvitations() {
           });
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
-          console.error("Email sending error:", emailError);
+          console.error("❌ Email sending error:", emailError);
           setDrafts((d) =>
             d.map((dr) =>
               dr.id === draft.id ? { ...dr, status: "failed" } : dr
