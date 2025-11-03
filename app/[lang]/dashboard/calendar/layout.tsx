@@ -10,13 +10,23 @@ interface LayoutProps {
 }
 
 export default function JobsLayout({ children }: LayoutProps) {
-  const { t } = useTranslation("jobs");
+  const { t, ready } = useTranslation("jobs");
   const pathname = usePathname();
   const lang = pathname.split("/")[1];
 
   const isJobs = pathname.includes("/jobs");
   const jobsPath = `/${lang}/dashboard/calendar/jobs`;
   const calendarPath = `/${lang}/dashboard/calendar`;
+
+  if (!ready) {
+    return (
+      <div className="space-y-6 py-20">
+        <div className="flex items-center justify-center min-h-[100px]">
+          <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 py-20">
