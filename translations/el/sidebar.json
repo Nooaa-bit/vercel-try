@@ -12,5 +12,11 @@
   "settings": "Ρυθμίσεις",
   "getHelp": "Λήψη Βοήθειας",
   "search": "Αναζήτηση",
-  "quickCreate": "Γρήγορη Δημιουργία"
+  "quickCreate": "Γρήγορη Δημιουργία",
+  "roles": {
+    "superadmin": "Superadmin",
+    "company_admin": "Διαχειριστής",
+    "supervisor": "Supervisor",
+    "talent": "Talent"
+  }
 }

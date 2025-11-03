@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/[lang]/dashboard/locations/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -78,7 +77,13 @@ interface GeoapifyResponse {
 export default function LocationsPage() {
   const { t, ready } = useTranslation("locations");
   const router = useRouter();
-  const { activeRole, loading: roleLoading } = useActiveRole();
+  // ✅ Get company selection from context
+  const {
+    activeRole,
+    loading: roleLoading,
+    isSuperAdmin,
+    selectedCompanyForAdmin,
+  } = useActiveRole();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -118,6 +123,11 @@ export default function LocationsPage() {
     { value: "Other", label: t("locationTypes.Other") },
   ];
 
+  // ✅ Determine target company ID
+  const targetCompanyId = isSuperAdmin
+    ? selectedCompanyForAdmin
+    : activeRole.companyId;
+
   useEffect(() => {
     if (roleLoading) return;
     if (activeRole.role === "supervisor" || activeRole.role === "talent") {
@@ -125,15 +135,15 @@ export default function LocationsPage() {
     }
   }, [roleLoading, activeRole.role, router]);
 
-  // Memoized fetch locations function
+  // ✅ Updated: Use targetCompanyId and add selectedCompanyForAdmin to dependencies
   const fetchLocations = useCallback(async () => {
-    if (activeRole.companyId <= 0) return;
+    if (!targetCompanyId || targetCompanyId <= 0) return;
 
     setLoading(true);
     const { data, error } = await supabase
       .from("location")
       .select("*")
-      .eq("company_id", activeRole.companyId)
+      .eq("company_id", targetCompanyId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
@@ -141,14 +151,15 @@ export default function LocationsPage() {
       setLocations(data);
     }
     setLoading(false);
-  }, [activeRole.companyId, supabase]);
+  }, [targetCompanyId, supabase]);
 
+  // ✅ Updated: Add selectedCompanyForAdmin to dependency array
   useEffect(() => {
     if (roleLoading) return;
     if (activeRole.role === "supervisor" || activeRole.role === "talent")
       return;
     fetchLocations();
-  }, [roleLoading, activeRole.role, fetchLocations]);
+  }, [roleLoading, activeRole.role, fetchLocations, selectedCompanyForAdmin]);
 
   // Memoized search address function
   const searchAddress = useCallback(
@@ -275,6 +286,7 @@ export default function LocationsPage() {
     [supabase, fetchLocations, t]
   );
 
+  // ✅ Updated: Use targetCompanyId for create operation
   const handleSaveLocation = useCallback(async () => {
     if (!locationName || !selectedAddress || !markerPosition) {
       toast.error(t("toast.provideNameAndAddress"));
@@ -313,7 +325,7 @@ export default function LocationsPage() {
       }
     } else {
       const { error } = await supabase.from("location").insert({
-        company_id: activeRole.companyId,
+        company_id: targetCompanyId, // ✅ Use targetCompanyId
         name: locationName,
         type: locationType,
         address: selectedAddress.address_line1,
@@ -348,7 +360,7 @@ export default function LocationsPage() {
     locationType,
     accessInstructions,
     editingLocation,
-    activeRole.companyId,
+    targetCompanyId, // ✅ Updated dependency
     supabase,
     fetchLocations,
     t,

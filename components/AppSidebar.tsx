@@ -151,7 +151,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
                       : activeRole.companyName}
                   </div>
                   <div className="text-xs text-muted-foreground capitalize">
-                    {activeRole.role}
+                    {t(`roles.${activeRole.role}`, {
+                      defaultValue: activeRole.role
+                        .replace("_", " ")
+                        .toUpperCase(),
+                    })}
                   </div>
                 </div>
               </div>
@@ -232,7 +236,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
                             </div>
                             {!isCompany && (
                               <div className="text-xs text-muted-foreground capitalize">
-                                {item.role}
+                                {t(`roles.${item.role}`, {
+                                  defaultValue: item.role
+                                    .replace("_", " ")
+                                    .toUpperCase(),
+                                })}
                               </div>
                             )}
                           </div>

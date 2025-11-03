@@ -27,10 +27,10 @@
     "allStatuses": "Όλες οι καταστάσεις"
   },
   "roles": {
-    "talent": "Ταλέντο",
-    "supervisor": "Επόπτης",
-    "company_admin": "Διαχειριστής Εταιρείας",
-    "superadmin": "Υπερ-Διαχειριστής"
+    "superadmin": "Superadmin",
+    "company_admin": "Διαχειριστής",
+    "supervisor": "Supervisor",
+    "talent": "Talent"
   },
   "status": {
     "pending": "Εκκρεμεί",
