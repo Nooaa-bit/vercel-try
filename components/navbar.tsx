@@ -106,11 +106,11 @@ const Navbar = () => {
     ? []
     : [
         { label: t("home"), href: homePath, onClick: handleHomeClick },
-        {
-          label: t("about"),
-          href: `${homePath}#features`,
-          onClick: handleHashNav("features"),
-        },
+       // {
+       // label: t("about"),
+       //   href: `${homePath}#features`,
+       //   onClick: handleHashNav("features"),
+       // },
         {
           label: t("contact"),
           href: `${homePath}#details`,
