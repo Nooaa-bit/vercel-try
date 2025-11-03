@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -27,16 +27,11 @@ interface User {
   role: Role;
 }
 
-interface Company {
-  id: number;
-  name: string;
-}
-
+// ✅ UPDATED: Removed companyId from Draft
 interface Draft {
   id: string;
   email: string;
   role: Role;
-  companyId?: number;
   warning?: string;
   conflictType?: "member" | "pending" | "expired";
   userId?: number;
@@ -69,16 +64,15 @@ export function useInvitations() {
   const { activeRole, activeCompanyId, availableRoles } = useActiveRole();
   const { user: authUser } = useAuth();
 
+  // ✅ Get company selection from context
+  const { isSuperAdmin, selectedCompanyForAdmin } = useActiveRole();
+
   // State
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sending, setSending] = useState(false);
   const [activeView, setActiveView] = useState<"draft" | "sent">("draft");
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
   const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
-    null
-  );
   const [searchEmail, setSearchEmail] = useState("");
   const [filterRole, setFilterRole] = useState<Role | "all">("all");
   const [filterStatus, setFilterStatus] = useState<InvitationStatus>("all");
@@ -91,29 +85,57 @@ export function useInvitations() {
   useEffect(() => {
     if (authUser?.id) {
       (async () => {
-        const { data: profile } = await supabase
-          .from("user")
-          .select("id")
-          .eq("auth_user_id", authUser.id)
-          .maybeSingle();
+        try {
+          console.log(
+            "🔐 Fetching user profile for auth_user_id:",
+            authUser.id
+          );
+          const { data: profile, error } = await supabase
+            .from("user")
+            .select("id")
+            .eq("auth_user_id", authUser.id)
+            .maybeSingle();
 
-        if (profile) {
-          setUserId(profile.id);
+          if (error) {
+            console.error("❌ Error fetching user profile:", error);
+            return;
+          }
+
+          if (profile) {
+            console.log("✅ User profile found, id:", profile.id);
+            setUserId(profile.id);
+          }
+        } catch (err) {
+          console.error("❌ Exception fetching user profile:", err);
         }
       })();
     }
   }, [authUser?.id, supabase]);
 
   // ✅ Derive user from activeRole, authUser, and userId
-  const user: User | null =
-    activeRole && authUser && userId
-      ? {
-          id: userId,
-          email: authUser.email || "",
-          companyId: activeRole.companyId,
-          role: activeRole.role,
-        }
-      : null;
+  const user: User | null = useMemo(
+    () =>
+      activeRole && authUser && userId
+        ? {
+            id: userId,
+            email: authUser.email || "",
+            companyId: activeRole.companyId,
+            role: activeRole.role,
+          }
+        : null,
+    [activeRole, authUser, userId]
+  );
+
+  useEffect(() => {
+    if (user) {
+      console.log("👤 User object updated:", {
+        id: user.id,
+        email: user.email,
+        companyId: user.companyId,
+        role: user.role,
+      });
+    }
+  }, [user]);
 
   // ✅ Memoized computed values
   const allowedRoles = useMemo(
@@ -121,20 +143,23 @@ export function useInvitations() {
     [user]
   );
 
-  const isSuperAdmin = activeRole?.role === "superadmin";
   const isCompanyAdmin = activeRole?.role === "company_admin";
   const isRegularUser =
     activeRole?.role === "talent" || activeRole?.role === "supervisor";
   const canManageInvitations = isSuperAdmin || isCompanyAdmin;
 
+  useEffect(() => {
+    console.log("🔑 Roles updated:", {
+      isSuperAdmin,
+      isCompanyAdmin,
+      isRegularUser,
+      canManageInvitations,
+    });
+  }, [isSuperAdmin, isCompanyAdmin, isRegularUser, canManageInvitations]);
+
   const problematicDrafts = useMemo(
     () => drafts.filter((d) => d.conflictType),
     [drafts]
-  );
-
-  const selectedCompany = useMemo(
-    () => companies.find((c) => c.id === selectedCompanyId),
-    [companies, selectedCompanyId]
   );
 
   const filteredSentInvitations = useMemo(() => {
@@ -153,36 +178,14 @@ export function useInvitations() {
     searchEmail !== "" || filterRole !== "all" || filterStatus !== "all";
 
   // ============================================================
-  // INITIALIZATION
-  // ============================================================
-
-  // ✅ Initialize companies for superadmin (if not already loaded)
-  useEffect(() => {
-    if (isSuperAdmin && companies.length === 0) {
-      (async () => {
-        const { data: companiesData } = await supabase
-          .from("company")
-          .select("id, name")
-          .order("name");
-
-        setCompanies(companiesData || []);
-        if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
-          setSelectedCompanyId(companiesData[0].id);
-        }
-      })();
-    }
-  }, [isSuperAdmin, companies.length, selectedCompanyId, supabase]);
-
-  // ============================================================
   // HELPER FUNCTIONS
   // ============================================================
 
+  // ✅ UPDATED: Removed companyId distinction
   const removeDuplicateDrafts = (draftArray: Draft[]): Draft[] => {
     const seen = new Set<string>();
     return draftArray.filter((draft) => {
-      const key = isSuperAdmin
-        ? `${draft.email.toLowerCase()}-${draft.role}-${draft.companyId}`
-        : `${draft.email.toLowerCase()}-${draft.role}`;
+      const key = `${draft.email.toLowerCase()}-${draft.role}`;
 
       if (seen.has(key)) return false;
       seen.add(key);
@@ -196,9 +199,10 @@ export function useInvitations() {
     setFilterStatus("all");
   };
 
+  // ✅ UPDATED: Removed "companyId" field
   const updateDraft = (
     id: string,
-    field: "email" | "role" | "companyId",
+    field: "email" | "role",
     value: string | number
   ) => {
     setDrafts((d) =>
@@ -223,7 +227,10 @@ export function useInvitations() {
     if (!user || !draft.email.includes("@")) return draft;
     if (isRegularUser) return draft;
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId! : user.companyId;
+    // ✅ Use context value for superadmins
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin!
+      : user.companyId;
 
     const { data: existingUser } = await supabase
       .from("user")
@@ -315,39 +322,100 @@ export function useInvitations() {
   // SENT INVITATIONS
   // ============================================================
 
-  const fetchSentInvitations = async () => {
-    if (!user) return;
+  // ✅ Updated fetchSentInvitations using context company selection
+  const fetchSentInvitations = useCallback(async () => {
+    console.log("🔄 fetchSentInvitations called");
+    console.log("📊 State:", {
+      user: !!user,
+      isSuperAdmin,
+      selectedCompanyForAdmin,
+    });
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId : user.companyId;
-    if (!targetCompanyId) return;
+    if (!user) {
+      console.log("❌ No user, skipping fetch");
+      return;
+    }
+
+    // ✅ Use selectedCompanyForAdmin from context
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin
+      : user.companyId;
+    console.log(
+      "🎯 Target Company ID:",
+      targetCompanyId,
+      "isSuperAdmin:",
+      isSuperAdmin
+    );
+
+    if (!targetCompanyId) {
+      console.log("❌ No target company ID, skipping fetch");
+      return;
+    }
 
     setLoadingSentInvitations(true);
-    const { data, error } = await supabase
-      .from("invitation")
-      .select(
-        "id, email, role, status, expires_at, invited_by, deleted_at, deleted_by"
-      )
-      .eq("company_id", targetCompanyId)
-      .is("deleted_at", null)
-      .in("status", ["pending", "expired"])
-      .order("expires_at", { ascending: false });
 
-    if (error) {
-      toast.error(t("toasts.failedToLoad"), { description: error.message });
-    } else {
-      setSentInvitations(data || []);
+    try {
+      console.log("📡 Querying Supabase for invitations...");
+      console.log("   company_id:", targetCompanyId);
+      console.log("   status: ['pending', 'expired']");
+      console.log("   deleted_at: null");
+
+      const { data, error } = await supabase
+        .from("invitation")
+        .select(
+          "id, email, role, status, expires_at, invited_by, deleted_at, deleted_by"
+        )
+        .eq("company_id", targetCompanyId)
+        .is("deleted_at", null)
+        .in("status", ["pending", "expired"])
+        .order("expires_at", { ascending: false });
+
+      if (error) {
+        console.error("❌ Supabase Error:", error.message, error.details);
+        toast.error("Failed to load invitations", {
+          description: `${error.message}${
+            error.details ? ` - ${error.details}` : ""
+          }`,
+        });
+        setSentInvitations([]);
+      } else {
+        console.log("✅ Invitations loaded successfully:", {
+          count: data?.length || 0,
+          data: data,
+        });
+        setSentInvitations(data || []);
+      }
+    } catch (err) {
+      console.error("❌ Exception in fetchSentInvitations:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      toast.error("Exception loading invitations", {
+        description: errorMsg,
+      });
+      setSentInvitations([]);
+    } finally {
+      setLoadingSentInvitations(false);
+      console.log("✅ fetchSentInvitations completed");
     }
-    setLoadingSentInvitations(false);
-  };
+  }, [user, isSuperAdmin, selectedCompanyForAdmin, supabase]);
 
+  // ✅ Updated dependency array to include selectedCompanyForAdmin
   useEffect(() => {
+    console.log("🔍 useEffect triggered with activeView:", activeView);
+    console.log("   canManageInvitations:", canManageInvitations);
+    console.log("   user:", !!user);
+
     if (activeView === "sent" && canManageInvitations && user) {
+      console.log("✓ Conditions met, calling fetchSentInvitations");
       fetchSentInvitations();
+    } else {
+      console.log("✗ Conditions NOT met");
     }
-  }, [activeView, user, selectedCompanyId]);
+  }, [activeView, canManageInvitations, user, fetchSentInvitations]);
 
   const revokeSentInvitation = async (invitationId: number) => {
     if (!user) return;
+
+    console.log("🗑️ Revoking invitation:", invitationId);
 
     const { error } = await supabase
       .from("invitation")
@@ -358,10 +426,12 @@ export function useInvitations() {
       .eq("id", invitationId);
 
     if (error) {
+      console.error("❌ Error revoking invitation:", error);
       toast.error(t("toasts.failedToRevoke"), {
         description: error.message,
       });
     } else {
+      console.log("✅ Invitation revoked successfully");
       toast.success(t("toasts.invitationRevoked"));
       setSentInvitations((prev) =>
         prev.filter((inv) => inv.id !== invitationId)
@@ -376,9 +446,21 @@ export function useInvitations() {
   const sendSingle = async (draft: Draft, force: boolean = false) => {
     if (!user || !draft.email.includes("@")) return;
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId! : user.companyId;
+    // ✅ Use context value for superadmins
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin!
+      : user.companyId;
 
-    if (isSuperAdmin && !selectedCompanyId) {
+    // ✅ DEBUG LOG
+    console.log("📤 sendSingle - Using company:", {
+      isSuperAdmin,
+      selectedCompanyForAdmin,
+      targetCompanyId,
+      draftEmail: draft.email,
+    });
+
+    if (isSuperAdmin && !selectedCompanyForAdmin) {
+      console.warn("⚠️ Superadmin but no company selected!");
       toast.error(t("toasts.selectCompanyFirst"));
       return;
     }
@@ -422,14 +504,12 @@ export function useInvitations() {
       }
     }
 
-    // ✅ Set status to sending
     setDrafts((d) =>
       d.map((dr) => (dr.id === draft.id ? { ...dr, status: "sending" } : dr))
     );
 
     setSending(true);
 
-    // ✅ Show loading toast
     const loadingToast = toast.loading(
       t("toasts.sending", { email: draft.email })
     );
@@ -490,6 +570,7 @@ export function useInvitations() {
         });
       } else if (invitation) {
         try {
+          console.log("📧 Sending email for invitation:", invitation.id);
           const response = await fetch("/api/invitations/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -499,8 +580,14 @@ export function useInvitations() {
             }),
           });
 
+          console.log("📬 Email API response status:", response.status);
+
           if (!response.ok) {
-            throw new Error("Failed to send email");
+            const responseText = await response.text();
+            console.error("❌ Email API error response:", responseText);
+            throw new Error(
+              `Email API error: ${response.status} ${responseText}`
+            );
           }
 
           toast.success(t("toasts.invitationSent"), {
@@ -511,7 +598,7 @@ export function useInvitations() {
           });
           setDrafts((d) => d.filter((dr) => dr.id !== draft.id));
         } catch (emailError) {
-          console.error("Email sending error:", emailError);
+          console.error("❌ Email sending error:", emailError);
           setDrafts((d) =>
             d.map((dr) =>
               dr.id === draft.id ? { ...dr, status: "failed" } : dr
@@ -547,9 +634,21 @@ export function useInvitations() {
       (d) => d.email.includes("@") && allowedRoles.includes(d.role)
     );
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId! : user.companyId;
+    // ✅ Use context value for superadmins
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin!
+      : user.companyId;
 
-    if (isSuperAdmin && !selectedCompanyId) {
+    // ✅ DEBUG LOG
+    console.log("📤 sendAll - Using company:", {
+      isSuperAdmin,
+      selectedCompanyForAdmin,
+      targetCompanyId,
+      draftCount: validDrafts.length,
+    });
+
+    if (isSuperAdmin && !selectedCompanyForAdmin) {
+      console.warn("⚠️ Superadmin but no company selected!");
       toast.error(t("toasts.selectCompanyFirst"));
       setSending(false);
       return;
@@ -801,7 +900,6 @@ export function useInvitations() {
 
   return {
     user,
-    companies,
     loading: !activeRole || !authUser || !userId,
     drafts,
     setDrafts,
@@ -810,8 +908,6 @@ export function useInvitations() {
     setActiveView,
     sentInvitations,
     loadingSentInvitations,
-    selectedCompanyId,
-    setSelectedCompanyId,
     searchEmail,
     setSearchEmail,
     filterRole,
@@ -824,7 +920,6 @@ export function useInvitations() {
     isRegularUser,
     canManageInvitations,
     problematicDrafts,
-    selectedCompany,
     filteredSentInvitations,
     hasActiveFilters,
     updateDraft,
@@ -836,4 +931,4 @@ export function useInvitations() {
   };
 }
 
-export type { Role, User, Company, Draft, SentInvitation, InvitationStatus };
+export type { Role, User, Draft, SentInvitation, InvitationStatus };

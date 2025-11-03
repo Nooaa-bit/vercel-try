@@ -29,6 +29,11 @@ interface UserCompanyRole {
   companyName: string;
 }
 
+interface Company {
+  id: number;
+  name: string;
+}
+
 interface ActiveRoleContext {
   availableRoles: UserCompanyRole[];
   activeRole: UserCompanyRole;
@@ -37,9 +42,13 @@ interface ActiveRoleContext {
   hasPermission: (requiredRole: Role) => boolean;
   hasAnyRole: (requiredRoles: Role[]) => boolean;
   loading: boolean;
+  // ✅ NEW: Company selection for superadmins
+  availableCompanies: Company[];
+  selectedCompanyForAdmin: number | null;
+  setSelectedCompanyForAdmin: (companyId: number) => void;
+  isSuperAdmin: boolean;
 }
 
-// ✅ NEW: Proper types for database queries
 interface RoleRow {
   id: number;
   role: Role;
@@ -55,12 +64,10 @@ const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
   undefined
 );
 
-// ✅ FIXED: Type-safe fetcher function
 async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
   const supabase = createClient();
 
   try {
-    // Fetch user profile
     const { data: profile, error: profileError } = await supabase
       .from("user")
       .select("id")
@@ -73,7 +80,6 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
-    // ✅ Fetch roles WITHOUT the company join
     const { data: roles, error: rolesError } = await supabase
       .from("user_company_role")
       .select("id, role, company_id")
@@ -85,7 +91,6 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
-    // ✅ Fetch all companies separately
     const { data: companies, error: companiesError } = await supabase
       .from("company")
       .select("id, name")
@@ -96,12 +101,10 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
-    // ✅ Create a map for quick lookup with proper typing
     const companyMap = new Map<number, string>(
       (companies as CompanyRow[]).map((c) => [c.id, c.name])
     );
 
-    // ✅ Combine data with proper typing
     return (roles as RoleRow[]).map((r) => ({
       id: r.id,
       role: r.role,
@@ -114,28 +117,61 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
   }
 }
 
+// ✅ NEW: Fetch all companies for superadmin selection
+async function fetchAllCompanies(): Promise<Company[]> {
+  const supabase = createClient();
+
+  try {
+    const { data: companies, error } = await supabase
+      .from("company")
+      .select("id, name")
+      .is("deleted_at", null)
+      .order("name");
+
+    if (error) {
+      console.error("Error fetching companies:", error);
+      return [];
+    }
+
+    return companies as Company[];
+  } catch (error) {
+    console.error("Unexpected error loading companies:", error);
+    return [];
+  }
+}
+
 export function ActiveRoleProvider({ children }: { children: ReactNode }) {
   const { t, ready } = useTranslation("role-access");
   const { user, loading: authLoading } = useAuth();
   const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
+  // ✅ NEW: Track selected company for admin purposes
+  const [selectedCompanyForAdmin, setSelectedCompanyForAdmin] = useState<
+    number | null
+  >(null);
 
-  // Use SWR with conditional fetching and 10-minute cache
-  const {
-    data: availableRoles = [],
-    isLoading: rolesLoading,
-    error,
-  } = useSWR(
-    user ? `roles-${user.id}` : null, // Conditional: only fetch if user exists
+  const { data: availableRoles = [], isLoading: rolesLoading } = useSWR(
+    user ? `roles-${user.id}` : null,
     () => fetchUserRoles(user!.id),
     {
-      dedupingInterval: 600000, // 10 minutes in milliseconds
-      revalidateOnFocus: false, // Don't refetch on window focus
-      revalidateOnReconnect: true, // Refetch on reconnect
+      dedupingInterval: 600000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
       shouldRetryOnError: true,
     }
   );
 
-  // Set initial active role when roles are loaded
+  // ✅ NEW: Fetch all companies for superadmin dropdown
+  const { data: availableCompanies = [] } = useSWR(
+    "all-companies",
+    fetchAllCompanies,
+    {
+      dedupingInterval: 600000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      shouldRetryOnError: true,
+    }
+  );
+
   useMemo(() => {
     if (availableRoles.length > 0 && activeRoleId === null) {
       const stored =
@@ -160,12 +196,43 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }, [availableRoles, activeRoleId]);
 
+  // ✅ NEW: Check if superadmin
+  const isSuperAdmin = activeRole?.role === "superadmin";
+
   const setActiveRole = useCallback((roleId: number) => {
     setActiveRoleId(roleId);
+    // ✅ NEW: Reset company selection when switching roles
+    setSelectedCompanyForAdmin(null);
     if (typeof window !== "undefined") {
       localStorage.setItem("activeRoleId", roleId.toString());
     }
   }, []);
+
+  // ✅ NEW: Setter for company selection
+  const handleSetSelectedCompanyForAdmin = useCallback((companyId: number) => {
+    setSelectedCompanyForAdmin(companyId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("selectedCompanyForAdmin", companyId.toString());
+    }
+  }, []);
+
+  // ✅ NEW: Initialize company selection from localStorage
+  useMemo(() => {
+    if (isSuperAdmin && selectedCompanyForAdmin === null) {
+      const stored =
+        typeof window !== "undefined"
+          ? localStorage.getItem("selectedCompanyForAdmin")
+          : null;
+      const storedId = stored ? parseInt(stored, 10) : null;
+
+      // Set to first available company if not stored
+      if (storedId && availableCompanies.some((c) => c.id === storedId)) {
+        setSelectedCompanyForAdmin(storedId);
+      } else if (availableCompanies.length > 0) {
+        setSelectedCompanyForAdmin(availableCompanies[0].id);
+      }
+    }
+  }, [isSuperAdmin, availableCompanies, selectedCompanyForAdmin]);
 
   const hasPermission = useCallback(
     (requiredRole: Role) => {
@@ -194,6 +261,11 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
       hasPermission,
       hasAnyRole,
       loading,
+      // ✅ NEW: Expose company selection
+      availableCompanies,
+      selectedCompanyForAdmin,
+      setSelectedCompanyForAdmin: handleSetSelectedCompanyForAdmin,
+      isSuperAdmin,
     }),
     [
       availableRoles,
@@ -202,6 +274,10 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
       hasPermission,
       hasAnyRole,
       loading,
+      availableCompanies,
+      selectedCompanyForAdmin,
+      handleSetSelectedCompanyForAdmin,
+      isSuperAdmin,
     ]
   );
 
@@ -223,7 +299,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  // ✅ Skip error screen if user is logging out (user === null)
   if (hasAttemptedLoad && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

@@ -1,7 +1,6 @@
-//hype-hire/vercel/components/AppSidebar.tsx
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
@@ -17,6 +16,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { NAV_ITEMS, type NavItem } from "@/lib/dash-navigation";
@@ -31,19 +31,26 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = usePathname();
-  const { activeRole, availableRoles, setActiveRole, hasPermission } =
-    useActiveRole();
-  const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
-  
-  // Use the user prop to get the user's email for display
-  const userEmail = user?.email || '';
+  const {
+    activeRole,
+    availableRoles,
+    setActiveRole,
+    hasPermission,
+    isSuperAdmin,
+    availableCompanies,
+    selectedCompanyForAdmin,
+    setSelectedCompanyForAdmin,
+  } = useActiveRole();
 
-  // Memoized: Strip language from pathname ONCE
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const userEmail = user?.email || "";
+
   const pathWithoutLang = useMemo(() => {
     return pathname.replace(/^\/[^/]+/, "");
   }, [pathname]);
 
-  // Memoized: Filter and group navigation items by section
   const filteredItems = useMemo(() => {
     const sections = {
       main: [] as NavItem[],
@@ -61,12 +68,34 @@ export function AppSidebar({ user }: AppSidebarProps) {
     return sections;
   }, [hasPermission]);
 
-  // Memoized: Other roles for dropdown
-  const otherRoles = useMemo(() => {
-    return availableRoles.filter((r) => r.id !== activeRole?.id);
-  }, [availableRoles, activeRole?.id]);
+  // ✅ For superadmins: show companies; for others: show roles
+  const switcherItems = useMemo(() => {
+    if (isSuperAdmin) {
+      // Filter companies by search query
+      return availableCompanies.filter((c) =>
+        c.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    } else {
+      // Show other roles
+      return availableRoles.filter((r) => r.id !== activeRole?.id);
+    }
+  }, [
+    isSuperAdmin,
+    availableCompanies,
+    availableRoles,
+    activeRole?.id,
+    searchQuery,
+  ]);
 
-  // Memoized: Check if path is active
+  // ✅ Get selected company name for display
+  const selectedCompanyName = useMemo(() => {
+    if (isSuperAdmin) {
+      return availableCompanies.find((c) => c.id === selectedCompanyForAdmin)
+        ?.name;
+    }
+    return null;
+  }, [isSuperAdmin, availableCompanies, selectedCompanyForAdmin]);
+
   const isActive = useCallback(
     (path: string) => {
       if (path === "/dashboard") {
@@ -77,7 +106,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
     [pathWithoutLang]
   );
 
-  // Memoized: Get navigation link classes
   const getNavClass = useCallback(
     (path: string) => {
       return cn(
@@ -90,7 +118,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
     [isActive]
   );
 
-  // Safety check
   if (!activeRole) {
     return null;
   }
@@ -104,20 +131,24 @@ export function AppSidebar({ user }: AppSidebarProps) {
       style={{ height: "calc(100vh - 4rem)" }}
     >
       <SidebarContent className="bg-sidebar pb-4">
-        {/* Company/Role Switcher */}
+        {/* ✅ Unified Switcher: Roles for regular users, Companies for superadmins */}
         {!collapsed && (
           <div className="p-4 border-b">
             <button
-              onClick={() => setIsRoleSwitcherOpen(!isRoleSwitcherOpen)}
+              onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
               className="w-full flex items-center justify-between p-3 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-pulse-500 to-pulse-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                  {activeRole.companyName[0]}
+                  {isSuperAdmin
+                    ? selectedCompanyName?.[0] || "?"
+                    : activeRole.companyName[0]}
                 </div>
                 <div className="text-left">
                   <div className="text-sm font-semibold">
-                    {activeRole.companyName}
+                    {isSuperAdmin
+                      ? selectedCompanyName || "Select Company"
+                      : activeRole.companyName}
                   </div>
                   <div className="text-xs text-muted-foreground capitalize">
                     {activeRole.role}
@@ -127,50 +158,98 @@ export function AppSidebar({ user }: AppSidebarProps) {
               <ChevronDown
                 className={cn(
                   "w-4 h-4 transition-transform",
-                  isRoleSwitcherOpen && "rotate-180"
+                  isSwitcherOpen && "rotate-180"
                 )}
               />
             </button>
 
-            {/* Role Dropdown */}
-            {isRoleSwitcherOpen && otherRoles.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {otherRoles.map((role) => (
-                  <button
-                    key={role.id}
-                    onClick={() => {
-                      setActiveRole(role.id);
-                      setIsRoleSwitcherOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium">
-                      {role.companyName[0]}
+            {/* ✅ Dropdown with Search for Superadmins */}
+            {isSwitcherOpen && (
+              <div className="mt-2 space-y-2">
+                {/* Search input for superadmins */}
+                {isSuperAdmin && availableCompanies.length > 0 && (
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search companies..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8 pr-8 h-8 text-sm"
+                      autoFocus
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                      >
+                        <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Items list */}
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {switcherItems.length === 0 ? (
+                    <div className="p-2 text-xs text-muted-foreground text-center">
+                      {isSuperAdmin ? "No companies found" : "No other roles"}
                     </div>
-                    <div className="text-left">
-                      <div className="text-sm font-medium">
-                        {role.companyName}
-                      </div>
-                      <div className="text-xs text-muted-foreground capitalize">
-                        {role.role}
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                  ) : (
+                    switcherItems.map((item) => {
+                      // Determine if this is a company or role
+                      const isCompany =
+                        "name" in item && !("companyName" in item);
+                      const itemId = isCompany ? item.id : item.id;
+                      const isSelected = isSuperAdmin
+                        ? selectedCompanyForAdmin === item.id
+                        : activeRole?.id === item.id;
+
+                      return (
+                        <button
+                          key={itemId}
+                          onClick={() => {
+                            if (isSuperAdmin) {
+                              setSelectedCompanyForAdmin(item.id);
+                            } else {
+                              setActiveRole(item.id);
+                            }
+                            setIsSwitcherOpen(false);
+                            setSearchQuery("");
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2 p-2 rounded-lg transition-colors",
+                            isSelected
+                              ? "bg-pulse-500/20 text-pulse-600 dark:text-pulse-400"
+                              : "hover:bg-muted/50"
+                          )}
+                        >
+                          <div className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium">
+                            {isCompany ? item.name[0] : item.companyName[0]}
+                          </div>
+                          <div className="text-left flex-1">
+                            <div className="text-sm font-medium">
+                              {isCompany ? item.name : item.companyName}
+                            </div>
+                            {!isCompany && (
+                              <div className="text-xs text-muted-foreground capitalize">
+                                {item.role}
+                              </div>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <span className="text-pulse-600 dark:text-pulse-400">
+                              ✓
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
         )}
-        {/* Quick Create Button 
-        <div className="p-4 flex justify-center">
-          <Button
-            className="w-[80%] bg-pulse-500 hover:bg-pulse-600 transition-all duration-200"
-            size={collapsed ? "icon" : "default"}
-          >
-            <Plus className="w-4 h-4" />
-            {!collapsed && <span className="ml-2">Quick Create</span>}
-          </Button>
-        </div> */}
 
         {/* Main Navigation */}
         <SidebarGroup>
@@ -235,5 +314,3 @@ export function AppSidebar({ user }: AppSidebarProps) {
     </Sidebar>
   );
 }
-
-        
