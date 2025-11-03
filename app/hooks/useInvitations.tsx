@@ -27,16 +27,11 @@ interface User {
   role: Role;
 }
 
-interface Company {
-  id: number;
-  name: string;
-}
-
+// ✅ UPDATED: Removed companyId from Draft
 interface Draft {
   id: string;
   email: string;
   role: Role;
-  companyId?: number;
   warning?: string;
   conflictType?: "member" | "pending" | "expired";
   userId?: number;
@@ -69,16 +64,15 @@ export function useInvitations() {
   const { activeRole, activeCompanyId, availableRoles } = useActiveRole();
   const { user: authUser } = useAuth();
 
+  // ✅ Get company selection from context
+  const { isSuperAdmin, selectedCompanyForAdmin } = useActiveRole();
+
   // State
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sending, setSending] = useState(false);
   const [activeView, setActiveView] = useState<"draft" | "sent">("draft");
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
   const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
-    null
-  );
   const [searchEmail, setSearchEmail] = useState("");
   const [filterRole, setFilterRole] = useState<Role | "all">("all");
   const [filterStatus, setFilterStatus] = useState<InvitationStatus>("all");
@@ -110,8 +104,6 @@ export function useInvitations() {
           if (profile) {
             console.log("✅ User profile found, id:", profile.id);
             setUserId(profile.id);
-          } else {
-            console.warn("⚠️ No user profile found");
           }
         } catch (err) {
           console.error("❌ Exception fetching user profile:", err);
@@ -121,19 +113,18 @@ export function useInvitations() {
   }, [authUser?.id, supabase]);
 
   // ✅ Derive user from activeRole, authUser, and userId
-const user: User | null = useMemo(
-  () =>
-    activeRole && authUser && userId
-      ? {
-          id: userId,
-          email: authUser.email || "",
-          companyId: activeRole.companyId,
-          role: activeRole.role,
-        }
-      : null,
-  [activeRole, authUser, userId]
-);
-
+  const user: User | null = useMemo(
+    () =>
+      activeRole && authUser && userId
+        ? {
+            id: userId,
+            email: authUser.email || "",
+            companyId: activeRole.companyId,
+            role: activeRole.role,
+          }
+        : null,
+    [activeRole, authUser, userId]
+  );
 
   useEffect(() => {
     if (user) {
@@ -152,7 +143,6 @@ const user: User | null = useMemo(
     [user]
   );
 
-  const isSuperAdmin = activeRole?.role === "superadmin";
   const isCompanyAdmin = activeRole?.role === "company_admin";
   const isRegularUser =
     activeRole?.role === "talent" || activeRole?.role === "supervisor";
@@ -172,11 +162,6 @@ const user: User | null = useMemo(
     [drafts]
   );
 
-  const selectedCompany = useMemo(
-    () => companies.find((c) => c.id === selectedCompanyId),
-    [companies, selectedCompanyId]
-  );
-
   const filteredSentInvitations = useMemo(() => {
     return sentInvitations.filter((inv) => {
       const matchesEmail =
@@ -193,48 +178,14 @@ const user: User | null = useMemo(
     searchEmail !== "" || filterRole !== "all" || filterStatus !== "all";
 
   // ============================================================
-  // INITIALIZATION
-  // ============================================================
-
-  // ✅ Initialize companies for superadmin (if not already loaded)
-  useEffect(() => {
-    if (isSuperAdmin && companies.length === 0) {
-      console.log("🏢 Fetching companies for superadmin");
-      (async () => {
-        try {
-          const { data: companiesData, error } = await supabase
-            .from("company")
-            .select("id, name")
-            .order("name");
-
-          if (error) {
-            console.error("❌ Error fetching companies:", error);
-            return;
-          }
-
-          console.log("✅ Companies loaded:", companiesData?.length || 0);
-          setCompanies(companiesData || []);
-          if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
-            console.log("📍 Setting default company:", companiesData[0].id);
-            setSelectedCompanyId(companiesData[0].id);
-          }
-        } catch (err) {
-          console.error("❌ Exception fetching companies:", err);
-        }
-      })();
-    }
-  }, [isSuperAdmin, supabase, companies.length, selectedCompanyId]);
-
-  // ============================================================
   // HELPER FUNCTIONS
   // ============================================================
 
+  // ✅ UPDATED: Removed companyId distinction
   const removeDuplicateDrafts = (draftArray: Draft[]): Draft[] => {
     const seen = new Set<string>();
     return draftArray.filter((draft) => {
-      const key = isSuperAdmin
-        ? `${draft.email.toLowerCase()}-${draft.role}-${draft.companyId}`
-        : `${draft.email.toLowerCase()}-${draft.role}`;
+      const key = `${draft.email.toLowerCase()}-${draft.role}`;
 
       if (seen.has(key)) return false;
       seen.add(key);
@@ -248,9 +199,10 @@ const user: User | null = useMemo(
     setFilterStatus("all");
   };
 
+  // ✅ UPDATED: Removed "companyId" field
   const updateDraft = (
     id: string,
-    field: "email" | "role" | "companyId",
+    field: "email" | "role",
     value: string | number
   ) => {
     setDrafts((d) =>
@@ -275,7 +227,10 @@ const user: User | null = useMemo(
     if (!user || !draft.email.includes("@")) return draft;
     if (isRegularUser) return draft;
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId! : user.companyId;
+    // ✅ Use context value for superadmins
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin!
+      : user.companyId;
 
     const { data: existingUser } = await supabase
       .from("user")
@@ -367,17 +322,24 @@ const user: User | null = useMemo(
   // SENT INVITATIONS
   // ============================================================
 
-  // ✅ Memoized fetchSentInvitations with comprehensive debugging
+  // ✅ Updated fetchSentInvitations using context company selection
   const fetchSentInvitations = useCallback(async () => {
     console.log("🔄 fetchSentInvitations called");
-    console.log("📊 State:", { user: !!user, isSuperAdmin, selectedCompanyId });
+    console.log("📊 State:", {
+      user: !!user,
+      isSuperAdmin,
+      selectedCompanyForAdmin,
+    });
 
     if (!user) {
       console.log("❌ No user, skipping fetch");
       return;
     }
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId : user.companyId;
+    // ✅ Use selectedCompanyForAdmin from context
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin
+      : user.companyId;
     console.log(
       "🎯 Target Company ID:",
       targetCompanyId,
@@ -434,9 +396,9 @@ const user: User | null = useMemo(
       setLoadingSentInvitations(false);
       console.log("✅ fetchSentInvitations completed");
     }
-  }, [user, isSuperAdmin, selectedCompanyId, supabase]);
+  }, [user, isSuperAdmin, selectedCompanyForAdmin, supabase]);
 
-  // ✅ Fixed useEffect with all required dependencies
+  // ✅ Updated dependency array to include selectedCompanyForAdmin
   useEffect(() => {
     console.log("🔍 useEffect triggered with activeView:", activeView);
     console.log("   canManageInvitations:", canManageInvitations);
@@ -446,10 +408,7 @@ const user: User | null = useMemo(
       console.log("✓ Conditions met, calling fetchSentInvitations");
       fetchSentInvitations();
     } else {
-      console.log("✗ Conditions NOT met:");
-      console.log("   activeView === 'sent':", activeView === "sent");
-      console.log("   canManageInvitations:", canManageInvitations);
-      console.log("   user:", !!user);
+      console.log("✗ Conditions NOT met");
     }
   }, [activeView, canManageInvitations, user, fetchSentInvitations]);
 
@@ -487,9 +446,21 @@ const user: User | null = useMemo(
   const sendSingle = async (draft: Draft, force: boolean = false) => {
     if (!user || !draft.email.includes("@")) return;
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId! : user.companyId;
+    // ✅ Use context value for superadmins
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin!
+      : user.companyId;
 
-    if (isSuperAdmin && !selectedCompanyId) {
+    // ✅ DEBUG LOG
+    console.log("📤 sendSingle - Using company:", {
+      isSuperAdmin,
+      selectedCompanyForAdmin,
+      targetCompanyId,
+      draftEmail: draft.email,
+    });
+
+    if (isSuperAdmin && !selectedCompanyForAdmin) {
+      console.warn("⚠️ Superadmin but no company selected!");
       toast.error(t("toasts.selectCompanyFirst"));
       return;
     }
@@ -533,14 +504,12 @@ const user: User | null = useMemo(
       }
     }
 
-    // ✅ Set status to sending
     setDrafts((d) =>
       d.map((dr) => (dr.id === draft.id ? { ...dr, status: "sending" } : dr))
     );
 
     setSending(true);
 
-    // ✅ Show loading toast
     const loadingToast = toast.loading(
       t("toasts.sending", { email: draft.email })
     );
@@ -665,9 +634,21 @@ const user: User | null = useMemo(
       (d) => d.email.includes("@") && allowedRoles.includes(d.role)
     );
 
-    const targetCompanyId = isSuperAdmin ? selectedCompanyId! : user.companyId;
+    // ✅ Use context value for superadmins
+    const targetCompanyId = isSuperAdmin
+      ? selectedCompanyForAdmin!
+      : user.companyId;
 
-    if (isSuperAdmin && !selectedCompanyId) {
+    // ✅ DEBUG LOG
+    console.log("📤 sendAll - Using company:", {
+      isSuperAdmin,
+      selectedCompanyForAdmin,
+      targetCompanyId,
+      draftCount: validDrafts.length,
+    });
+
+    if (isSuperAdmin && !selectedCompanyForAdmin) {
+      console.warn("⚠️ Superadmin but no company selected!");
       toast.error(t("toasts.selectCompanyFirst"));
       setSending(false);
       return;
@@ -919,7 +900,6 @@ const user: User | null = useMemo(
 
   return {
     user,
-    companies,
     loading: !activeRole || !authUser || !userId,
     drafts,
     setDrafts,
@@ -928,8 +908,6 @@ const user: User | null = useMemo(
     setActiveView,
     sentInvitations,
     loadingSentInvitations,
-    selectedCompanyId,
-    setSelectedCompanyId,
     searchEmail,
     setSearchEmail,
     filterRole,
@@ -942,7 +920,6 @@ const user: User | null = useMemo(
     isRegularUser,
     canManageInvitations,
     problematicDrafts,
-    selectedCompany,
     filteredSentInvitations,
     hasActiveFilters,
     updateDraft,
@@ -954,4 +931,4 @@ const user: User | null = useMemo(
   };
 }
 
-export type { Role, User, Company, Draft, SentInvitation, InvitationStatus };
+export type { Role, User, Draft, SentInvitation, InvitationStatus };

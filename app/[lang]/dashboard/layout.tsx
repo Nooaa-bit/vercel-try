@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/[lang]/dashboard/layout.tsx
 "use client";
 
 import { useMemo } from "react";
@@ -18,7 +17,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation("dash-layout");
   const { t: tSidebar } = useTranslation("sidebar");
   const { user, profile, loading } = useAuth();
-  const { activeRole } = useActiveRole();
+  const {
+    activeRole,
+    isSuperAdmin,
+    selectedCompanyForAdmin,
+    availableCompanies,
+  } = useActiveRole();
   const pathname = usePathname();
 
   // Memoized to avoid recalculating on every render
@@ -33,6 +37,22 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     });
     return currentItem ? tSidebar(currentItem.titleKey) : tSidebar("dashboard");
   }, [pathname, tSidebar]);
+
+  // ✅ Memoized company name display - shows selected company for superadmins
+  const displayCompanyName = useMemo(() => {
+    if (isSuperAdmin && selectedCompanyForAdmin) {
+      const selectedCompany = availableCompanies.find(
+        (c) => c.id === selectedCompanyForAdmin
+      );
+      return selectedCompany?.name || activeRole.companyName;
+    }
+    return activeRole.companyName;
+  }, [
+    isSuperAdmin,
+    selectedCompanyForAdmin,
+    availableCompanies,
+    activeRole.companyName,
+  ]);
 
   if (loading) {
     return (
@@ -57,7 +77,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 <SidebarTrigger className="mr-2" />
                 <h1 className="text-lg font-semibold">{currentTitle}</h1>
                 <span className="text-lg text-muted-foreground hidden sm:block">
-                  {activeRole.companyName}
+                  {/* ✅ Shows selected company for superadmins, activeRole company for others */}
+                  {displayCompanyName}
                 </span>
               </div>
               <div className="flex items-center gap-2 p-2">

@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/[lang]/dashboard/invitations/page.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -12,19 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -35,8 +21,6 @@ import {
   RefreshCw,
   Search,
   X,
-  Check,
-  ChevronsUpDown,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -44,12 +28,12 @@ import { cn } from "@/lib/utils";
 import { useInvitations } from "@/app/hooks/useInvitations";
 import type { InvitationStatus, Role } from "@/app/hooks/useInvitations";
 import { useTranslation } from "react-i18next";
+import { useActiveRole } from "@/app/hooks/useActiveRole";
 
 export default function InvitationsPage() {
   const { t, ready } = useTranslation("invitations");
   const {
     user,
-    companies,
     loading,
     drafts,
     setDrafts,
@@ -58,8 +42,6 @@ export default function InvitationsPage() {
     setActiveView,
     sentInvitations,
     loadingSentInvitations,
-    selectedCompanyId,
-    setSelectedCompanyId,
     searchEmail,
     setSearchEmail,
     filterRole,
@@ -67,11 +49,9 @@ export default function InvitationsPage() {
     filterStatus,
     setFilterStatus,
     allowedRoles,
-    isSuperAdmin,
     isRegularUser,
     canManageInvitations,
     problematicDrafts,
-    selectedCompany,
     filteredSentInvitations,
     hasActiveFilters,
     updateDraft,
@@ -82,7 +62,8 @@ export default function InvitationsPage() {
     sendAll,
   } = useInvitations();
 
-  const [companySearchOpen, setCompanySearchOpen] = useState(false);
+  // ✅ Get company selection from context (only needed for superadmins)
+  const { isSuperAdmin, selectedCompanyForAdmin } = useActiveRole();
 
   // ✅ Pagination state for sent invitations
   const [currentPage, setCurrentPage] = useState(1);
@@ -210,71 +191,16 @@ export default function InvitationsPage() {
         <CardHeader>
           {canManageInvitations ? (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Tabs
-                  value={activeView}
-                  onValueChange={(v) => setActiveView(v as "draft" | "sent")}
-                  className="flex-1"
-                >
-                  <TabsList>
-                    <TabsTrigger value="draft">{t("tabs.drafts")}</TabsTrigger>
-                    <TabsTrigger value="sent">{t("tabs.sent")}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-
-                {isSuperAdmin && (
-                  <Popover
-                    open={companySearchOpen}
-                    onOpenChange={setCompanySearchOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={companySearchOpen}
-                        className="w-64 justify-between"
-                      >
-                        {selectedCompany?.name || t("company.select")}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 p-0">
-                      <Command>
-                        <CommandInput
-                          placeholder={t("company.searchPlaceholder")}
-                        />
-                        <CommandList>
-                          <CommandEmpty>
-                            {t("company.noCompanyFound")}
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {companies.map((company) => (
-                              <CommandItem
-                                key={company.id}
-                                value={company.name}
-                                onSelect={() => {
-                                  setSelectedCompanyId(company.id);
-                                  setCompanySearchOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedCompanyId === company.id
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {company.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
+              {/* ✅ REMOVED: Company selector - now in AppSidebar */}
+              <Tabs
+                value={activeView}
+                onValueChange={(v) => setActiveView(v as "draft" | "sent")}
+              >
+                <TabsList>
+                  <TabsTrigger value="draft">{t("tabs.drafts")}</TabsTrigger>
+                  <TabsTrigger value="sent">{t("tabs.sent")}</TabsTrigger>
+                </TabsList>
+              </Tabs>
 
               {activeView === "draft" && (
                 <div className="flex justify-between items-center">
@@ -287,9 +213,6 @@ export default function InvitationsPage() {
                             id: crypto.randomUUID(),
                             email: "",
                             role: "talent",
-                            companyId: isSuperAdmin
-                              ? selectedCompanyId || companies[0]?.id
-                              : user.companyId,
                           },
                         ])
                       }
@@ -454,7 +377,6 @@ export default function InvitationsPage() {
                     .map((draft) => (
                       <div key={draft.id} className="border rounded p-3">
                         <div className="flex gap-2 items-center">
-                          {/* ✅ Email Input - Disabled when sending */}
                           <Input
                             placeholder={t("placeholders.email")}
                             value={draft.email}
@@ -465,7 +387,6 @@ export default function InvitationsPage() {
                             disabled={draft.status === "sending"}
                           />
 
-                          {/* ✅ Role Select - Disabled when sending */}
                           <Select
                             value={draft.role}
                             onValueChange={(v: Role) =>
@@ -485,7 +406,6 @@ export default function InvitationsPage() {
                             </SelectContent>
                           </Select>
 
-                          {/* ✅ Status Indicator - Sending */}
                           {draft.status === "sending" && (
                             <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm text-blue-600 dark:text-blue-400 whitespace-nowrap">
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent" />
@@ -493,7 +413,6 @@ export default function InvitationsPage() {
                             </div>
                           )}
 
-                          {/* ✅ Status Indicator - Failed */}
                           {draft.status === "failed" && (
                             <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-600 dark:text-red-400 whitespace-nowrap">
                               <X className="w-4 h-4" />
@@ -501,7 +420,6 @@ export default function InvitationsPage() {
                             </div>
                           )}
 
-                          {/* ✅ Send Button - Shows spinner when sending */}
                           <Button
                             onClick={() => sendSingle(draft)}
                             disabled={
@@ -519,7 +437,6 @@ export default function InvitationsPage() {
                             )}
                           </Button>
 
-                          {/* ✅ Delete Button - Disabled when sending */}
                           <Button
                             onClick={() =>
                               setDrafts((d) =>

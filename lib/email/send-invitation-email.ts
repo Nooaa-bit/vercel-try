@@ -180,7 +180,7 @@ export async function sendInvitationEmail({
     message.htmlContent = htmlContent;
     message.textContent = textContent;
     message.sender = {
-      name: companyName,
+      name: "Hype Hire",
       email: process.env.BREVO_SENDER_EMAIL || "noreply@yourdomain.com",
     };
     message.to = [{ email: to }];
