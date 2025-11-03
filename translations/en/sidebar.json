@@ -12,5 +12,11 @@
   "settings": "Settings",
   "getHelp": "Get Help",
   "search": "Search",
-  "quickCreate": "Quick Create"
+  "quickCreate": "Quick Create",
+  "roles": {
+    "superadmin": "Super Admin",
+    "company_admin": "Company Admin",
+    "supervisor": "Supervisor",
+    "talent": "Talent"
+  }
 }
