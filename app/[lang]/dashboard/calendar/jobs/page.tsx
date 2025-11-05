@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/jobs/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
