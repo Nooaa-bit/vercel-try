@@ -5,7 +5,7 @@
      "description": "Manage your job postings ({{count}})",
      "addButton": "Create Job",
      "editButton": "Edit",
-     "workersNeeded": "workers needed"
+     "workersNeeded": ": Required Personnel"
    },
    "emptyState": {
      "title": "No jobs yet",
@@ -30,7 +30,7 @@
      "selectLocation": "Select a location",
      "description": "Description",
      "descriptionPlaceholder": "Job description and requirements...",
-     "workersNeeded": "Workers Needed",
+     "workersNeeded": "Required Personnel",
      "startDate": "Start Date",
      "endDate": "End Date"
    },
