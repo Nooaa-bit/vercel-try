@@ -175,8 +175,14 @@ export function DayView({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      onClick={onClose} // ✅ Add this to close on backdrop click
+    >
+      <Card
+        className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()} // ✅ Prevent card clicks from closing
+      >
         <CardHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -213,6 +219,7 @@ export function DayView({
                     <JobDialog
                       editingJob={null}
                       locations={locations}
+                      defaultStartDate={dateStr}
                       onSave={async () => {
                         setDialogOpen(false);
                         onSave();

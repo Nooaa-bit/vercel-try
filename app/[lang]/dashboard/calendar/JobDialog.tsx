@@ -52,6 +52,7 @@ interface JobDialogProps {
   onSave: () => void;
   onCancel: () => void;
   companyId: number;
+  defaultStartDate?: string; 
 }
 
 // ✅ Helper to extract error message
@@ -70,6 +71,7 @@ export default function JobDialog({
   onSave,
   onCancel,
   companyId,
+  defaultStartDate, 
 }: JobDialogProps) {
   const { t, ready } = useTranslation("jobs");
   const { activeRole } = useActiveRole();
@@ -80,12 +82,13 @@ export default function JobDialog({
   const [description, setDescription] = useState("");
   const [workersNeeded, setWorkersNeeded] = useState(1);
   const [locationId, setLocationId] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState(defaultStartDate || "");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
   const [isMultipleDays, setIsMultipleDays] = useState(false);
   const [saving, setSaving] = useState(false);
+
 
   // ✅ Pre-fill if editing
   useEffect(() => {

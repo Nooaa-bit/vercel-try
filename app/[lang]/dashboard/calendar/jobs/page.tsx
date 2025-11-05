@@ -22,7 +22,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Briefcase, Trash2, Pencil, Calendar, Users } from "lucide-react";
+import {
+  Plus,
+  Briefcase,
+  Trash2,
+  Pencil,
+  Calendar,
+  Users,
+  MapPin,
+} from "lucide-react";
 import { toast } from "sonner";
 import JobDialog from "../JobDialog";
 
@@ -181,7 +189,7 @@ export default function JobsPage() {
       requiredRole="company_admin"
       redirectTo="/dashboard/calendar"
     >
-      <div className="w-full space-y-4 py-0">
+      <div className="w-full space-y-8 py-2">
         {/* ✅ Filters and Stats Row */}
         <div className="grid grid-cols-4 gap-4">
           {/* Location Filter */}
@@ -323,6 +331,17 @@ export default function JobsPage() {
                       )}
 
                       <div className="space-y-2">
+                        {/* ✅ Location */}
+                        {job.location_id && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <MapPin className="w-4 h-4 text-muted-foreground" />
+                            <span>
+                              {locations.find(
+                                (loc) => loc.id === job.location_id
+                              )?.name || "Unknown Location"}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="w-4 h-4 text-muted-foreground" />
                           <span>

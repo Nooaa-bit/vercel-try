@@ -200,7 +200,8 @@ export default function CalendarPage() {
       }
 
       const locationName = jobData.location?.name || "No Location";
-      const displayTitle = `${locationName} - ${jobData.position}`;
+      //const displayTitle = `${locationName} - ${jobData.position}`;
+      const displayTitle = `${jobData.position}`;
 
       return {
         id: shift.id,
