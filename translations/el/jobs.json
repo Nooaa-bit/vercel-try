@@ -5,7 +5,7 @@
     "description": "Διαχειριστείτε τις ανακοινώσεις θέσεων σας ({{count}})",
     "addButton": "Δημιουργία Θέσης",
     "editButton": "Επεξεργασία",
-    "workersNeeded": "εργάτες που χρειάζονται"
+    "workersNeeded": ": Αριθμός προσωπικού"
   },
   "emptyState": {
     "title": "Καμία θέση ακόμα",
@@ -30,7 +30,7 @@
     "selectLocation": "Επιλέξτε τοποθεσία",
     "description": "Περιγραφή",
     "descriptionPlaceholder": "Περιγραφή θέσης και απαιτήσεις...",
-    "workersNeeded": "Εργάτες που Χρειάζονται",
+    "workersNeeded": "Αριθμός προσωπικού",
     "startDate": "Ημερομηνία Έναρξης",
     "endDate": "Ημερομηνία Λήξης"
   },

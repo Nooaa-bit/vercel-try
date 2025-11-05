@@ -1,59 +1,153 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { createClient } from "@/lib/supabase/client";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Briefcase } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { AlertCircle, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import JobDialog from "./JobDialog";
+import { DayView } from "./DayView";
 
 interface Job {
+  id: number;
+  position: string;
+  seniority: "junior" | "senior";
+  description: string | null;
+  workers_needed: number;
+  start_date: string;
+  end_date: string;
+  location_id: number | null;
+}
+
+interface ShiftFromDB {
+  id: number;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  workers_needed: number;
+  job_id: number;
+  job: {
+    id: number;
+    position: string;
+    seniority: "junior" | "senior";
+    description: string | null;
+    workers_needed: number;
+    start_date: string;
+    end_date: string;
+    location_id: number | null;
+    location: {
+      id: number;
+      name: string;
+    } | null;
+  };
+}
+
+
+interface Shift {
   id: number;
   position: string;
   start_date: string;
   end_date: string;
   workers_needed: number;
+  location: string;
+  status: "draft" | "active" | "completed";
+  startTime: string;
+  endTime: string;
+}
+
+interface Location {
+  id: number;
+  name: string;
 }
 
 export default function CalendarPage() {
   const { t, ready } = useTranslation("jobs");
-  const { activeRole, loading } = useActiveRole();
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const { activeRole, loading, isSuperAdmin, selectedCompanyForAdmin } =
+    useActiveRole();
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [filterLocation, setFilterLocation] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const supabase = createClient();
 
-  useEffect(() => {
-    if (loading || !ready || !activeRole) return;
+  const targetCompanyId = isSuperAdmin
+    ? selectedCompanyForAdmin
+    : activeRole?.companyId;
 
-    const fetchJobs = async () => {
-      setPageLoading(true);
+  // ✅ Fetch shifts with job data
+  const fetchShifts = async () => {
+    if (!targetCompanyId || targetCompanyId <= 0) return;
 
+    setPageLoading(true);
+    setError(null);
+
+    try {
       if (
         activeRole.role === "company_admin" ||
         activeRole.role === "superadmin"
       ) {
-        // Admins see all jobs in their company
-        const { data } = await supabase
-          .from("job")
-          .select("id, position, start_date, end_date, workers_needed")
-          .eq("company_id", activeRole.companyId)
+        // Get shifts directly with job data - simpler query
+        const { data: shiftsData, error: shiftError } = await supabase
+          .from("shift")
+          .select(
+            `
+    id, shift_date, start_time, end_time, workers_needed, job_id,
+    job:job_id(
+      id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+      location:location_id(id, name)
+    )
+  `
+          )
+          .eq("job.company_id", targetCompanyId)
           .is("deleted_at", null)
-          .order("start_date", { ascending: true });
+          .order("shift_date", { ascending: true });
 
-        if (data) {
-          setJobs(data as Job[]);
-        }
+        if (shiftError) throw shiftError;
+
+        const transformedShifts = transformShifts(
+          (shiftsData as unknown as ShiftFromDB[]) || []
+        );
+        setShifts(transformedShifts);
+
+        // Fetch locations for dialog
+        const { data: locationsData, error: locationsError } = await supabase
+          .from("location")
+          .select("id, name")
+          .eq("company_id", targetCompanyId)
+          .is("deleted_at", null)
+          .order("name", { ascending: true });
+
+        if (locationsError) throw locationsError;
+        setLocations(locationsData || []);
       } else {
-        // Talent and supervisors see only jobs they're assigned to
-        const { data: assignments } = await supabase
+        // Talent/Supervisor see only their assigned shifts
+        const { data: assignments, error: assignmentError } = await supabase
           .from("shift_assignment")
           .select("shift_id")
           .eq("user_id", activeRole.id)
-          .is("cancelled_at", null);
+          .is("cancelled_at", null)
+          .is("marked_no_show_at", null);
+
+        if (assignmentError) throw assignmentError;
 
         if (!assignments || assignments.length === 0) {
-          setJobs([]);
-          setPageLoading(false);
+          setShifts([]);
           return;
         }
 
@@ -61,88 +155,424 @@ export default function CalendarPage() {
           (a: { shift_id: number }) => a.shift_id
         );
 
-        const { data: shifts } = await supabase
+        const { data: shiftsData, error: shiftError } = await supabase
           .from("shift")
-          .select("job_id")
-          .in("id", shiftIds);
+          .select(
+            `
+    id, shift_date, start_time, end_time, workers_needed, job_id,
+    job:job_id(
+      id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+      location:location_id(id, name)
+    )
+  `
+          )
+          .in("id", shiftIds)
+          .is("deleted_at", null)
+          .order("shift_date", { ascending: true });
 
-        if (!shifts) {
-          setJobs([]);
-          setPageLoading(false);
-          return;
-        }
+        if (shiftError) throw shiftError;
 
-        const jobIds = [
-          ...new Set(shifts.map((s: { job_id: number }) => s.job_id)),
-        ];
+        const transformedShifts = transformShifts(
+          (shiftsData as unknown as ShiftFromDB[]) || []
+        );
+        setShifts(transformedShifts);
+      }
+    } catch (err) {
+      console.error("Error fetching shifts:", err);
+      setError(t("calendar.loadError"));
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
-        const { data: jobsData } = await supabase
-          .from("job")
-          .select("id, position, start_date, end_date, workers_needed")
-          .in("id", jobIds)
-          .is("deleted_at", null);
-
-        if (jobsData) {
-          setJobs(jobsData as Job[]);
-        }
+  // ✅ Transform shifts with location + position title
+  const transformShifts = (shiftsData: ShiftFromDB[]): Shift[] => {
+    return shiftsData.map((shift) => {
+      const jobData = shift.job;
+      if (!jobData) {
+        return {
+          id: shift.id,
+          position: "Unknown Position",
+          start_date: shift.shift_date,
+          end_date: shift.shift_date,
+          workers_needed: shift.workers_needed,
+          location: "Unspecified",
+          status: "active" as const,
+          startTime: shift.start_time,
+          endTime: shift.end_time,
+        };
       }
 
-      setPageLoading(false);
-    };
+      const locationName = jobData.location?.name || "No Location";
+      const displayTitle = `${locationName} - ${jobData.position}`;
 
-    fetchJobs();
-  }, [loading, ready, activeRole, supabase]);
+      return {
+        id: shift.id,
+        position: displayTitle,
+        start_date: shift.shift_date,
+        end_date: shift.shift_date,
+        workers_needed: shift.workers_needed,
+        location: locationName,
+        status: "active" as const,
+        startTime: shift.start_time,
+        endTime: shift.end_time,
+      };
+    });
+  };
+
+  useEffect(() => {
+    if (loading || !ready || !activeRole || !targetCompanyId) return;
+    fetchShifts();
+  }, [loading, ready, activeRole, targetCompanyId]);
+
+  // ✅ Get unique locations from shifts
+  const locationsFromShifts = useMemo(() => {
+    return [...new Set(shifts.map((shift) => shift.location))];
+  }, [shifts]);
+
+  // ✅ Calculate stats
+  const stats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+
+    const totalEvents = shifts.filter((shift) => {
+      const shiftDate = new Date(shift.start_date);
+      return shiftDate >= today;
+    }).length;
+
+    const todaysEvents = shifts.filter((shift) => {
+      const shiftDate = new Date(shift.start_date);
+      shiftDate.setHours(0, 0, 0, 0);
+
+      if (shiftDate.getTime() !== today.getTime()) return false;
+
+      const [hours, minutes, seconds] = shift.startTime.split(":").map(Number);
+      const shiftStartTime = new Date();
+      shiftStartTime.setHours(hours, minutes, seconds || 0);
+
+      return shiftStartTime > now;
+    }).length;
+
+    return { totalEvents, todaysEvents };
+  }, [shifts]);
+
+  // ✅ Get days in month
+  const getDaysInMonth = (date: Date): number => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  // ✅ Monday start - Convert Sunday (0) to 6, shift everything else up
+  const getFirstDayOfMonth = (date: Date): number => {
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    return firstDay === 0 ? 6 : firstDay - 1;
+  };
+
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDay = getFirstDayOfMonth(currentDate);
+
+  // ✅ Get shifts for a specific date
+  const getShiftsForDate = (day: number): Shift[] => {
+    const dateStr = `${currentDate.getFullYear()}-${String(
+      currentDate.getMonth() + 1
+    ).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    return shifts.filter((shift) => {
+      const isOnDate = shift.start_date === dateStr;
+
+      const matchesLocation =
+        filterLocation === "all" || shift.location === filterLocation;
+      const matchesStatus =
+        filterStatus === "all" || shift.status === filterStatus;
+
+      return isOnDate && matchesLocation && matchesStatus;
+    });
+  };
+
+  // ✅ Navigation
+  const previousMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1)
+    );
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1)
+    );
+  };
+
+  const handleNextDay = () => {
+    if (selectedDay) {
+      const nextDay = new Date(selectedDay);
+      nextDay.setDate(nextDay.getDate() + 1);
+      setSelectedDay(nextDay);
+    }
+  };
+
+  const handlePreviousDay = () => {
+    if (selectedDay) {
+      const prevDay = new Date(selectedDay);
+      prevDay.setDate(prevDay.getDate() - 1);
+      setSelectedDay(prevDay);
+    }
+  };
+
+  const monthName = currentDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const handleDialogClose = (open: boolean) => {
+    setDialogOpen(open);
+  };
 
   if (!ready || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="w-5 h-5" />
-          {t("calendar.title")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {pageLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-12">
-            <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">{t("calendar.noJobs")}</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                className="p-4 border rounded-lg hover:bg-muted transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold">{job.position}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(job.start_date).toLocaleDateString()} -{" "}
-                      {new Date(job.end_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className="text-sm bg-muted px-2 py-1 rounded">
-                    {job.workers_needed} {t("card.workersNeeded")}
-                  </span>
-                </div>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 py-6">
+      {/* ✅ Left Sidebar - Filters */}
+      <div className="lg:col-span-1">
+        <Card className="sticky top-6">
+          <CardHeader>
+            <CardTitle className="text-base">Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Location</label>
+              <Select value={filterLocation} onValueChange={setFilterLocation}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locationsFromShifts.map((location) => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Status</label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="pt-4 border-t space-y-3">
+              <div className="text-sm">
+                <p className="text-muted-foreground text-xs">Upcoming Shifts</p>
+                <p className="text-3xl font-bold text-primary">
+                  {stats.totalEvents}
+                </p>
               </div>
-            ))}
+              <div className="text-sm">
+                <p className="text-muted-foreground text-xs">
+                  Today&apos;s Shifts (Not Started)
+                </p>
+                <p className="text-3xl font-bold text-accent">
+                  {stats.todaysEvents}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ✅ Main Content - Full Calendar Grid */}
+      <div className="lg:col-span-3">
+        {error && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <p className="text-red-700">{error}</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>{monthName}</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={previousMonth}
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={nextMonth}
+                  className="h-8 w-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            {pageLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* ✅ Week day headers */}
+                <div className="grid grid-cols-7 gap-2">
+                  {weekDays.map((day) => (
+                    <div
+                      key={day}
+                      className="text-center font-semibold text-sm text-muted-foreground py-2"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* ✅ Calendar grid */}
+                <div className="grid grid-cols-7 gap-2">
+                  {/* Empty cells for days before month starts */}
+                  {Array.from({ length: firstDay }).map((_, i) => (
+                    <div
+                      key={`empty-${i}`}
+                      className="aspect-square bg-muted/30 rounded-lg"
+                    />
+                  ))}
+
+                  {/* Days of the month */}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const day = i + 1;
+                    const dayDate = new Date(
+                      currentDate.getFullYear(),
+                      currentDate.getMonth(),
+                      day
+                    );
+                    const dayShifts = getShiftsForDate(day);
+                    const hasEvents = dayShifts.length > 0;
+
+                    // ✅ Check if this day is today
+                    const today = new Date();
+                    const isToday =
+                      day === today.getDate() &&
+                      currentDate.getMonth() === today.getMonth() &&
+                      currentDate.getFullYear() === today.getFullYear();
+
+                    return (
+                      <div
+                        key={day}
+                        className={`aspect-square rounded-lg border-2 p-2 flex flex-col overflow-hidden cursor-pointer ${
+                          isToday
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                            : hasEvents
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-muted bg-background"
+                        } hover:border-primary/60 transition-colors`}
+                        onClick={() => setSelectedDay(dayDate)}
+                      >
+                        <div
+                          className={`text-xs font-semibold mb-1 ${
+                            isToday
+                              ? "text-primary font-bold"
+                              : "text-foreground"
+                          }`}
+                        >
+                          {day}
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-1">
+                          {dayShifts.slice(0, 3).map((shift) => (
+                            <div
+                              key={shift.id}
+                              className="text-xs p-1.5 rounded bg-primary hover:bg-primary/90 text-primary-foreground truncate hover:shadow-md transition-all cursor-pointer group"
+                              title={`${shift.position} - ${shift.startTime}`}
+                            >
+                              <div className="truncate font-medium">
+                                {shift.position}
+                              </div>
+                              <div className="text-primary-foreground/80 text-xs">
+                                {shift.startTime.slice(0, 5)}
+                              </div>
+                            </div>
+                          ))}
+                          {dayShifts.length > 3 && (
+                            <div className="text-xs text-accent font-semibold px-1">
+                              +{dayShifts.length - 3} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ✅ Floating Action Button */}
+        {(activeRole.role === "company_admin" ||
+          activeRole.role === "superadmin") &&
+          targetCompanyId &&
+          targetCompanyId > 0 && (
+            <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+              <DialogTrigger asChild>
+                <button className="button-primary fixed bottom-8 right-8 h-14 w-14 rounded-full p-0 flex items-center justify-center">
+                  <Plus className="w-6 h-6" />
+                </button>
+              </DialogTrigger>
+              {dialogOpen && (
+                <JobDialog
+                  editingJob={null}
+                  locations={locations}
+                  onSave={async () => {
+                    setDialogOpen(false);
+                    await fetchShifts();
+                  }}
+                  onCancel={() => {
+                    setDialogOpen(false);
+                  }}
+                  companyId={targetCompanyId as number}
+                />
+              )}
+            </Dialog>
+          )}
+      </div>
+
+      {/* ✅ Day View Modal */}
+      {selectedDay && (
+        <DayView
+          date={selectedDay}
+          shifts={shifts}
+          locations={locations}
+          onClose={() => setSelectedDay(null)}
+          onPreviousDay={handlePreviousDay}
+          onNextDay={handleNextDay}
+          onSave={fetchShifts}
+          activeRole={activeRole}
+          targetCompanyId={targetCompanyId as number}
+        />
+      )}
+    </div>
   );
 }
