@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -45,8 +46,13 @@ interface ShiftFromDB {
     start_date: string;
     end_date: string;
     location_id: number | null;
+    location: {
+      id: number;
+      name: string;
+    } | null;
   };
 }
+
 
 interface Shift {
   id: number;
@@ -101,9 +107,12 @@ export default function CalendarPage() {
           .from("shift")
           .select(
             `
-          id, shift_date, start_time, end_time, workers_needed, job_id,
-          job:job_id(id, position, seniority, description, workers_needed, start_date, end_date, location_id, company_id)
-        `
+    id, shift_date, start_time, end_time, workers_needed, job_id,
+    job:job_id(
+      id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+      location:location_id(id, name)
+    )
+  `
           )
           .eq("job.company_id", targetCompanyId)
           .is("deleted_at", null)
@@ -150,9 +159,12 @@ export default function CalendarPage() {
           .from("shift")
           .select(
             `
-            id, shift_date, start_time, end_time, workers_needed, job_id,
-            job(id, position, seniority, description, workers_needed, start_date, end_date, location_id)
-          `
+    id, shift_date, start_time, end_time, workers_needed, job_id,
+    job:job_id(
+      id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+      location:location_id(id, name)
+    )
+  `
           )
           .in("id", shiftIds)
           .is("deleted_at", null)
@@ -176,7 +188,7 @@ export default function CalendarPage() {
   // ✅ Transform shifts with location + position title
   const transformShifts = (shiftsData: ShiftFromDB[]): Shift[] => {
     return shiftsData.map((shift) => {
-    const jobData = shift.job;
+      const jobData = shift.job;
       if (!jobData) {
         return {
           id: shift.id,
@@ -191,8 +203,8 @@ export default function CalendarPage() {
         };
       }
 
-      const locationId = jobData.location_id || "none";
-      const displayTitle = `${locationId} - ${jobData.position}`;
+      const locationName = jobData.location?.name || "No Location";
+      const displayTitle = `${locationName} - ${jobData.position}`;
 
       return {
         id: shift.id,
@@ -200,7 +212,7 @@ export default function CalendarPage() {
         start_date: shift.shift_date,
         end_date: shift.shift_date,
         workers_needed: shift.workers_needed,
-        location: "Unspecified",
+        location: locationName,
         status: "active" as const,
         startTime: shift.start_time,
         endTime: shift.end_time,

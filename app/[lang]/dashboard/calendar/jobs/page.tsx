@@ -42,7 +42,12 @@ interface Location {
 
 export default function JobsPage() {
   const { t, ready } = useTranslation("jobs");
-  const { activeRole, loading: roleLoading } = useActiveRole();
+  const {
+    activeRole,
+    loading: roleLoading,
+    isSuperAdmin,
+    selectedCompanyForAdmin,
+  } = useActiveRole();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,9 +55,14 @@ export default function JobsPage() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const supabase = createClient();
 
+  // ✅ Get the correct company ID
+  const targetCompanyId = isSuperAdmin
+    ? selectedCompanyForAdmin
+    : activeRole?.companyId;
+
   // Fetch jobs and locations
   const fetchData = useCallback(async () => {
-    if (activeRole.companyId <= 0) return;
+    if (!targetCompanyId || targetCompanyId <= 0) return;
 
     setLoading(true);
     try {
@@ -60,7 +70,7 @@ export default function JobsPage() {
       const { data: jobsData, error: jobsError } = await supabase
         .from("job")
         .select("*")
-        .eq("company_id", activeRole.companyId)
+        .eq("company_id", targetCompanyId)
         .is("deleted_at", null)
         .order("start_date", { ascending: true });
 
@@ -72,7 +82,7 @@ export default function JobsPage() {
       const { data: locationsData, error: locationsError } = await supabase
         .from("location")
         .select("id, name")
-        .eq("company_id", activeRole.companyId)
+        .eq("company_id", targetCompanyId)
         .is("deleted_at", null);
 
       if (!locationsError && locationsData) {
@@ -82,15 +92,15 @@ export default function JobsPage() {
       console.error("Error fetching data:", error);
     }
     setLoading(false);
-  }, [activeRole.companyId, supabase]);
+  }, [targetCompanyId, supabase]);
 
   useEffect(() => {
-    if (roleLoading || !ready) return;
+    if (roleLoading || !ready || !targetCompanyId) return;
     if (activeRole.role === "supervisor" || activeRole.role === "talent") {
       return;
     }
     fetchData();
-  }, [roleLoading, ready, activeRole.role, activeRole.companyId, fetchData]);
+  }, [roleLoading, ready, activeRole.role, targetCompanyId, fetchData]);
 
   const handleEdit = useCallback((job: Job) => {
     setEditingJob(job);
@@ -136,7 +146,10 @@ export default function JobsPage() {
   }
 
   return (
-    <ProtectedPage requiredRole="company_admin" redirectTo="/dashboard/calendar">
+    <ProtectedPage
+      requiredRole="company_admin"
+      redirectTo="/dashboard/calendar"
+    >
       <div className="space-y-6 py-0">
         <Card>
           <CardHeader className="border-b">
@@ -168,7 +181,7 @@ export default function JobsPage() {
                       setDialogOpen(false);
                       setEditingJob(null);
                     }}
-                    companyId={activeRole.companyId}
+                    companyId={targetCompanyId as number}
                   />
                 )}
               </Dialog>
