@@ -53,7 +53,6 @@ interface ShiftFromDB {
   };
 }
 
-
 interface Shift {
   id: number;
   position: string;
@@ -102,17 +101,16 @@ export default function CalendarPage() {
         activeRole.role === "company_admin" ||
         activeRole.role === "superadmin"
       ) {
-        // Get shifts directly with job data - simpler query
         const { data: shiftsData, error: shiftError } = await supabase
           .from("shift")
           .select(
             `
-    id, shift_date, start_time, end_time, workers_needed, job_id,
-    job:job_id(
-      id, position, seniority, description, workers_needed, start_date, end_date, location_id,
-      location:location_id(id, name)
-    )
-  `
+            id, shift_date, start_time, end_time, workers_needed, job_id,
+            job:job_id(
+              id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+              location:location_id(id, name)
+            )
+          `
           )
           .eq("job.company_id", targetCompanyId)
           .is("deleted_at", null)
@@ -125,7 +123,6 @@ export default function CalendarPage() {
         );
         setShifts(transformedShifts);
 
-        // Fetch locations for dialog
         const { data: locationsData, error: locationsError } = await supabase
           .from("location")
           .select("id, name")
@@ -136,7 +133,6 @@ export default function CalendarPage() {
         if (locationsError) throw locationsError;
         setLocations(locationsData || []);
       } else {
-        // Talent/Supervisor see only their assigned shifts
         const { data: assignments, error: assignmentError } = await supabase
           .from("shift_assignment")
           .select("shift_id")
@@ -159,12 +155,12 @@ export default function CalendarPage() {
           .from("shift")
           .select(
             `
-    id, shift_date, start_time, end_time, workers_needed, job_id,
-    job:job_id(
-      id, position, seniority, description, workers_needed, start_date, end_date, location_id,
-      location:location_id(id, name)
-    )
-  `
+            id, shift_date, start_time, end_time, workers_needed, job_id,
+            job:job_id(
+              id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+              location:location_id(id, name)
+            )
+          `
           )
           .in("id", shiftIds)
           .is("deleted_at", null)
@@ -225,12 +221,10 @@ export default function CalendarPage() {
     fetchShifts();
   }, [loading, ready, activeRole, targetCompanyId]);
 
-  // ✅ Get unique locations from shifts
   const locationsFromShifts = useMemo(() => {
     return [...new Set(shifts.map((shift) => shift.location))];
   }, [shifts]);
 
-  // ✅ Calculate stats
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -257,12 +251,10 @@ export default function CalendarPage() {
     return { totalEvents, todaysEvents };
   }, [shifts]);
 
-  // ✅ Get days in month
   const getDaysInMonth = (date: Date): number => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
 
-  // ✅ Monday start - Convert Sunday (0) to 6, shift everything else up
   const getFirstDayOfMonth = (date: Date): number => {
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
     return firstDay === 0 ? 6 : firstDay - 1;
@@ -271,7 +263,6 @@ export default function CalendarPage() {
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
 
-  // ✅ Get shifts for a specific date
   const getShiftsForDate = (day: number): Shift[] => {
     const dateStr = `${currentDate.getFullYear()}-${String(
       currentDate.getMonth() + 1
@@ -289,7 +280,6 @@ export default function CalendarPage() {
     });
   };
 
-  // ✅ Navigation
   const previousMonth = () => {
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() - 1)
@@ -338,226 +328,226 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 py-6">
-      {/* ✅ Left Sidebar - Filters */}
-      <div className="lg:col-span-1">
-        <Card className="sticky top-6">
-          <CardHeader>
-            <CardTitle className="text-base">Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Location</label>
-              <Select value={filterLocation} onValueChange={setFilterLocation}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {locationsFromShifts.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+    <div className="w-full space-y-4 py-0">
+      {/* ✅ Filters and Stats Row */}
+      <div className="grid grid-cols-4 gap-4">
+        {/* Location Filter */}
+        <div>
+          <label className="text-sm font-medium mb-2 block">Location</label>
+          <Select value={filterLocation} onValueChange={setFilterLocation}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {Array.from(new Set(locationsFromShifts)).map((location) => (
+                <SelectItem key={location} value={location}>
+                  {location}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Status</label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Status Filter */}
+        <div>
+          <label className="text-sm font-medium mb-2 block">Status</label>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="pt-4 border-t space-y-3">
-              <div className="text-sm">
-                <p className="text-muted-foreground text-xs">Upcoming Shifts</p>
-                <p className="text-3xl font-bold text-primary">
-                  {stats.totalEvents}
-                </p>
-              </div>
-              <div className="text-sm">
-                <p className="text-muted-foreground text-xs">
-                  Today&apos;s Shifts (Not Started)
-                </p>
-                <p className="text-3xl font-bold text-accent">
-                  {stats.todaysEvents}
-                </p>
-              </div>
+        {/* Upcoming Shifts Stat */}
+        <Card>
+          <CardContent className="p-0 pt-3">
+            <div className="text-center">
+              <p className="text-muted-foreground text-xs mb-0.5">
+                Upcoming Shifts
+              </p>
+              <p className="text-lg font-bold text-primary">
+                {stats.totalEvents}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Today's Shifts Stat */}
+        <Card>
+          <CardContent className="p-0 pt-3">
+            <div className="text-center">
+              <p className="text-muted-foreground text-xs mb-0.5">
+                Today&apos;s Shifts
+              </p>
+              <p className="text-lg font-bold text-primary">
+                {stats.todaysEvents}
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* ✅ Main Content - Full Calendar Grid */}
-      <div className="lg:col-span-3">
-        {error && (
-          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
+      {/* ✅ Error Message */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{monthName}</CardTitle>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={previousMonth}
-                  className="h-8 w-8"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={nextMonth}
-                  className="h-8 w-8"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
+      {/* ✅ Calendar Card */}
+      <Card className="w-full">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>{monthName}</CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={previousMonth}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={nextMonth}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
             </div>
-          </CardHeader>
+          </div>
+        </CardHeader>
 
-          <CardContent>
-            {pageLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <CardContent>
+          {pageLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Week day headers */}
+              <div className="grid grid-cols-7 gap-2">
+                {weekDays.map((day) => (
+                  <div
+                    key={day}
+                    className="text-center font-semibold text-sm text-muted-foreground py-2"
+                  >
+                    {day}
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="space-y-4">
-                {/* ✅ Week day headers */}
-                <div className="grid grid-cols-7 gap-2">
-                  {weekDays.map((day) => (
+
+              {/* Calendar grid */}
+              <div className="grid grid-cols-7 gap-2">
+                {Array.from({ length: firstDay }).map((_, i) => (
+                  <div
+                    key={`empty-${i}`}
+                    className="aspect-square bg-muted/30 rounded-lg"
+                  />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const dayDate = new Date(
+                    currentDate.getFullYear(),
+                    currentDate.getMonth(),
+                    day
+                  );
+                  const dayShifts = getShiftsForDate(day);
+                  const hasEvents = dayShifts.length > 0;
+
+                  const today = new Date();
+                  const isToday =
+                    day === today.getDate() &&
+                    currentDate.getMonth() === today.getMonth() &&
+                    currentDate.getFullYear() === today.getFullYear();
+
+                  return (
                     <div
                       key={day}
-                      className="text-center font-semibold text-sm text-muted-foreground py-2"
+                      className={`aspect-square rounded-lg border-2 p-2 flex flex-col overflow-hidden cursor-pointer ${
+                        isToday
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                          : hasEvents
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-muted bg-background"
+                      } hover:border-primary/60 transition-colors`}
+                      onClick={() => setSelectedDay(dayDate)}
                     >
-                      {day}
-                    </div>
-                  ))}
-                </div>
-
-                {/* ✅ Calendar grid */}
-                <div className="grid grid-cols-7 gap-2">
-                  {/* Empty cells for days before month starts */}
-                  {Array.from({ length: firstDay }).map((_, i) => (
-                    <div
-                      key={`empty-${i}`}
-                      className="aspect-square bg-muted/30 rounded-lg"
-                    />
-                  ))}
-
-                  {/* Days of the month */}
-                  {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const dayDate = new Date(
-                      currentDate.getFullYear(),
-                      currentDate.getMonth(),
-                      day
-                    );
-                    const dayShifts = getShiftsForDate(day);
-                    const hasEvents = dayShifts.length > 0;
-
-                    // ✅ Check if this day is today
-                    const today = new Date();
-                    const isToday =
-                      day === today.getDate() &&
-                      currentDate.getMonth() === today.getMonth() &&
-                      currentDate.getFullYear() === today.getFullYear();
-
-                    return (
                       <div
-                        key={day}
-                        className={`aspect-square rounded-lg border-2 p-2 flex flex-col overflow-hidden cursor-pointer ${
-                          isToday
-                            ? "border-primary bg-primary/10 ring-2 ring-primary/30"
-                            : hasEvents
-                            ? "border-primary/40 bg-primary/5"
-                            : "border-muted bg-background"
-                        } hover:border-primary/60 transition-colors`}
-                        onClick={() => setSelectedDay(dayDate)}
+                        className={`text-xs font-semibold mb-1 ${
+                          isToday ? "text-primary font-bold" : "text-foreground"
+                        }`}
                       >
-                        <div
-                          className={`text-xs font-semibold mb-1 ${
-                            isToday
-                              ? "text-primary font-bold"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {day}
-                        </div>
-                        <div className="flex-1 overflow-y-auto space-y-1">
-                          {dayShifts.slice(0, 3).map((shift) => (
-                            <div
-                              key={shift.id}
-                              className="text-xs p-1.5 rounded bg-primary hover:bg-primary/90 text-primary-foreground truncate hover:shadow-md transition-all cursor-pointer group"
-                              title={`${shift.position} - ${shift.startTime}`}
-                            >
-                              <div className="truncate font-medium">
-                                {shift.position}
-                              </div>
-                              <div className="text-primary-foreground/80 text-xs">
-                                {shift.startTime.slice(0, 5)}
-                              </div>
-                            </div>
-                          ))}
-                          {dayShifts.length > 3 && (
-                            <div className="text-xs text-accent font-semibold px-1">
-                              +{dayShifts.length - 3} more
-                            </div>
-                          )}
-                        </div>
+                        {day}
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex-1 overflow-y-auto space-y-1">
+                        {dayShifts.slice(0, 3).map((shift) => (
+                          <div
+                            key={shift.id}
+                            className="text-xs p-1.5 rounded bg-primary hover:bg-primary/90 text-primary-foreground truncate hover:shadow-md transition-all cursor-pointer group"
+                            title={`${shift.position} - ${shift.startTime}`}
+                          >
+                            <div className="truncate font-medium">
+                              {shift.position}
+                            </div>
+                            <div className="text-primary-foreground/80 text-xs">
+                              {shift.startTime.slice(0, 5)}
+                            </div>
+                          </div>
+                        ))}
+                        {dayShifts.length > 3 && (
+                          <div className="text-xs text-accent font-semibold px-1">
+                            +{dayShifts.length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ✅ Floating Action Button */}
-        {(activeRole.role === "company_admin" ||
-          activeRole.role === "superadmin") &&
-          targetCompanyId &&
-          targetCompanyId > 0 && (
-            <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-              <DialogTrigger asChild>
-                <button className="button-primary fixed bottom-8 right-8 h-14 w-14 rounded-full p-0 flex items-center justify-center">
-                  <Plus className="w-6 h-6" />
-                </button>
-              </DialogTrigger>
-              {dialogOpen && (
-                <JobDialog
-                  editingJob={null}
-                  locations={locations}
-                  onSave={async () => {
-                    setDialogOpen(false);
-                    await fetchShifts();
-                  }}
-                  onCancel={() => {
-                    setDialogOpen(false);
-                  }}
-                  companyId={targetCompanyId as number}
-                />
-              )}
-            </Dialog>
+            </div>
           )}
-      </div>
+        </CardContent>
+      </Card>
+
+      {/* ✅ Floating Action Button */}
+      {(activeRole.role === "company_admin" ||
+        activeRole.role === "superadmin") &&
+        targetCompanyId &&
+        targetCompanyId > 0 && (
+          <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+            <DialogTrigger asChild>
+              <button className="button-primary fixed bottom-8 right-8 h-14 w-14 rounded-full p-0 flex items-center justify-center">
+                <Plus className="w-6 h-6" />
+              </button>
+            </DialogTrigger>
+            {dialogOpen && (
+              <JobDialog
+                editingJob={null}
+                locations={locations}
+                onSave={async () => {
+                  setDialogOpen(false);
+                  await fetchShifts();
+                }}
+                onCancel={() => {
+                  setDialogOpen(false);
+                }}
+                companyId={targetCompanyId as number}
+              />
+            )}
+          </Dialog>
+        )}
 
       {/* ✅ Day View Modal */}
       {selectedDay && (

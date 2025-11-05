@@ -1,7 +1,6 @@
-//hype-hire/vercel/app/[lang]/dashboard/calendar/jobs/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
@@ -15,6 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Briefcase, Trash2, Pencil, Calendar, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -54,12 +60,36 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [filterLocation, setFilterLocation] = useState<string>("all");
+  const [filterSeniority, setFilterSeniority] = useState<string>("all");
   const supabase = createClient();
 
   // ✅ Get the correct company ID
   const targetCompanyId = isSuperAdmin
     ? selectedCompanyForAdmin
     : activeRole?.companyId;
+
+  // ✅ Calculate stats
+  const stats = useMemo(() => {
+    const total = jobs.length;
+    const draft = jobs.filter((job) => !job.start_date).length;
+
+    return { total, draft };
+  }, [jobs]);
+
+  // ✅ Filter jobs
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      const locationMatch =
+        filterLocation === "all"
+          ? true
+          : job.location_id?.toString() === filterLocation;
+      const seniorityMatch =
+        filterSeniority === "all" ? true : job.seniority === filterSeniority;
+
+      return locationMatch && seniorityMatch;
+    });
+  }, [jobs, filterLocation, filterSeniority]);
 
   // Fetch jobs and locations
   const fetchData = useCallback(async () => {
@@ -151,14 +181,75 @@ export default function JobsPage() {
       requiredRole="company_admin"
       redirectTo="/dashboard/calendar"
     >
-      <div className="space-y-6 py-0">
+      <div className="w-full space-y-4 py-0">
+        {/* ✅ Filters and Stats Row */}
+        <div className="grid grid-cols-4 gap-4">
+          {/* Location Filter */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Location</label>
+            <Select value={filterLocation} onValueChange={setFilterLocation}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id.toString()}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Seniority Filter */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Seniority</label>
+            <Select value={filterSeniority} onValueChange={setFilterSeniority}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Levels</SelectItem>
+                <SelectItem value="junior">Junior</SelectItem>
+                <SelectItem value="senior">Senior</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Total Jobs Stat */}
+          <Card>
+            <CardContent className="p-0 pt-3">
+              <div className="text-center">
+                <p className="text-muted-foreground text-xs mb-0.5">
+                  Total Jobs
+                </p>
+                <p className="text-lg font-bold text-primary">{stats.total}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Draft Jobs Stat */}
+          <Card>
+            <CardContent className="p-0 pt-3">
+              <div className="text-center">
+                <p className="text-muted-foreground text-xs mb-0.5">
+                  Draft Jobs
+                </p>
+                <p className="text-lg font-bold text-primary">{stats.draft}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ✅ Jobs Card */}
         <Card>
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>{t("card.title")}</CardTitle>
                 <CardDescription>
-                  {t("card.description", { count: jobs.length })}
+                  {t("card.description", { count: filteredJobs.length })}
                 </CardDescription>
               </div>
 
@@ -194,7 +285,7 @@ export default function JobsPage() {
               <div className="flex items-center justify-center py-12">
                 <div className="w-6 h-6 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : jobs.length === 0 ? (
+            ) : filteredJobs.length === 0 ? (
               <div className="text-center py-12">
                 <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground text-lg mb-2">
@@ -206,7 +297,7 @@ export default function JobsPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {jobs.map((job) => (
+                {filteredJobs.map((job) => (
                   <Card
                     key={job.id}
                     className="hover:shadow-md transition-shadow"

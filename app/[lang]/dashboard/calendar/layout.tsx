@@ -29,7 +29,7 @@ export default function JobsLayout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="space-y-6 py-20">
+    <div className="space-y-6 py-16">
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         <Link
