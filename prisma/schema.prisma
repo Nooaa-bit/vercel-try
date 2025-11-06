@@ -65,6 +65,9 @@ model user {
   
   ratingsReceived          JobRating[]         @relation("RatingForTalent")
   ratingsGiven             JobRating[]         @relation("RatingByUser")
+
+  jobInvitationsReceived    JobInvitation[]   @relation("JobInvitationInvitee")
+  jobInvitationsSent        JobInvitation[]   @relation("JobInvitationInvitedBy")
   
 // GDPR relations
   dataExportRequests       DataExportRequest[] @relation("DataExportRequests")
@@ -222,6 +225,7 @@ model Job {
   creator       user      @relation("JobCreatedBy", fields: [createdBy], references: [id])
   deleter       user?     @relation("JobDeletedBy", fields: [deletedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   
+  invitations   JobInvitation[]
   shifts        Shift[]
   ratings       JobRating[]
 
@@ -295,6 +299,33 @@ model ShiftAssignment {
 @@index([userId, cancelledAt, markedNoShowAt], map: "idx_assignment_user_status")
   @@index([shiftId, cancelledAt, deletedAt], map: "idx_assignment_shift_active")
   @@map("shift_assignment")
+}
+
+model JobInvitation {
+  id            Int       @id @default(autoincrement())
+  jobId         Int       @map("job_id")
+  userId        Int       @map("user_id")
+  
+  // Who sent it
+  invitedBy     Int       @map("invited_by")
+  
+  // Lifecycle
+  status        job_invitation_status @default(pending)
+  expiresAt     DateTime  @map("expires_at")
+  respondedAt   DateTime? @map("responded_at")
+  
+  // Audit
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  job           Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  invitee       user      @relation("JobInvitationInvitee", fields: [userId], references: [id], onDelete: Cascade)
+  inviter       user      @relation("JobInvitationInvitedBy", fields: [invitedBy], references: [id])
+  
+  @@index([jobId, status])
+  @@index([userId, status])
+  @@map("job_invitation")
 }
 
 // ============================================
@@ -554,7 +585,14 @@ enum AccessType {
 }
 
 
-
+enum job_invitation_status {
+  pending
+  accepted
+  declined
+  expired
+  cancelled
+  @@map("job_invitation_status")
+}
 
 
 //enum ExportStatus { pending processing completed failed @@map("export_status") }

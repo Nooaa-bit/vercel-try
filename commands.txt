@@ -1,0 +1,3573 @@
+mkdir hotfix
+echo "Hot-fix on the same line" >> week3/README.md\
+cd week3
+cd ts_uni
+cd week 3
+git checkout  hotfix/typo\
+
+mkdir -p week3 && echo "# Week 3 experiments" > week3/README.md\
+
+ls -la week3/\
+
+cat week3/README.md\
+
+git add week3/README.md\
+
+git commit -m "chore: add Week 3 README"\
+
+git push -u origin hotfix/typo\
+
+cat week3/README.md\
+
+echo "Hot-fix on the same line" >> week3/README.md
+git add week3/README.md\
+
+git commit -m "test conflict Week 3 README"\
+
+git push origin feat/week-3-setup
+git branch -D hotfix/typo\
+
+git push origin --delete hotfix/typo\
+
+git branch -D hotfix/typo\
+
+git checkout feat/week-3-setup\
+
+echo "Feature branch changes" >> README.md\
+
+git add README.md\
+
+git commit -m "feat: update README from feature branch"\
+
+git push origin feat/week-3-setup\
+
+git version
+git checkout main
+git branch\
+
+git branch | grep -v "main" | xargs git branch -D\
+
+git branch\
+
+git status
+git branch
+pwd\
+
+cd ..
+cd/Users/xenrok/Downloads/Code/TS_uni
+cd /Users/xenrok/Downloads/Code/TS_uni
+git status
+git commit -a
+git commit -m "test"\
+
+git status
+git version
+git branch\
+
+git branch -D main\
+
+cd ts_uni
+pwd
+git version
+git status\\
+
+git remote -v\
+
+git remote rm origin\
+
+git remote -v\
+
+rm .git/FETCH_HEAD\
+
+rm -rf .git\
+
+git branch -D hotfix/typo\
+mkdir week3-git-mastery\
+
+mkdir week3-git-mastery\
+
+cd week3-git-mastery\
+
+git init\
+
+git branch -M main
+mkdir src tests docs\
+
+echo "# Week 3 Git Mastery Project" > README.md\
+
+git remote add origin https://github.com/XenRok/week3-git-mastery.git
+git add .\
+
+git commit -m "Initial commit: Week 3 Git mastery project setup"\
+
+git push -u origin main\
+
+git checkout -b feature/week1-code\
+
+cd ..
+ls
+cd foundation-week1
+git add .\
+
+cd week3-git-mastery
+cd ..
+cd week3-git-mastery
+gti branch
+git branch
+cp -r ../foundation-week1/* ./src/\
+
+git add .\
+
+git status\
+
+git commit -m "feat: Add Week 1 foundational code\
+\
+- Core TypeScript/JavaScript functionality\
+- Basic project structure  \
+- Initial learning exercises"\
+
+git push -u origin feature/week1-code\
+
+git checkout main\
+
+echo "const version = '1.0.0';\
+const author = 'Original Author';\
+const features = ['basic', 'standard'];" > src/config.js
+mkdir -p src\
+
+echo "const version = '1.0.0';\
+const author = 'Original Author';\
+const features = ['basic', 'standard'];" > src/config.js
+cat src/config.js\
+
+git add src
+git commit -m "Add initial configuration file"\
+
+git push origin main\
+
+gti status
+git status
+git branch
+git checkout feature/week1-code
+ls
+cd foundation-week1
+mkdir -p src\
+
+echo "const version = '1.1.0';\
+const author = 'Team Member A';\
+const features = ['basic', 'standard', 'advanced'];" > src/config.js\
+
+git add src
+git commit -m "Update version to 1.1.0 and add advanced features"\
+
+git push -u foundation-week1
+git status
+git push -u feature/week1-code
+git push -u origin feature/week1-code
+git checkout main\
+
+git merge feature/week1-code
+git checkout merge\
+
+git checkout mergetest\
+
+git checkout -b mergetest
+ls
+git add src
+git commit -m "Potential conflict"
+cd ..
+cd foundation-week1
+ls
+git status
+git add src
+git commit -m "conflict"
+cd ..
+cd ..
+ls
+git add src
+git checkout -b conflitc
+cd week3-git-mastery
+ls
+cd tests
+ls
+git add src
+git commit -m "Potential conflict"    
+git push -u origin feature/week1-code
+git checkout feature/week1-code\
+
+git pull --rebase origin feature/week1-code\
+
+git status\
+
+git add .
+git commit -m "Add current work before rebase"
+git pull --rebase origin feature/week1-code
+git push -u origin feature/week1-code\
+
+git pull --rebase --autostash origin feature/week1-code\
+
+git push -u origin feature/week1-code\
+
+git status\
+
+cd ..
+git stσ�θσ�
+git status
+git pull --rebase origin feature/week1-code\
+
+git rm foundation-week1/.DS_Store\
+
+git reset HEAD .DS_Store\
+
+rm .DS_Store\
+
+git status
+git status
+git remote -v\
+
+git remote rm origin\
+
+git remote -v\
+
+rm -rf .git\
+\
+
+git help config
+git help -w config
+git config --global help.browser chrome\
+\
+
+git status
+clear
+git init
+git config --global user.name  �Xen �\
+
+git status
+git rm -r FolderName\
+
+git rm -r week3-git-mastery
+git status
+cd ..
+cd /Users/xenrok/Downloads/Code/TS_uni
+ls
+mkdir week3_github
+git init
+git status
+git config --global user.name  �Xen �\
+
+git add .
+git status
+git restore .
+git status
+git restore --staged
+git reset
+git status
+printf "node_modules/\ndist/\n.vite/\n.tsbuildinfo\ncoverage/\n.DS_Store\n.env\n.env.*\n" >> .gitignore
+printf "node_modules/\ndist/\n.vite/\n.tsbuildinfo\ncoverage/\n.DS_Store\n.env\n.env.*\n" >> .gitignore
+echo ".DS_Store\node_modules/" >> ~/.gitignore\
+
+echo ".DS_Store\node_modules/" >> ~/.gitignore\
+
+echo ".DS_Store\node_modules/" >> /.gitignore\
+
+echo ".DS_Store\node_modules/" >> /.gitignore\
+
+echo ".DS_Store\node_modules/" >> ./.gitignore\
+
+echo ".DS_Store" >> ~/.gitignore\
+
+ls -la ~/.gitignore_global\
+
+touch .gitignore_global\
+
+pwd
+echo ".DS_Store" > .gitignore\
+
+ls -la .gitignore\
+
+echo "node_modules/" >> .gitignore\
+
+cat .gitignore
+echo ".DS_store" >> .gitignore\
+
+cat .gitignore
+echo ".DS_Store" > .gitignore\
+
+cat .gitignore
+echo "node_modules/" >> .gitignore\
+
+cat .gitignore
+git status
+git add .
+git status
+git commit -m "Add work of week 1 & 2"\
+
+git log
+git reset c464e6207821ba48c61e814494ce20b62473ecd0
+git log
+git reset
+git log
+git reset --soft HEAD~1\
+
+git reset --mixed HEAD~1\
+
+git update-ref -d HEAD\
+
+git log
+git branch
+cat .gitignore
+git rev-parse --is-inside-work-tree\
+
+git rev-parse --git-dir > /dev/null 2>&1\
+echo $?\
+
+ls -la | grep "\.git"\
+
+git branch
+git log
+git brnach
+git branch
+rm -rf .git
+git rev-parse --is-inside-work-tree\
+
+git init
+git rev-parse --is-inside-work-tree\
+
+git log
+git add .
+git log
+git add .
+git status
+git commit -m "test1"
+git log
+git update-ref -d HEAD 
+git log
+git rev-parse --is-inside-work-tree
+git add .
+git status
+git commit -m "test1"
+git status
+git status
+git diff
+git commit 
+git add week1_foundation/test.txt
+git commit
+git commit -m "Add for test"\
+
+git status
+git status
+git diff
+git add week1_foundation/test.txt
+git status
+git restore --staged week1_foundation/test.txt
+git status
+git restore week1_foundation/test.txt
+git status
+git restore week1_foundation/test.txt
+git status
+git rm week1_foundation/test.txt
+git restore --staged week1_foundation/test.txt\
+
+git status
+git restore week1_foundation/test.txt
+git status
+git log
+git log oneline
+git log --oneline
+git rebase -i HEAD~2\
+
+git rebase -i --root\
+
+git log --oneline
+git commit --amend -m "Add foundation test file"\
+
+git log --oneline
+git log -p
+git rebase -i --root\
+
+git status
+git branch
+git branch test
+git branch
+git switch test
+git status
+git add.
+git add .
+git commit -m "change for branch test"
+git switch main
+git switch test
+git add .
+git commit -m "final v"
+git switch main
+git merge -m "merge test file"
+git merge -m "merge test file" test
+git switch test
+git status
+git log
+git log -p
+git branch -D branch_1 
+git branch -D test
+git branch main
+git switch main
+git branch -D test
+git status
+git log
+git branch
+git switch -c test1
+git switch -c test2
+git switch test1
+git switch main
+git switch test1
+git git commit -a -m  �merge test1"\
+q
+git commit -a -m  �merge test1"
+git commit -a -m "merge test1"
+git switch test2
+git commit -a -m "merge test2"
+git switch main
+git merge test1
+git merge test2
+git status
+git branch
+git branch | grep -v "main" | xargs git branch -D
+git remote add origin https://github.com/XenRok/TS_uni\
+
+git remote -v
+git push -u origin main
+brew install tree
+tree
+tree -I 'node_modules|dist|.git'\
+\
+
+cd ..
+git clone https://github.com/XenRok/job-seek-hub
+cd job-seek-hub
+npm run dev
+node -v\
+\
+
+npm -v\
+\
+
+npm install\
+\
+
+npm run dev\
+\
+
+tree
+tree -I 'node_modules|dist|.git'\
+\
+
+tree /Users/xenrok/Downloads/Code/job-seek-hub/src/components/ui
+npm run dev\
+\
+
+npm run dev\
+\
+
+grep -Rl --binary-files=without-match "JobSeekHub" .\
+\
+
+cd ..
+mkdir robot
+cd robot
+cd ..
+git clone https://github.com/XenRok/pulse-robot-template-3780
+cd pulse-robot
+npm run def
+npm run dev
+npm i
+npm run dev
+cd ..
+git clone https://github.com/XenRok/broker-calendar-viewer-640
+ls
+cd broker-calendar-viewer-640
+nmp i
+npm i
+npm run dev
+cd ..
+git clone https://github.com/XenRok/market-mosaic-online-4938
+npm run dev
+nmp i
+npm i
+cd market-mosaic-online-4938
+npm run dev
+npm i
+npm run dev
+ls
+cd ..
+ls
+cd TS_uni
+npx create-next-app@latest week4_my-first-next --typescript --eslint --tailwind --app
+ls
+cd week4_my-first-next
+ls
+tree
+tree -I 'node_modules|dist|.git'                                \
+
+ls -la\
+
+npm install -D tailwindcss postcss autoprefixer\
+
+npx tailwindcss init -p\
+
+npm uninstall tailwindcss\
+
+npm install -D tailwindcss@3 postcss autoprefixer\
+
+npx tailwindcss init -p\
+
+ls -la\
+
+grep -r "@modelib/fs.scandir" .\
+
+grep -r "fs.scandir" .\
+
+npm ls @nodelib/fs.scandir\
+
+rm -rf .next\
+
+rm -rf node_modules\
+
+npm install\
+
+npm run dev
+rm -rf .next\
+
+rm -rf node_modules\
+
+npm install\
+
+npm run dev
+mkdir
+mkdir components
+mkdir about
+cd ..
+git status
+git add week4_my-first-next/
+git commit
+git status
+git remote
+git remote -v
+git push -u origin main
+git status
+tree
+tree -I 'node_modules|dist|.git'                                \
+
+mkdir components\
+
+mkdir app/about
+mkdir app/contact
+npm run dev\
+
+rm -rf node_modules package-lock.json\
+
+npm install\
+
+npm run dev\
+
+npm ls @nodelib/fs.scandir\
+
+npm run dev\
+
+npm ls @nodelib/fs.scandir\
+
+npm uninstall tailwindcss\
+
+npm install -D tailwindcss@3.3.0 postcss autoprefixer\
+
+npm run dev\
+
+npm run dev\
+
+npm run dev\
+
+rm -rf node_modules .next package-lock.json\
+
+npm install tailwindcss@3.4.17 postcss@8.4.47 autoprefixer@10.4.20\
+
+npm run dev\
+
+cd ..
+cd ..
+cd ..
+ls
+cd xenrok
+ls
+cd Downloads
+ls
+cd code
+ls
+cd ts_uni
+mkdir week4_my-first-next
+mkdir week4_my-first-next
+npx create-next-app@latest my-first-next --typescript --eslint --tailwind --app\
+
+ls
+cd week4_my-first-next
+tree -I 'node_modules|dist|.git'                                \
+
+npm run dev
+cd ..
+cd ..
+ls
+cd 
+cd n8n*
+cd ..
+ls
+cd xenrok
+ls
+cd code
+cd code
+cd downloads
+cd code
+cd n8n_local
+cd ..
+cd n8n_local
+WEBHOOK_URL=https://821ef34e3b99.ngrok-free.app ./node_modules/.bin/n8n start\
+
+npm install n8n\
+\
+
+WEBHOOK_URL=https://821ef34e3b99.ngrok-free.app ./node_modules/.bin/n8n start\
+
+n8n version
+npx n8n --version\
+\
+
+cd ..
+cd ..
+cd n8n_local
+ngrok http 5678\
+
+which n8n
+npx n8n --version\
+\
+
+ngrok http 5678\
+
+WEBHOOK_URL=https://083de179bad6.ngrok-free.app ./node_modules/.bin/n8n start
+mkdir car_gr_refresh\
+
+cd car_gr_refresh
+npm init -y
+npm i -D playwright\
+\
+
+npx playwright install chromium\
+\
+
+npx playwright --version\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm start
+npm run headful\
+\
+
+npm run headful\
+\
+
+clear
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+npm run headful\
+\
+
+ngrok http 5678\
+
+WEBHOOK_URL=https://241e105d869a.ngrok-free.app ./node_modules/.bin/n8n start
+cd ..
+mkdir open_lovable
+cd open_lovable
+git clone https://github.com/mendableai/open-lovable.git\
+
+npm install
+npm install
+npm run dev
+cd ts_uni
+npm create vite@latest week5_react-counter -- --template react\
+\
+
+  cd week5_react-counter
+  npm install
+npm run dev\
+\
+
+cd ..
+npx create-react-app counter-app\
+
+cd counter-app
+npm start
+npx create-react-app week6-typescript --template typescript\
+
+cd week6-typescript\
+
+cd ..
+ls
+cd ts_uni
+npx create-react-app week6-typescript --template typescript\
+
+ls
+cd week6-typescript
+mkdir src/hooks\
+mkdir src/components\
+mkdir src/types\
+
+npm start\
+
+cd ts_uni
+cd week7-component-library
+npm run storybook
+cd ts_uni
+ls
+cd week8-my-next-fetch-app
+npm install swr\
+
+clear
+cd ..
+npx create-react-app my-component-library --template cra-template-pwa\
+
+npx create-react-app my-component-library --template cra-template-pwa --legacy-peer-deps\
+
+npx create-react-app week7-my-component-library --template cra-template-pwa --legacy-peer-deps\
+
+npx create-react-app week7-my-component-library --template cra-template-pwa --legacy-peer-deps\
+
+npx create-react-app week7-my-component-library --legacy-peer-deps\
+
+cd week7-my-component-library\
+
+npm install react@18 react-dom@18\
+
+rm -rf node_modules package-lock.json\
+
+npm install\
+
+cd ..
+npx create-react-app my-component-library --template cra-template-pwa\
+
+npm uninstall react react-dom\
+
+npm install react@18 react-dom@18\
+
+npx create-react-app week7-my-component-library --legacy-peer-deps\
+
+npm uninstall react react-dom\
+
+npx create-react-app week7-my-component-library --legacy-peer-deps\
+
+cd week7-my-component-library
+npm uninstall react react-dom\
+
+npm install\
+
+npm list react\
+
+npx create-react-app my-component-library --template cra-template-pwa --legacy-peer-deps\
+
+cd ..
+cd ..
+ls
+cd downloads
+ls
+cd code
+cd ts_uni
+npx create-react-app my-component-library --template cra-template-pwa --legacy-peer-deps\
+
+npx create-react-app my-component-library --template cra-template-pwa --use-npm\
+
+npx create-react-app my-component-library --use-npm --legacy-peer-deps\
+
+npm install cra-template-pwa --legacy-peer-deps\
+
+  cd my-component-library
+npm install cra-template-pwa --legacy-peer-deps\
+
+npm create vite@latest week7-ui-components-library -- --template react-ts\
+
+cd /Users/xenrok/Downloads/Code/TS_uni
+npm create vite@latest week7-ui-components-library -- --template react-ts\
+
+cd week7-ui-components-library
+npm install\
+
+npm install -D tailwindcss postcss autoprefixer\
+
+npx tailwindcss init -p\
+
+npm uninstall tailwindcss\
+
+npm install -D tailwindcss@3 postcss autoprefixer\
+
+npx tailwindcss init -p\
+
+npm install clsx tailwind-variants\
+
+npx storybook@latest init\
+
+cleaf
+clear
+cd /Users/xenrok/Downloads/Code/TS_uni
+npx create-react-app week7-button-library\
+
+cd week7-button-library
+npm install -D tailwindcss postcss autoprefixer\
+
+  npm audit fix --force
+npx tailwindcss init -p\
+
+cd ..
+clear
+npx create-react-app week7-my-component-library\
+\
+
+  cd week7-my-component-library
+npm install -D tailwindcss@3\
+
+npm audit\
+
+npm audit\
+
+npm audit --production\
+
+rm -rf node_modules package-lock.json\
+
+npm install\
+
+clear
+cd /Users/xenrok/Downloads/Code/TS_uni
+npx create-react-app week7-component-library\
+\
+
+cd week7-component-library
+npm install -D tailwindcss@3 postcss autoprefixer\
+
+npm install clsx tailwind-variants\
+
+npx storybook@latest init\
+
+c
+npx tailwindcss init -p\
+
+npm start
+npm install tailwind-merge\
+
+npm start
+npm run storybook\
+
+npm run storybook\
+
+npm install -D @storybook/addon-links @storybook/addon-essentials @storybook/addon-interactions @storybook/addon-controls @storybook/addon-docs @storybook/react-vite @storybook/blocks\
+
+npm install -D @storybook/react-webpack5\
+
+npm run storybook\
+
+rm -rf .storybook\
+rm -rf src/**/*.stories.*\
+
+npx storybook@latest init\
+
+npm uninstall @storybook/addon-essentials @storybook/addon-interactions @storybook/addon-links @storybook/blocks @storybook/react @storybook/react-vite @storybook/test\
+~
+npx storybook@latest init\
+
+npm run storybook
+npm run storybook
+npm run storybook
+npm install -D @storybook/addon-links @storybook/addon-essentials @storybook/addon-interactions @storybook/addon-controls @storybook/addon-docs\
+
+npm install -D @storybook/addon-links@^9.1.3 @storybook/addon-essentials@^9.1.3 @storybook/addon-interactions@^9.1.3 @storybook/addon-controls@^9.1.3 @storybook/addon-docs@^9.1.3\
+
+rm -rf .storybook\
+
+rm -rf src/stories\
+
+npm uninstall storybook @storybook/react @storybook/react-webpack5 @storybook/addon-essentials @storybook/addon-interactions @storybook/addon-links @storybook/addon-controls @storybook/addon-docs\
+
+npm cache clean --force\
+
+rm -rf node_modules package-lock.json\
+
+npm install\
+
+npx storybook@latest init\
+
+c
+npm install prop-types\
+
+npm start
+rm -rf node_modules package-lock.json\
+
+npm cache clean --force\
+
+npm install\
+
+npm start
+npm ls react-refresh\
+
+npm dedupe\
+
+npm ls react-refresh\
+
+npm start
+cd ..
+git status
+git add .
+git commit -a -m "Weeks 5-7"
+git status
+clear
+npx create-next-app@latest week8-my-next-fetch-app\
+
+cd week8-my-next-fetch-app
+npm run dev\
+
+clear
+openssl rand -base64 32\
+
+tree -I 'node_modules|dist|.git'                                
+cd week9-next-prisma-auth-demo
+tree -I 'node_modules|dist|.git'                                
+clear
+tree -I 'node_modules|dist|.git'                                
+npx create-next-app@latest week9-next-prisma-auth-demo\
+
+cd week9-next-prisma-auth-demo\
+
+npm install prisma @prisma/client next-auth\
+
+npx prisma init\
+
+npx prisma migrate dev --name init\
+
+tree
+clear
+tree -I 'node_modules|dist|.git'                                \
+
+npm run dev\
+
+npm run dev\
+
+npx create-next-app@latest week9-myblog --experimental-app\
+
+cd week9-myblog
+npm install prisma @prisma/client sqlite3\
+
+tree -I 'node_modules|dist|.git'                                \
+
+npx prisma init\
+
+npx prisma migrate dev --name init\
+
+npx prisma generate\
+
+npm install @auth/core @auth/prisma-adapter @auth/next\
+
+npm install next-auth\
+
+npm install @next-auth/prisma-adapter\
+
+npx prisma migrate dev --name add-nextauth\
+
+npx prisma generate\
+
+tree -I 'node_modules|dist|.git'                                \
+
+npx prisma migrate dev --name init\
+
+node prisma/test.js\
+
+node prisma/test.js\
+
+npm install next-auth\
+
+npm run dev\
+
+cd week9-my-blog-app
+npx prisma studio\
+
+npx prisma studio\
+
+cd week9-myblog
+rm prisma/dev.db\
+
+npx prisma migrate dev --name nextauth-setup\
+
+npx prisma generate\
+
+npm run dev\
+
+grep -Rl --binary-files=without-match "Try signing in with a different account." .
+npx create-next-app@latest week9-next-prisma-auth-demo\
+
+cd ..
+cd /Users/xenrok/Downloads/Code/TS_uni/week8-my-next-fetch-app
+cd ..
+npx create-next-app@latest week9-next-prisma-auth-demo\
+
+npm run dev
+cd week9-next-prisma-auth-demo\
+
+npm install prisma @prisma/client sqlite3 next-auth @next-auth/prisma-adapter\
+
+npx prisma init\
+
+npx prisma db push\
+
+npx prisma db push\
+
+mkdir app/api/auth/[...nextaut]
+mkdir -p app/api/auth/[...nextauth]
+mkdir -p 'app/api/auth/[...nextauth]'\
+
+touch app/api/auth/[...nextauth]/route.ts
+touch 'app/api/auth/[...nextauth]/route.ts'
+npm run dev
+npx prisma generate\
+
+npm run dev
+cd ..
+npx create-next-app@latest week9-my-blog-app --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
+cd week9-my-blog-app
+npm install next-auth @next-auth/prisma-adapter prisma @prisma/client\
+
+npm install -D prisma\
+
+npm run dev\
+
+npx prisma init --datasource-provider sqlite\
+
+npx prisma migrate dev --name init
+npx prisma generate\
+
+npx prisma studio\
+
+mkdir 'src/app/api/auth/[...nextauth]'
+mkdir -p 'src/app/api/auth/[...nextauth]'
+touch 'src/app/api/auth/[...nextauth]/route.ts'
+mkdir -p 'src/lib'
+touch 'src/lib/prisma.ts'
+mkdir -p 'src/components/providers/'
+touch 'src/components/providers/SessionProvider.tsx'
+npm run dev
+mkdir -p src/app/api/posts/[id]\
+
+mkdir -p 'src/app/api/posts/[id]'\
+
+npm run dev
+tree -I 'node_modules|dist|.git'                                \
+
+npm run dev
+npm run dev
+ollama list
+ollama serve
+ngrok http 5678\
+
+ngrok http 5678\
+
+WEBHOOK_URL=https://33e6d0921ca8.ngrok-free.app ./node_modules/.bin/n8n start\
+
+cd n8n_local
+WEBHOOK_URL=https://33e6d0921ca8.ngrok-free.app ./node_modules/.bin/n8n start\
+
+WEBHOOK_URL=https://fd4f97305a0b.ngrok-free.app ./node_modules/.bin/n8n start\
+
+ollama serve
+ps aux | grep ollama\
+
+pkill ollama\
+
+ps aux | grep ollama\
+
+ollama stop\
+
+ps aux | grep ollama\
+
+ollama ps\
+
+ollama run qwen3:8b\
+
+ollama ps\
+
+WEBHOOK_URL=https://f24915a42e63.ngrok-free.app ./node_modules/.bin/n8n start
+ngrok http 5678\
+
+WEBHOOK_URL=https://b2bf868d1b15.ngrok-free.app ./node_modules/.bin/n8n start
+ollama serve
+ollama ps\
+
+ollama ps\
+
+ollama run qwen3:8b\
+
+ollama ps\
+
+ollama list
+ollama rm qwen3:8b
+ollama list
+ollama
+ollama list
+ollama run qwen3:1.7b
+ollama run qwen3:1.7b
+ollama run gemma3:4b
+ollama run llama3.2
+ollama list
+ollama run ilsp/llama-krikri-8b-instruct\
+
+ollama ps\
+
+ollama run ilsp/llama-krikri-8b-instruct\
+
+ollama run jobautomation/OpenEuroLLM-Greek\
+
+ollama list
+ollama run llama3.2:latest
+ollama run ilsp/llama-krikri-8b-instruct:latest
+ollama run llama3.2:latest
+ngrok http 5678\
+
+mkdir hype-hire && cd hype-hire && git init
+npx create-next-app@latest web
+cd web
+pnpm add -D tailwindcss postcss autoprefixer && npx tailwindcss init -p
+npm add -D tailwindcss postcss autoprefixer && npx tailwindcss init -p
+npm remove tailwindcss && npm i -D tailwindcss@3 postcss autoprefixer && npx tailwindcss init -p
+npx tailwindcss --version
+npm list tailwindcss
+cd /Users/xenrok/Downloads/Code/hype-hire
+npx create-next-app@latest web
+npm list tailwindcss
+cd web
+npm list tailwindcss
+npm run dev
+node -e "console.log(encodeURIComponent('Ns89m'))"\
+
+npx encodeURI
+node\
+
+ollama ls
+cd hype-hire
+cd web
+npm install @supabase/supabase-js @supabase/ssr
+npm install -D prisma && npm install @prisma/client\
+\
+
+npx prisma init --datasource-provider postgresql\
+\
+
+npm run dev
+npm run dev
+npx prisma generate
+npx prisma migrate status\
+\
+
+npx prisma migrate status\
+\
+
+npx prisma migrate status\
+\
+
+npx prisma migrate status\
+\
+
+npx prisma migrate status\
+\
+
+npx prisma migrate dev --name init_schema\
+\
+
+npx prisma studio\
+
+npx prisma migrate dev --name init_schema\
+\
+
+npx prisma studio\
+
+npx prisma generate
+ls -l node_modules/@prisma/client
+cd hype
+cd hype-hire
+cd web
+npm run dev
+npm run dev
+npm run dev
+npx prisma generate\
+
+npm run dev\
+
+npx prisma generate\
+
+npm run dev\
+
+ls -l node_modules/@prisma/client
+rm -rf .next\
+
+npx prisma generate\
+
+npm run dev -- --turbo=false\
+
+npm run dev 
+ls node_modules/@prisma/client/index.js\
+
+npx prisma migrate status
+cd hype-hire
+vd web
+cd web
+npx shadcn@latest init
+npx shadcn@latest add button input form card
+tree -I 'node_modules|dist|.git'                                \
+
+tree -I 'node_modules|dist|prisma|.git'                                \
+
+npm list tailwindcss\
+
+npm uninstall tailwindcss\
+
+npm install tailwindcss@^3.4.0\
+
+npx shadcn@latest init\
+
+npm list tailwindcss\
+
+npm uninstall tailwindcss @tailwindcss/postcss @tailwindcss/node\
+
+npm list tailwindcss\
+
+npm install -D tailwindcss@^3.4.17 postcss autoprefixer\
+
+npm list tailwindcss\
+
+rm components.json\
+
+rm -rf components/ui\
+
+npx shadcn@latest init\
+
+npm list tailwindcss\
+
+npx tailwindcss init -p\
+
+npx shadcn@latest init\
+
+npx shadcn@latest init\
+
+npx shadcn@latest init\
+
+npx shadcn@latest init\
+
+tree -I 'node_modules|dist|prisma|.git'                                \
+
+npx shadcn@latest init --overwrite\
+
+npx shadcn@latest init --force --yes\
+
+npx shadcn@latest add button input form card
+npx prisma migrate dev --name init_multi_tenant
+npx prisma migrate dev --name init_multi_tenant
+npx prisma migrate dev --name init_multi_tenant
+npx prisma migrate dev --name init 
+npx prisma migrate dev --name init
+npx prisma migrate dev --name init
+prisma migrate reset
+prisma migrate reset
+npx prisma migrate dev --name init
+npx prisma migrate dev
+npx prisma migrate dev --sqlappend --create-only
+npx prisma migrate dev --sqlappend init --create-only
+npx prisma migrate dev --name sqlappend init --create-only
+npx prisma migrate dev --name sqlappend  --create-only
+npx prisma migrate reset\
+
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma migrate reset\
+
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma generate\
+
+npx prisma studio\
+
+mkdir -p app/auth/callback app/api/auth/complete
+npx prisma studio\
+
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma migrate dev --name init_schema
+npx prisma studio\
+
+cd hype-hire
+cd web
+npx supabase start
+brew install --cask docker       
+npx supabase start 
+npx supabase start 
+npx prisma migrate dev --name init_schema\
+
+npx prisma migrate dev --name init_schema\
+
+tree -I 'node_modules|dist|.git'                                \
+
+cd web
+npx prisma migrate dev --name init_schema\
+
+npx prisma migrate dev --name init_schema\
+
+rm -rf .next && rm -rf node_modules/.prisma && npm install && npx prisma generate && npm run dev\
+
+npx supabase status
+npm install @supabase/ssr\
+
+cd web
+npx supabase start
+npx supabase start
+npm ls @supabase/supabase-js --depth=0\
+
+npm ls @supabase/supabase-js 
+npx prisma migrate status\
+
+grep -rnw . -e 'NEXT_PUBLIC_BASE_URL'\
+
+grep -rnw . -e 'signInWithOtp'\
+
+npm run dev
+npm run dev
+npx supabase status\
+
+grep -rl 'signInWithOtp' .\
+
+tree -I 'node_modules|dist|.git'                                \
+
+npm run dev
+npm run dev
+npx supabase start
+tree -I 'node_modules|dist|.git'                                \
+
+npm run dev
+tree -I 'node_modules|dist|.git'                                \
+
+cat package.json | grep type\
+
+node --version\
+
+grep -r "import " app/ lib/ components/ --include="*.ts" --include="*.js" | head -5\
+
+npx supabase start
+npm run dev
+tree -I 'node_modules|dist|.git'                                \
+
+npx supabase start
+npx supabase start
+supabase stop\
+
+npx supabase start
+npx supabase start
+npx supabase stop\
+
+npx supabase stop\
+
+npx supabase start
+npx prisma studio\
+
+npm run dev
+npx next --version\
+
+npm run dev
+npx prisma studio\
+
+npm run dev
+npx supabase start
+npx supabase start
+npm install @supabase/auth-helpers-nextjs
+tree -I 'node_modules|dist|.git'                                \
+
+npx next --version\
+
+npx prisma studio\
+
+npx prisma studio\
+
+npx prisma db pull\
+
+npx prisma studio\
+
+npx prisma generate
+npx prisma studio\
+
+npm run dev
+npm run dev
+npm run dev
+tree -I 'node_modules|dist|.git'                                \
+
+git status
+git add .
+git commit -m "Magic link to new users, dashboard and logout button. Sign in page (not functional yet)"\
+
+git log
+grep -r "signInWithOtp" .
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+node test-query.js\
+
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+npm run dev
+node test-query.js\
+
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+npx prisma migrate dev --name remove_user_company_unique_constraint\
+
+npx prisma db pull\
+
+prisma generate
+run prisma generate
+npx prisma generate\
+
+npx prisma migrate dev --name remove_user_company_unique_constraint\
+
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+curl -X POST http://localhost:3000/api/auth/magic_link_to_existing \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"xenofon.pagoulatos@gmail.com"}'
+git status
+npm run dev
+npm run dev
+npm run dev
+curl http://localhost:3000/api/test_route
+curl -H "Cookie: sb-elwwlcopauqjbzonchlq-auth-token=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSklVekkxTmlJc0ltdHBaQ0k2SW1KeVdtbENVMmcxVjFkbFVYTm1hRVVpTENKMGVYQWlPaUpLVjFRaWZRLmV5SnBjM01pT2lKb2RIUndjem92TDJWc2QzZHNZMjl3WVhWeGFtSjZiMjVqYUd4eExuTjFjR0ZpWVhObExtTnZMMkYxZEdndmRqRWlMQ0p6ZFdJaU9pSTJObUU0WlRrNU5TMDNZVEZsTFRSaFpqY3RZbVEwWXkwNE1tUTFOems0WkRGbU4yRWlMQ0poZFdRaU9pSmhkWFJvWlc1MGFXTmhkR1ZrSWl3aVpYaHdJam94TnpVM056VTVNREkzTENKcFlYUWlPakUzTlRjM05UVTBNamNzSW1WdFlXbHNJam9pZUdWdWIyWnZiaTV3WVdkdmRXeGhkRzl6UUdkdFlXbHNMbU52YlNJc0luQm9iMjVsSWpvaUlpd2lZWEJ3WDIxbGRHRmtZWFJoSWpwN0luQnliM1pwWkdWeUlqb2laVzFoYVd3aUxDSndjbTkyYVdSbGNuTWlPbHNpWlcxaGFXd2lYWDBzSW5WelpYSmZiV1YwWVdSaGRHRWlPbnNpWTI5dGNHRnVlVjlwWkNJNk1Td2laVzFoYVd4ZmRtVnlhV1pwWldRaU9uUnlkV1VzSW1sdWRtbDBZWFJwYjI1ZmFXUWlPalFzSW1sdWRtbDBaV1JmWW5raU9pSmhaRzFwYmtCcGJuUmxjaTVqYjIwaUxDSnliMnhsSWpvaWMzVndaWEpoWkcxcGJpSjlMQ0p5YjJ4bElqb2lZWFYwYUdWdWRHbGpZWFJsWkNJc0ltRmhiQ0k2SW1GaGJERWlMQ0poYlhJaU9sdDdJbTFsZEdodlpDSTZJbTkwY0NJc0luUnBiV1Z6ZEdGdGNDSTZNVGMxTnpjeE1qZ3lObjFkTENKelpYTnphVzl1WDJsa0lqb2lOVFF5TTJRd01tWXRNelZpTmkwME1EWmhMVGhrTlRJdE9XRTNOakV6TWpWa016QTVJaXdpYVhOZllXNXZibmx0YjNWeklqcG1ZV3h6WlgwLkRaQ2YyR3MwejFEZzU5MWFKcURSWGhCaGdRQV9kaGs5YS1zZzZGNm1EOGsiLCJ0b2tlbl90eXBlIjoiYmVhcmVyIiwiZXhwaXJlc19pbiI6MzYwMCwiZXhwaXJlc19hdCI6MTc1Nzc1OTAyNywicmVmcmVzaF90b2tlbiI6Im1tNXRxZGx5ZHh2cyIsInVzZXIiOnsiaWQiOiI2NmE4ZTk5NS03YTFlLTRhZjctYmQ0Yy04MmQ1Nzk4ZDFmN2EiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJlbWFpbCI6Inhlbm9mb24ucGFnb3VsYXRvc0BnbWFpbC5jb20iLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI1LTA5LTEwVDE5OjQ2OjA3LjgwNzc5OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjUtMDktMTBUMTk6NDY6MDcuODA3Nzk4WiIsInJlY292ZXJ5X3NlbnRfYXQiOiIyMDI1LTA5LTEyVDIxOjMzOjI0LjEwMjcyMloiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI1LTA5LTEyVDIxOjMzOjQ2LjQzMjA4NVoiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJjb21wYW55X2lkIjoxLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaW52aXRhdGlvbl9pZCI6NCwiaW52aXRlZF9ieSI6ImFkbWluQGludGVyLmNvbSIsInJvbGUiOiJzdXBlcmFkbWluIn0sImlkZW50aXRpZXMiOlt7ImlkZW50aXR5X2lkIjoiOWUxOGM4MWEtYmU2ZC00NGUzLTljZmQtNzM2NGY0ZDUyODkxIiwiaWQiOiI2NmE4ZTk5NS03YTFlLTRhZjctYmQ0Yy04MmQ1Nzk4ZDFmN2EiLCJ1c2VyX2lkIjoiNjZhOGU5OTUtN2ExZS00YWY3LWJkNGMtODJkNTc5OGQxZjdhIiwiaWRlbnRpdHlfZGF0YSI6eyJlbWFpbCI6Inhlbm9mb24ucGFnb3VsYXRvc0BnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiNjZhOGU5OTUtN2ExZS00YWY3LWJkNGMtODJkNTc5OGQxZjdhIn0sInByb3ZpZGVyIjoiZW1haWwiLCJsYXN0X3NpZ25faW5fYXQiOiIyMDI1LTA5LTEwVDE5OjQ2OjA3LjgwMzYwNFoiLCJjcmVhdGVkX2F0IjoiMjAyNS0wOS0xMFQxOTo0NjowNy44MDM2NjFaIiwidXBkYXRlZF9hdCI6IjIwMjUtMDktMTBUMTk6NDY6MDcuODAzNjYxWiIsImVtYWlsIjoieGVub2Zvbi5wYWdvdWxhdG9zQGdtYWlsLmNvbSJ9XSwiY3JlYXRlZF9hdCI6IjIwMjUtMDktMTBUMTk6NDY6MDcuNzk2MjY5WiIsInVwZGF0ZWRfYXQiOiIyMDI1LTA5LTEzVDA5OjIzOjQ3LjEyMDY5NloiLCJpc19hbm9ueW1vdXMiOmZhbHNlfX0" \\
+     http://localhost:3000/api/test
+npm install --save-dev @testing-library/react @testing-library/jest-dom @testing-library/user-event jest-environment-jsdom\
+
+npx jest --version\
+
+npm install --save-dev @types/jest\
+
+grep -r "completeInvite" .\
+
+grep -rl "completeInvite" .\
+
+npx prisma migrate dev --name add_has_password_to_user
+npx prisma migrate resolve --applied 0_init\
+
+npx prisma migrate dev --name add_has_password_to_user
+npx prisma migrate dev --name add_has_password_to_user
+npx prisma migrate dev
+npx prisma migrate dev
+npx prisma migrate dev
+npx prisma migrate dev
+npx prisma migrate dev
+npx prisma migrate dev
+npx prisma migrate resolve --applied 20250914224422_add_has_password_to_user\
+
+npx prisma migrate status\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only --schema ./prisma/schema.prisma\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+mkdir -p prisma/migrations/fk_init\
+
+npx prisma migrate diff \\
+  --from-empty \\
+  --to-schema-datamodel prisma/schema.prisma \\
+  --script > prisma/migrations/fk_init/migration.sql
+npx prisma migrate resolve --applied 0_init\
+
+npx prisma migrate resolve --applied fk_init\
+
+npx prisma migrate status\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+mkdir -p prisma/migrations/fk_init\
+
+npx prisma migrate diff \\
+  --from-empty \\
+  --to-schema-datamodel prisma/schema.prisma \\
+  --script > prisma/migrations/fk_init/migration.sql
+npx prisma migrate resolve --applied fk_init\
+
+npx prisma migrate resolve --applied fk_init\
+
+npx prisma migrate dev --name soft_delete --create-only\
+
+npx prisma db push\
+
+prisma db push --force-reset
+npx prisma db push --force-reset\
+
+npx prisma generate\
+
+npx prisma migrate dev --name test --create-only\
+
+npx prisma migrate dev --name test --create-only\
+
+npx prisma migrate dev --name test --create-only\
+
+npx prisma migrate reset\
+
+npx prisma migrate dev --name start --create-only\
+
+npx prisma migrate dev --name start --create-only\
+
+npx prisma migrate dev --name start --create-only\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+./test-magic-link.sh xen@gmail.com\
+
+./test-magic-link.sh xenofon.pagoulatos@gmail.com\
+
+npx prisma migrate dev --name inv_by_fk --create-only\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_final\
+
+npx prisma migrate dev --name inv_by_fk_fin --create-only\
+
+npx prisma migrate dev --name inv_by_fk_fin --create-only\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+history\
+
+nl ~/.bash_history\
+
+cat ~/.bash_history\
+
+history | less\
+
+.test-magic-link.sh nooaaanderson@gmail.com\
+
+./test-magic-link.sh nooaaanderson@gmail.com\
+
+./test-magic-link.sh nooaaanderson@gmail.com\
+
+npm run dev
+git status
+git commit -a -m  �All login ways work, start actual dev �
+git add .
+git commit -m  �All login ways work, start actual dev �
+git commit -m 'All login ways work, start actual dev'\
+
+git status
+git diff
+git log
+tree -I 'node_modules|dist|.git'                                \
+
+npm run dev
+cd hype-hire
+cd web
+npm install @radix-ui/react-toast\
+
+npm install @radix-ui/react-toast @radix-ui/react-tooltip @radix-ui/react-dialog @radix-ui/react-dropdown-menu @radix-ui/react-popover @radix-ui/react-select @radix-ui/react-accordion @radix-ui/react-alert-dialog @radix-ui/react-aspect-ratio @radix-ui/react-avatar @radix-ui/react-checkbox @radix-ui/react-collapsible @radix-ui/react-context-menu @radix-ui/react-hover-card @radix-ui/react-label @radix-ui/react-menubar @radix-ui/react-navigation-menu @radix-ui/react-progress @radix-ui/react-radio-group @radix-ui/react-scroll-area @radix-ui/react-separator @radix-ui/react-slider @radix-ui/react-switch @radix-ui/react-tabs @radix-ui/react-toggle @radix-ui/react-toggle-group\
+
+npm install lottie-react\
+
+npm install cmdk date-fns embla-carousel-react input-otp next-themes react-day-picker react-resizable-panels recharts vaul\
+
+npm install --save-dev @tailwindcss/typography\
+
+cd ..
+cd..
+ cd ..
+ls
+cd pulse-robot
+npm run dev
+npm run dev
+cd hy
+cd hype-hire
+cd web
+npm run dev
+npm install @tanstack/react-query\
+
+npm install sonner\
+
+npm run dev
+cd pulse-robot
+cd ..
+cd dash
+git clone https://github.com/Nooaa-bit/hi-there-buddy-333.git
+ls
+cd hi-there-buddy-333
+npm run dev
+npm i
+npm run dev
+cd pulse-robot
+tree src/components
+npm run dev
+cd hype-hire
+npm run dev
+grep -rl 'import './App.css'' .
+grep -rl 'import "./App.css"' .
+grep -rl 'import "./pages/Index"' .
+grep -rl 'import ' .
+clear
+find pulse-robot/src/components -type f -print0 | while IFS= read -r -d '' f; do printf "\n===== %s =====\n" "$f"; cat "$f"; done
+find /src/components -type f -print0 | while IFS= read -r -d '' f; do printf "\n===== %s =====\n" "$f"; cat "$f"; done
+find src/components -type f -print0 | while IFS= read -r -d '' f; do printf "\n===== %s =====\n" "$f"; cat "$f"; done
+find src/components -type f -print0 | xargs -0 -I{} sh -c 'printf "\n===== %s =====\n" "{}"; cat "{}"'
+find src/components -type f -print0 | while IFS= read -r -d '' f; do printf "\n===== %s =====\n" "$f"; cat "$f"; done
+clear
+find src/components -type f -print0 \\
+| xargs -0 -I {} sh -c 'printf "\n===== %s =====\n" "{}"; cat "{}"' \\
+> components_dump.txt
+printf '%s\n\n' src/components/* | awk 'BEGIN{ORS=""}{print $0 "\n"; system("printf "\n==== " $0 " ====\n\n"; cat "" $0 ""; printf "\n\n"")} ' > components_dump.txt
+find src/components -maxdepth 1 -type f -print0 | xargs -0 -I{} sh -c 'printf "\n==== %s ====\n\n" "{}"; cat "{}"; printf "\n\n"' > components_dump.txt
+grep -rl 'Header-background.webp' .
+npm run dev
+npm run dev
+npm run dev
+npm install clsx tailwind-merge\
+
+npm run dev
+cd dash
+cd hi-there-buddy-333
+find components -maxdepth 1 -type f -print0 | xargs -0 -I{} sh -c 'printf "\n==== %s ====\n\n" "{}"; cat "{}"; printf "\n\n"' > components_dump.txt
+find src/components -maxdepth 1 -type f -print0 | xargs -0 -I{} sh -c 'printf "\n==== %s ====\n\n" "{}"; cat "{}"; printf "\n\n"' > components_dump.txt
+Show Only Filenames=   grep -rl 'AppSidebar' .
+grep -rl 'LayoutDashboard' .
+grep -rl 'AppSidebar.' .
+comm -23 <(ls dash/hi-there-buddy-333/src/components/ui) <(ls hype-hire/web/components/ui)\
+
+diff -q /Users/xenrok/Downloads/Code/hype-hire/web/components/ui /Users/xenrok/Downloads/Code/hype-hire/web/components/ui | grep "Only in" | grep "location1"\
+
+cd web
+find src/components/ui -maxdepth 1 -type f -print0 | xargs -0 -I{} sh -c 'printf "\n==== %s ====\n\n" "{}"; cat "{}"; printf "\n\n"' > components_dump.txt
+find src/components/ui -maxdepth 1 -type f -print0 | xargs -0 -I{} sh -c 'printf "\n==== %s ====\n\n" "{}"; cat "{}"; printf "\n\n"' > components_dump.txt
+find components/ui -maxdepth 1 -type f -print0 | xargs -0 -I{} sh -c 'printf "\n==== %s ====\n\n" "{}"; cat "{}"; printf "\n\n"' > components_dump.txt
+cd components
+cd ui
+ls
+npm run dev
+npm run dev
+cd components
+cd ui
+ls
+tree /Users/xenrok/Downloads/Code/hype-hire/web/components/ui\
+
+cd ..
+cd ..
+npx prisma migrate dev --name basic_GDPR
+npx prisma studio\
+
+npm ls next-i18next\
+npm ls react-i18next  \
+npm ls i18next\
+
+npm ls next-i18next
+npm install next-i18next react-i18next i18next\
+
+npx prisma migrate dev --name basic_GDPR_1
+mkdir -p app/[locale]/privacy && touch app/[locale]/privacy/page.tsx\
+
+tree -I 'node_modules|dist|.git|test_pages|test|ui'\
+
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public'\
+
+npx prisma studio\
+
+npm run dev
+npm run dev
+npm run dev
+cd hype-hire
+cd web
+npm run dev
+cd hype-hire
+cd web
+git status
+git add .
+git commit -m "1st gdpr buttons"
+git status
+git
+git status
+git add .
+git status
+git commit -m "1st translation"
+git add .
+git commit -m "working dark toggle"
+cd hype-hire/
+cd web
+npm install next-intl\
+
+npm install react-i18next i18next i18next-browser-languagedetector\
+
+npm install next-intl\
+
+npm run dev
+touch translations/en/nav.json\
+touch translations/en/hero.json  \
+touch translations/en/footer.json\
+touch translations/en/gdpr.json\
+touch translations/en/common.json
+touch translations/el/nav.json\
+touch translations/el/hero.json\
+touch translations/el/footer.json  \
+touch translations/el/gdpr.json\
+touch translations/el/common.json\
+
+npm run dev
+npm run dev
+cd hype-hire
+cd web
+cd hype-hire
+cd web
+npm run dev
+cd hype-hire
+cd web
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public'\
+
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|translations'\
+
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|gdpr|translations'
+npx prisma migrate dev --name invitation_enums
+npx prisma generate
+npm list @prisma/client
+npx prisma migrate dev --name invitation_enums_up
+npx prisma generate
+ls -la node_modules/@prisma/client/\
+
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_test
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_token
+npx prisma migrate dev --name invitation_toke
+npx prisma migrate dev --name invitation_toke
+npx prisma migrate dev --name invitation_toke
+npx prisma migrate dev --name invitation_toke
+npx prisma migrate dev --name invitation_toke
+npx prisma migrate dev --create-only --name fix-token-default\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+cd hype-hire
+cd web
+npm run dev
+cd /Users/xenrok/Downloads/Code/hype-hire/web
+npm list @prisma/client
+cd web
+git branch
+git switch main
+cd hype-hire
+cd web
+grep -ri "brockmann"\
+
+git log
+git branch
+git status
+git add .
+git commit -m "Working before enhancment attempts" 
+git status
+git switch -c kimi_branch
+git log
+git branch
+git checkout main
+git checkout kimi_branch
+git status
+git add .
+git commit -m "test branch" 
+git checkout main
+git checkout kimi_branch
+git checkout main
+git checkout kimi_branch
+npm i next-i18next react-i18next i18next i18next-resources-to-backend
+npm install next-intl
+tree app
+tree app -I 'test_pages'
+tree app -| 'test_pages'
+tree folderA -I 'test_pages|node_modules|dist'
+tree app -I 'test_pages|node_modules|dist'
+tree app -I 'test_pages|node_modules|test'
+git checkout main
+git checkout kimi_branch
+git checkout main
+cd hype-hire
+cd web
+npm run dev
+npm run dev
+npm run dev
+cd hype-hire
+cd web
+git status
+git bracch
+git switch kimi_branch
+git status
+git list
+git switch main
+git status
+git switch kimi_branch
+git switch main
+git log
+git switch kimi_branch
+git add .
+git commit -m "Universal language" \
+
+git switch main
+git branch
+git add .
+git commit -m "log in magic link translation" \
+
+cd hype-hire
+cd web
+npm run dev
+grep -rl "Welcome" .\
+
+git status
+git log
+git add .
+git commit -m "lock before kimi enchance" \
+
+git branch
+git branch -d kimi_branch\
+
+git branch -D kimi_branch\
+
+git switch -c kimi_updates\
+
+git branch
+npm i date-fns @tanstack/react-table
+git status
+git branch
+git add .
+git commit -m "kimi invitation split" \
+
+git switch
+git switch main
+git switch -c claude_invitation_split
+git branch
+npm run dev
+git bramch
+git branch
+npm run dev
+git branch main
+git switch main
+git branch -D claude_invitation_split\
+
+git switch -c create_comp_role_flags
+git branch
+git switch main
+git switch kimi_updates
+git switch main
+git branch -D create_comp_role_flags
+git switch -c create_comp_role_flags
+git branch
+git branch main
+git switch main
+git switch kimi_updates
+git switch main
+git log --oneline
+git reset --hard 4d0d05a
+git branch
+git switch kimi_updates
+git switch main
+git add .
+git commit -m "aligned dashboard label"\
+
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|gdpr|translations'
+git branch
+curl -X POST http://localhost:3000/api/platform-invitations/create-magic-link \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "nooaaanderson@gmail.com"}'
+npx prisma migrate dev --name rmv_uniq_id --create-only\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+npx prisma migrate dev\
+
+grep -RIl --fixed-strings "components/QuickEventCard" 
+grep -RIl --fixed-strings "components/EventDialog" 
+grep -RIl --fixed-strings "components/RoleSelector" 
+grep -RIl --fixed-strings "components/ui/calendar" 
+grep -RIl --fixed-strings "components/ui/chart"
+grep -RIl --fixed-strings "components/CustomRepeatDialog" 
+curl -X POST http://localhost:3000/api/platform-invitations/create-magic-link \\
+  -H "Content-Type: application/json" \    \
+  -d '{"email": "oliver.schmitty12@gmail.com"}'
+curl -X POST http://localhost:3000/api/platform-invitations/create-magic-link \\
+  -H "Content-Type: application/json" \    \
+  -d '{"email": "oliver.schmitty12@gmail.com"}'
+curl -X POST http://localhost:3000/api/invitations/create-magic-link \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "oliver.schmitty12@gmail.com"}'
+curl -X POST http://localhost:3000/api/invitations/create-magic-link -H "Content-Type: application/json" -d '{"email":"oliver.schmitty12@gmail.com"}'\
+
+curl -X POST http://localhost:3000/api/platform-invitations/create-magic-link -H "Content-Type: application/json" -d '{"email":"oliver.schmitty12@gmail.com"}'
+curl -X POST http://localhost:3000/api/platform-invitations/create-magic-link -H "Content-Type: application/json" -d '{"email":"oliver.schmitty12@gmail.com"}'
+curl -X POST http://localhost:3000/api/platform-invitations/create-magic-link -H "Content-Type: application/json" -d '{"email":"oliver.schmitty12@gmail.com"}'
+git status
+git add .
+git commit -m "fixed auth and invitation b4 multi-tenancy"\
+
+git branch
+git branch -D create_comp_role_flags
+git switch -c start multi-tenant
+git switch -c start-multi-tenant
+git status
+git branch
+git add .
+git commit -m "multi-tenancy-appsider"\
+
+git switch main
+git switch start-multi-tenant
+git add . 
+git commit -m "multi-tenancy-appsider"\
+
+cd ..
+cd ..
+cd ts_uni
+cd ..
+git status
+find . -name ".git" -type d\
+
+cd ts_uni
+git remote -v\
+
+cd ..
+cd sucre
+git remote -v\
+
+cd ..
+cd pulse-robot
+git remote -v\
+
+find . -name ".git" -type d\
+
+cd ..
+cd ..
+cd ..
+ls
+cd xenrok
+ls
+cd downloads
+ls
+cd code
+ls
+cd hype-hire
+cd web
+git remote -v\
+
+find . -name ".git" -type d\
+
+git branch
+git switch main
+git add .
+git commit -m "auth and role filtering" \
+
+git main
+git switch main
+git switch start-multi-tenant
+git branch
+git checkout main\
+
+git merge start-multi-tenant\
+
+git branch
+git remote add origin https://github.com/XenRok/HypeHire.git
+git remote -v\
+
+git push -u origin main\
+
+npx next --version\
+
+git add next.config.js
+git status
+git add .
+git commit -m "Disable ESLint during builds"
+git push
+grep -RIl --fixed-strings "api/gdpr/consent"
+git push
+git status
+git commit -a
+git commit -a "ignore" 
+git add . 
+git commit -m "ignore" 
+git push
+git remote
+git remote -v
+git remote remove origin
+git remote -v
+git remote add origin https://github.com/XenRok/HypeHire.git
+git push
+git remote -v
+git status
+git add .
+git commit -m "Initial commit"
+git status
+git branch
+git add -A
+git commit -m "Initial commit"
+git push
+git push -u origin main
+git rm -r --cached
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git rm -r --cached
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git rm -r --cached
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git rm -r --cached
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git rm -r --cached
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git rm -r --cached
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git branch
+git branch -D start-multi-tenant
+git branch
+git checkout -b fallback-b4-vercel
+git switch main
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+git add .
+git commit -m "Untrack files now in .gitignore"
+git push
+npm run dev
+npm run dev
+cd ..
+npx create-next-app@latest vercel-staff\
+
+npx create-next-app@latest vercel\
+
+cd vercel
+nmp run dev
+npm run dev
+git init
+git add .
+git commit -m "Initial Next.js setup"\
+
+git remote add origin https://github.com/Nooaa-bit/vercel-try.git\
+\
+
+git branch
+git push -u origin main\
+
+git branch -M main\
+
+git branch
+git remote -v\
+
+git push -u origin main\
+
+git push -u origin main\
+
+git push -u origin main\
+
+npm install @prisma/client\
+
+npm install -D prisma\
+
+npx prisma init\
+
+npx prisma generate\
+
+git add .\
+
+git commit -m "Add Prisma with User model"
+git push
+git add .\
+
+git commit -m "Add Prisma"
+git push
+git rm -r --cached
+git add .\
+
+git commit -m "Add Prisma"
+git push
+npm install -D tailwindcss postcss autoprefixer\
+
+npx tailwindcss init -p\
+
+git add .\
+
+git commit -m "Add tailwind"
+git push
+cd ..
+cd ..
+ls
+cd Do
+cd downloads
+cd code
+cd hype-hire
+npx create-next-app@latest vercel --typescript --tailwind --app --no-src-dir --import-alias "@/*"
+cd vercel
+npm install @prisma/client\
+npm install -D prisma\
+npx prisma init\
+
+npx prisma generate\
+npm run dev\
+
+git init
+git add .
+git commit -m "Initial commit with Prisma"\
+
+git remote add origin https://github.com/Nooaa-bit/vercel-try.git
+git push -u origin main\
+
+npm install @supabase/supabase-js @supabase/ssr\
+
+git add .
+git commit -m "Add Supabase Auth with Google OAuth"\
+
+git push\
+
+git add .
+git commit -m "Add Supabase Auth with Google OAuth add"\
+
+git push\
+
+git add .
+git commit -m "Add Navbar and page structure"\
+
+git push
+git add .
+git commit -m "Add Navbar and page structure"\
+
+git push
+git add .
+git commit -m "Add Navbar and page structure"\
+
+git push
+npm install i18next react-i18next i18next-resources-to-backend\
+
+npm run dev
+git add .
+git commit -m "Add i18n with lazy loading per page"\
+
+git push
+npx prisma migrate dev --name init_user_table\
+
+npx prisma migrate dev --name init_user_table\
+
+npx prisma migrate dev --create-only --name add_user_sync_trigger\
+
+npx prisma migrate dev\
+
+rm -rf prisma/migrations/*_add_user_sync_trigger\
+
+npx prisma migrate status\
+
+git add .
+git commit -m "Prisma updates"\
+
+git push
+git add .
+git commit -m "Prisma Migrations should be run manually "\
+
+git push
+git status
+git branch
+git switch new_landing
+xgit checkout -b new_landing
+git checkout -b new_landing
+npm run dev
+git branch
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|gdpr|translations'\
+tree app -I
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|gdpr|translations'\
+tree app -I
+npm ls punycode\
+
+git branch
+git remote -v
+git status
+git add .
+git commit -m "SEO language" \
+
+git merge
+git merge -m "merge test file" main
+git branch
+git switch main
+git switch new_landing
+git switch main
+git merge new_landing
+git switch new_landing
+git reset --hard HEAD~1\
+
+git switch main
+git branch
+git push origin main\
+
+git add .
+git commit -m "correct" \
+
+git push origin main\
+
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|gdpr|translations'\
+tree app -I
+git add .
+git commit -m "correct" \
+
+git push origin main\
+
+cd hype-hire
+cd web
+npm install tailwindcss-animate\
+
+cd /Users/xenrok/Downloads/Code/hype-hire/vercel
+npm install
+npm install @radix-ui/react-switch
+git branch
+git remote -v
+git switch new_landing
+git switch new_landing
+git switch main
+git remote -v
+git switch new_landing
+git remote -v
+git branch -d new_landing
+git switch main
+git branch -d new_landing
+git switch new_landing
+git branch new_land
+git branch
+git switch new_land
+git branch
+cd app
+cd hooks
+ls
+ls
+cd ..
+cd ..
+npm install tailwind-merge\
+
+npm install clsx\
+
+npm install lucide-react\
+
+npm install @radix-ui/react-dropdown-menu\
+
+npm install sonner\
+
+npm install lottie-react\
+
+npm install tailwindcss-animate\
+
+npm view tailwindcss version\
+
+npm uninstall tailwindcss\
+
+npm install -D tailwindcss@3.4.17 postcss autoprefixer\
+
+npm view tailwindcss version\
+
+npm uninstall tailwindcss\
+
+npm install -D tailwindcss@3.4.17 postcss autoprefixer\
+
+npm view tailwindcss version\
+
+npm uninstall @tailwindcss/postcss @tailwindcss/node @tailwindcss/vite\
+
+npm view tailwindcss version\
+
+cat package.json | grep tailwind\
+
+npm list tailwindcss\
+
+npm view tailwindcss version\
+
+git branch
+git add .
+git commit -m "land" \
+
+git checkout main\
+
+git merge new_land\
+
+git push origin main\
+
+git add .
+git branch
+git commit -m "land" \
+
+git push origin main\
+
+git add .
+git commit -m "land" \
+
+git push origin main\
+
+cd hype-hire
+cd we
+cd web
+tree ui
+ls
+cd components
+cd ui
+ls
+cd hype-hire
+cd vercel
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+git branhc
+git branch
+git branch -d new_land
+git checkout new_land
+git switch new_land
+git branch new_land
+git branch
+git switch new_land
+git branch main
+git switch main
+git switch new_land
+git add . 
+git commit -m "land"
+git branch main
+git switch main
+git merge new_land
+git status
+git push origin main\
+
+cd components
+cd ui
+ls
+git branch
+git status
+git add .
+git commit -m "land"
+git status
+git branch
+git status
+git add .
+git commit -m "UI components + translations: details/footer updates"\
+
+cd ..
+cd ..
+git add -A :/\
+git commit -m "UI components + translations: details/footer updates"\
+
+git push origin main
+git branch -D new_land
+git branch new
+git switch new
+npx prisma migrate dev --name add_contact_messages\
+
+git branch
+git switch main
+git switch new
+git add .
+git commit -m "new"
+git switch main
+git merge 
+git merge new
+git push
+git branch -D new
+git branch
+npm run dev
+cd /Users/xenrok/Downloads/Code/hype-hire/vercel
+npm install @radix-ui/react-tabs
+pnpm add @radix-ui/react-label
+npm install -g pnpm
+npm install @radix-ui/react-label
+git branch
+git branch new
+git branch
+git switch new
+npm install @radix-ui/react-dialog
+npm install @radix-ui/react-separator\
+
+npm install @radix-ui/react-tooltip\
+
+npm install @radix-ui/react-popover\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+git add .
+git commit -m "dash"
+git switch main
+git merge new
+git branch
+git switch new
+git status
+git add .
+git commit -m "working"
+git switch main
+git push origin main
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name add_contact_messages\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma migrate dev --create-only --name added_company_roles_tables\
+
+git branch main
+git switch main
+git switch new
+npm run dev
+npx prisma migrate dev --name added_company_roles_tables\
+
+npx prisma db pull\
+
+npx prisma db pull\
+
+npx prisma db pull\
+
+npx prisma migrate dev --name added_company_roles_tables\
+
+git branch
+git branch m,ai
+git branch main
+git switch main
+npx prisma migrate dev --name added_company_roles_tables\
+
+git add .
+git commit -m "dash1"
+git push
+git commit -a "new"
+git commit -a -m "fix"
+git push
+git commit -a -m "fix1"
+git push
+git commit -a -m "fix1"
+git push
+git commit -a -m "fix1"
+git push
+git branch -d new
+git branch -D new
+git commit -a -m "fix1"
+git push
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+git grep -n "Please include an"\
+
+grep -rn "Please include an" .\
+
+git commit -a -m "fix1"
+git push
+git branch new
+git switch new
+git branch
+git branch -D m,ai
+git commit -a -m "fix1"
+git switch main
+git merge new
+git push
+git switch new
+git switch main
+git push 
+git branch
+git commit -a -m "fix2"
+git push 
+git push origin main
+git status
+git add .
+git commit -m "fix2"
+git push origin main
+git commit -a -m "fix2"
+git push origin main
+git branch
+git branch -d new
+git branch new
+git switch new
+git branch
+npx prisma migrate dev --name worker2talent\
+
+git add .
+git commit -m "fix3"
+git switch main
+git merge new
+git push
+git bramch
+git branch
+git branch new
+git switch new
+npm install @radix-ui/react-select\
+
+git branch
+git add .
+git commit -m "invitations UI"
+git switch main
+git merge new
+git push
+npm run dev
+git branch
+git branch new
+git switch new
+git add .
+got commit -m "invitations1"
+git commit -m "invitations1"
+git switch main
+git merge new
+git push
+git push origin main
+git add .
+git commit -m "invitations1"
+git push origin main
+git branch invitations_v1_singlefile
+git branch -d new
+git branch new
+git switch new
+git branhc
+git branch
+git branch -d invitations_v1_singlefile
+git branch invitations_v1_singlefile
+git branch
+npm run dev
+git log
+r
+git log
+git grep -l "hooks/useActiveRole"
+git branch
+git branhc
+git branch
+npm install nodemailer\
+\
+npm install --save-dev @types/nodemailer
+git branch
+git branch invitations_v2_multifiles_noemail
+git branch invitations_v1_singlefile
+git switch invitations_v1_singlefile
+git switch main
+git branch
+git switch new
+git branch -d invitations_v2_multifiles_noemail
+git branch
+git add . 
+git commit -m "mult"
+git branch main
+git swtich main
+git switch main
+git switch new
+git branch invitations_v2_multifiles_noemail
+git switch main
+git branch -d new
+git branch -D new
+git switch invitations_v1_singlefile
+git branch
+git switch invitations_v2_multifiles_noemail
+git switch invitations_v1_singlefile
+git add .
+git commit -m "fix"
+git branch new
+git switch new
+git switch invitations_v2_multifiles_noemail
+git switch new
+git switch invitations_v2_multifiles_noemail
+git switch new
+git switch new
+git switch new
+curl -X POST http://localhost:3000/api/invitations/send \\
+  -H "Content-Type: application/json" \\
+  -d '{"invitationId": 1, "language": "en"}'\
+
+git switch invitations_v2_multifiles_noemail
+git add .
+git commit -m "fix"
+git switch invitations_v2_multifiles_noemail
+git switch new
+git branch
+git add .
+git commit -m "sending works"
+git branch   invitations_v1_singlefile
+git branch   invitations_v3_simple singlefile_snedinvites
+git branch   invitations_v3_simplesinglefile_snedinvites
+git switch invitations_v1_singlefile
+git switch invitations_v2_multifiles_noemail
+npm run dev
+npm run dev
+npm run dev
+git branch
+git switch new
+git switch invitations_v2_multifiles_noemail
+git branch
+git commit -a -m "fix1"
+git switch invitations_v2_multifiles_noemail
+git switch new
+git branch -d invitations_v1_singlefile
+git commit -a -m "fix1"
+git switch invitations_v2_multifiles_noemail
+git switch new
+git commit -a -m "fix1"
+git branch -d   invitations_v3_simplesinglefile_snedinvites
+git branhc
+git branch
+git switch main
+git merge new
+git push origin main
+git status
+git branch
+git commit -a -m "fix1"
+git push origin main
+git status
+git add .
+git commit -m "fix2"
+git push origin main
+git branch -d new
+git branch new
+git switch new
+git branch
+tree app -I 'test_pages'
+npx prisma migrate dev --name add_profile_picture
+npx prisma generate\
+
+npm install react-easy-crop\
+
+cd /Users/xenrok/Downloads/Code/hype-hire/vercel
+npm install cmdk
+npm install nodemailer @types/nodemailer
+git branch
+git switch main
+git add .
+git commit -m "prof_pic"
+git switch main
+git merge new
+git branch
+git push origin main
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+git branch
+git status
+git switch new
+git add .
+git commit -m "commments"
+git branch -d new
+git branch new
+git add .
+git commit -m "commments"
+git add .
+git commit -m "fix"
+git branch main
+git switch main
+git merge new
+git branch
+git switch new
+git switch main
+git push origin main
+git branch -d new
+git branhc
+git branch
+git branch new
+git switch new
+git switch main
+git add . 
+git commit -m "fix"
+git branch -d new
+git branch new
+git switch new
+git branch
+git add .
+git commit -m "fix"
+git switch main
+git merge new
+git push
+git switch new
+git branch
+npm run dev
+npx prisma migrate dev --name add_location_table\
+
+npx prisma generate\
+
+# Install Mapbox GL JS\
+npm install mapbox-gl\
+\
+# Install missing shadcn components\
+npx shadcn@latest add dialog\
+npx shadcn@latest add select\
+npx shadcn@latest add textarea\
+
+git add . 
+git branch
+git commit -m "Locationwithmaps"
+git status
+git add . 
+git commit -m "Locationwithmaps2"
+git add . 
+git commit -m "Locationwithmaps3"
+git add . 
+git commit -m "Locationwithmaps4"
+git switch main
+git merge new
+git push origin main
+git branch -d new
+npm run dev
+npm run dev
+git branch
+git add . 
+git commit -m "fix"
+git branch new
+git swtich new
+git switch new
+git add .
+git commit -m "fixed RBAC refresh"
+git switch main
+git merge new
+git switch new
+git add . 
+git commit -m "test map"
+git switch main
+git merge new
+git push
+git branch
+git add .
+git commit -m "test map"
+git push
+git branch
+git branch -d new
+git branch new
+git switch new
+jobs -l
+jobs -l
+tree 
+tree vercel
+tree -I 'node_modules|dist|.git|test_pages|test|ui|migrations|public|gdpr|translations'
+npx prisma format\
+
+npx prisma generate\
+
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+kill -9 $(lsof -ti:3000)
+npm run dev
+git branch
+git status
+git add .
+git commit -m "allign"
+git status
+git branch main
+git switch main
+git merge new
+git push
+git branch
+git branch -d
+git branch -d new
+git branch new
+git switch new
+git push
+npm run dev
+git switch main
+git branch 0d new
+git branch -d new
+git status
+git status
+git add . 
+git commit -m "allign"
+git branch new
+git switch new
+git add .
+git commit -m "new schema"
+git switch main
+git merge new
+git switch new
+npm run dev
+npm install react-hook-form\
+
+git switch main
+git switch new
+git add . 
+git commit -m "review"
+git switch main
+git switch new
+git add .
+git commit -m "review"
+git switch main
+git switch new
+git add .
+git commit -m "review until login"
+git switch main
+git switch new
+git add . 
+git commit -m "review until login fix"
+git switch main
+git switch new
+git add . 
+git commit -m "review until login fix"
+git add . 
+git commit -m "review until pass reset"
+git add . 
+git commit -m "review until error"
+grep -r "use-mobile" .\
+
+npx prisma migrate dev --name jobs\
+
+npx prisma migrate dev --name jobs\
+
+npx prisma migrate dev --name jobs2\
+
+npx prisma migrate dev --name jobs2\
+
+npx prisma generate\
+
+git add . 
+git commit -m "review until ActiveRole"
+git add . 
+git commit -m "review settings"
+git commit -m "review settings2"
+git add . 
+git commit -m "review settings2"
+npm run dev
+npm run dev
+npm run dev
+grep -r "getUser()" .\
+
+grep -rl "getUser()" .\
+
+npm install swr\
+
+git add . 
+git commit -m "review SWR in useAuth and useActiveRole"
+git add . 
+git commit -m "review SWR in useAuth and useActiveRole"
+git add . 
+git commit -m "review locations"
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+cd ..
+cd vercel
+npm run dev
+npm run dev
+npm run dev
+git log
+npx prisma migrate dev --name Indexes for Team and jobs
+npx prisma generate\
+
+git add . 
+git commit -m "review pic in team cards"
+npm install sharp\
+
+npm install heic2any\
+
+git add . 
+git commit -m "review team"
+grep -rl "lang" .\
+
+grep -rl "lang" . --exclude-dir={node_modules,.next}\
+
+git add . 
+git commit -m "review team2"
+git switch main
+git merge new -m "Location,Settings,Teams"\
+
+git push
+git switch new
+git add . 
+git commit -m "review team vercel1"
+git switch main
+git merge new -m "Location,Settings,Teams Vercel 1"\
+
+git push
+git add . 
+git commit -m "review team vercel2"
+git push
+git add . 
+git commit -m "review team vercel3"
+git push
+git add . 
+git commit -m "review team vercel4"
+git push
+git switch new
+git merge main
+git branch
+git branch -d 0d
+npm run dev
+git log
+git log -n 7 --oneline\
+
+git checkout -b test_speed_team c2e75e0\
+
+git add . 
+git commit -m "review team vercel4.2"
+git checkout -b test_speed_team c2e75e0\
+
+git branch
+git switch new
+git switch main
+git switch main
+git add . 
+git commit -m "Team server-side filtering"
+git add . 
+git commit -m "Team server-side filtering/pagination"
+git add . 
+git commit -m "Team server-side filtering/pagination"
+git rebase -i HEAD~2\
+
+git rebase --continue\
+
+git rebase --continue\
+
+git rebase --continue\
+
+git rm app/[lang]/dashboard/team/readme.txt\
+git rebase --continue
+git rm app/[lang]/dashboard/team/readme.txt\
+git rebase --continue
+git rm 'app/[lang]/dashboard/team/readme.txt'\
+ git rebase --continue\
+
+git log -n 7 --oneline\
+
+git add . 
+git commit -m "Team client-side filtering/pagination"
+git branch
+git push
+git log -n 7 --oneline\
+
+git reset --soft HEAD~1\
+
+git log -n 7 --oneline\
+
+git add . 
+git commit -m "Team client-side filtering/pagination"
+git push
+git push --force\
+
+git add . 
+git commit -m "Team client-side filtering/pagination"
+git push --force\
+
+git log -n 7 --oneline\
+
+npx next --version\
+
+git rebase -i HEAD~2\
+
+npx next --version\
+
+git log -n 7 --oneline\
+
+git pull origin main\
+
+git fetch origin\
+git reset --hard origin/main\
+
+git log -n 7 --oneline\
+
+git branch
+git switch new
+git merge main
+git merge main
+git add . 
+git commit -m"test"
+git merge main
+git switch main
+git merge new
+git switch new
+git log 
+grep -r "api/user" . --exclude-dir={node_modules,.next}\
+
+git branch
+git add .
+git commit -m "review invitations"
+cd /path/to/hype-hire/vercel\
+grep -r "handle_new_user" prisma/migrations/\
+
+grep -r "handle_new_user" prisma/migrations/\
+
+grep -r "handle_new_user"
+cd prisma
+cd migrations
+grep -r "handle_new_user"
+cd ..
+cd..
+cd ..
+git branch
+git add .
+git commit -m "review accept invitation and reset password"
+git switch main
+git merge new
+git push
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+cd hype-hire
+cd vercel
+npm install @getbrevo/brevo --save\
+
+grep -r "Failed to send reset email" --include="*.ts" --include="*.tsx" app/\
+
+npm run dev
+npm run dev
+eval 'npx prisma generate'
+cd /Users/xenrok/Downloads/Code/hype-hire/vercel
+eval 'npx prisma generate'
+npx prisma migrate dev --name add_password_reset_tokens\
+
+curl -X POST http://localhost:3000/api/password-reset \\
+  -H "Content-Type: application/json" \\
+  -d '{\
+    "email": "xenofon.pagoulatos@gmail.com",\
+    "language": "en"\
+  }'
+npm run dev
+curl -X POST http://localhost:3000/api/password-reset \\
+  -H "Content-Type: application/json" \\
+  -d '{\
+    "email": "xenofon.pagoulatos@gmail.com",\
+    "language": "en"\
+  }'
+curl -X POST http://localhost:3000/api/password-reset \\
+  -H "Content-Type: application/json" \\
+  -d '{\
+    "email": "xenofon.pagoulatos@gmail.com",\
+    "language": "en"\
+  }'
+curl -X POST http://localhost:3000/api/password-reset \\
+  -H "Content-Type: application/json" \\
+  -d '{\
+    "email": "xenofon.pagoulatos@gmail.com",\
+    "language": "el"\
+  }'
+npx prisma migrate dev --name add_user_id_to_password_reset_token\
+
+npx prisma migrate dev --name add_user_id_to_password_reset_token\
+
+npx prisma migrate dev --name int_user_id_to_password_reset_token\
+
+npx prisma generate\
+
+npx prisma migrate dev --name int_user_id_to_password_reset_token\
+
+npx prisma migrate dev --name int_user_id_to_password_reset_token\
+
+npx prisma generate\
+
+npx prisma migrate dev --name int_user_id_to_password_reset_token\
+
+git branch
+git add .
+git commit -m "forgot password internal"
+git branch -d new
+git branch
+git branch -d invitations_v2_multifiles_noemail
+git push
+git branch
+git add .
+git commit -m "logo in email forgot pass"
+git push
+git add .
+git commit -m "logo in email forgot pass1"
+git push
+git add . 
+git commit -m "logos in emails"
+git push
+git branch
+git branch dev
+git branch
+git switch dev
+git add . 
+git commit -m "fix logout lag messages of useActiveRole"
+git push origin dev
+git switch main
+git merge dev
+git push
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+npm run dev
+cd vercel
+git branch
+git switch test_speed_team
+git switch dev
+git rev-parse main\
+git rev-parse dev\
+
+git diff main..dev\
+
+git log main..dev\
+git log dev..main\
+
+git switch dev
+grep -r --exclude-dir={node_modules,dist,build} "sidebar" .\
+
+Show Only Filenames=   grep -rl 'AppSidebar.' .\
+
+grep -rl '("Sidebar").' .
+npx prisma migrate dev --removed inviter fkey\
+
+npx prisma migrate dev --name removed_inviter_fkey\
+
+npx prisma generate
+npx prisma migrate dev --name added_inviter_fkey\
+
+npx prisma migrate dev --name added_inviter_fkey\
+
+npx prisma migrate dev --name added_inviter_fkey\
+
+npx prisma migrate resolve --rolled-back 20251101225907_added_inviter_fkey\
+
+npx prisma migrate dev --name added_inviter_fkey\
+
+git add .
+npm run create-test-users 
+npx tsx scripts/create-test-user.ts\
+
+npx tsx scripts/create-test-user.ts\
+
+npx tsx scripts/create-test-user.ts\
+
+git add .
+git commit -m "fixed invitations"
+git switch main
+git merge dev
+git push
+git switch dev
+npm run dev
+git status
+git branch
+git add . 
+git commit -m "jobs page"
+git switch main
+git merge dev
+git push
+git switch dev
+git add .
+git commit -m "calendar1"
+git switch main
+git merge dev
+git push
+npm run dev
+npm run dev
+cd bitcoin_bot\
+
+cd bitcoin_bot\
+
+python -m venv venv\
+
+python3 -m venv venv\
+
+source venv/bin/activate\
+
+pip3 install -r requirements.txt\
+
+python3 app.py\
+
+npm run dev
+npm run dev
+npm run dev
+git branch
+git diff main..dev\
+
+git branch dev
+git switch dev
+got add .
+git add .
+git commit -m "small update in trans details"
+git switch main
+git merge dev
+git push
+git branch
+git add .
+git commit -m "rmv navbar about"
+git push
+git push
+git add .
+git commit -m "rmv old jobs page"
+git push
+git switch dev
+git merge main
+git diff main..dev\
+
+git add .
+git commit -m "ready clause in calendar layout"
+git switch main
+git merge dev
+git push
+git branch
+git status
+git add .
+git commit -m "invitations show up"
+git push
+git switch dev
+git add .
+git commit -, "fix company selection and invitations"
+git commit -m "fix company selection and invitations"
+gti switch main
+git switch main
+git merge dev
+git checkout --theirs app/hooks/useInvitations.tsx\
+
+git add app/hooks/useInvitations.tsx\
+
+git commit -m "Resolve merge conflict: use dev version"\
+
+git status
+git push
+git switch dev
+git diff main..dev\
+
+git branch
+git diff main..dev\
+
+git switch main
+git diff main..dev\
+
+git switch dev
+git switch main
+git switch dev
+git switch dev
+git add .
+git commit -m "test"
+git diff main..dev\
+
+git branch
+git add .
+git commit -m "translate roles in role selector"
+git switch main
+git merge dev
+git diff main..dev\
+
+git push
+git branch
+git diff main..dev\
+
+curl http://127.0.0.1:5000/api/bitcoin | python3 -m json.tool\
+
+npx create-next-app@latest frontend --typescript --tailwind\
+
+npm install lightweight-charts axios\
+
+rm -rf node_modules package-lock.json package.json\
+
+cd frontend
+npm install lightweight-charts axios\
+
+tree -I 'node_modules'
+ls node_modules | grep -E "lightweight-charts|axios"\
+
+npm run dev
+npm run dev
+npm run dev
+npm install
+npm run dev
+npm install
+npm run dev
+npm run dev
+npm install
+npm run dev
+curl -i http://127.0.0.1:5000/api/bitcoin\
+
+curl -i http://127.0.0.1:5000/api/bitcoin\
+
+curl -i http://127.0.0.1:5000/api/bitcoin | head -20\
+
+curl -i http://127.0.0.1:5000/api/health
+curl http://127.0.0.1:5000/api/bitcoin | python3 -m json.tool | head -50\
+
+curl -i http://127.0.0.1:5000/api/health | head -20\
+
+npm install\
+
+python3 app.py\
+
+source venv/bin/activate\
+
+python3 app.py\
+
+python3 app.py\
+
+python3 app.py\
+
+python3 app.py\
+
+python3 app.py\
+
+python3 app.py\
+
+git branch
+git switch dev
+npx shadcn-ui@latest add calendar\
+
+npx shadcn@latest add calendar\
+
+npm install @radix-ui/react-checkbox\
+
+git branch
+git add .
+git commit -m "calendar wip"
+npm run dev
+cd /Users/xenrok/Downloads/Code/hype-hire/vercel
+eval 'npm install react-day-picker @types/react-day-picker'
+cat ~/.zsh_history > commands.txt
