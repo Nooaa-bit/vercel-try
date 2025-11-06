@@ -1,7 +1,6 @@
-//hype-hire/vercel/app/[lang]/dashboard/team/page.tsx
 "use client";
 
-import { use, useEffect, useState, useMemo, useCallback } from "react"; // ✅ Import 'use'
+import { use, useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,16 +27,26 @@ type Employee = {
   joinedAt: Date;
 };
 
-// ✅ Next.js 15: params is now Promise<{ lang: string }>
 interface PageProps {
-  params: Promise<{ lang: string }>; // ✅ Changed to Promise
+  params: Promise<{ lang: string }>;
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+interface RoleInfo {
+  role: string;
+  count: number;
+}
+
 export default function TeamPage({ params }: PageProps) {
-  const { lang } = use(params); // ✅ Use React.use() to unwrap Promise
+  const { lang } = use(params);
   const { t, ready } = useTranslation("team");
-  const { activeRole, hasPermission } = useActiveRole();
+  const {
+    activeRole,
+    hasPermission,
+    loading: roleLoading,
+    isSuperAdmin,
+    selectedCompanyForAdmin,
+  } = useActiveRole();
   const router = useRouter();
 
   // Store ALL employees once
@@ -53,33 +62,41 @@ export default function TeamPage({ params }: PageProps) {
   const hasAccess = hasPermission("company_admin");
   const pageSize = 50;
 
-  // Helper functions
-  const getProfilePictureUrl = useCallback((profilePicture: string | null) => {
-    if (!profilePicture) return null;
-    if (profilePicture.trim() === "") return null;
-    if (profilePicture.startsWith("http")) return profilePicture;
-    return null;
-  }, []);
+  // ✅ Determine target company ID
+  const targetCompanyId = isSuperAdmin
+    ? selectedCompanyForAdmin
+    : activeRole.companyId;
 
-  const getUserInitial = useCallback((employee: Employee) => {
+  // Helper functions
+  const getProfilePictureUrl = useCallback(
+    (profilePicture: string | null): string | null => {
+      if (!profilePicture) return null;
+      if (profilePicture.trim() === "") return null;
+      if (profilePicture.startsWith("http")) return profilePicture;
+      return null;
+    },
+    []
+  );
+
+  const getUserInitial = useCallback((employee: Employee): string => {
     if (employee.firstName) return employee.firstName[0].toUpperCase();
     return employee.email[0].toUpperCase();
   }, []);
 
   const getRoleName = useCallback(
-    (role: string) => {
+    (role: string): string => {
       return t(`roles.${role}`, { defaultValue: role.replace("_", " ") });
     },
     [t]
   );
 
-  const handleEditUser = useCallback((employee: Employee) => {
+  const handleEditUser = useCallback((employee: Employee): void => {
     setSelectedUser(employee);
     setEditDialogOpen(true);
   }, []);
 
   // Client-side filtering
-  const filteredEmployees = useMemo(() => {
+  const filteredEmployees = useMemo((): Employee[] => {
     if (selectedRole === "all") {
       return allEmployees;
     }
@@ -87,7 +104,7 @@ export default function TeamPage({ params }: PageProps) {
   }, [allEmployees, selectedRole]);
 
   // Calculate available roles
-  const availableRoles = useMemo(() => {
+  const availableRoles = useMemo((): RoleInfo[] => {
     const roleCounts = allEmployees.reduce((acc, emp) => {
       acc[emp.role] = (acc[emp.role] || 0) + 1;
       return acc;
@@ -100,7 +117,7 @@ export default function TeamPage({ params }: PageProps) {
   }, [allEmployees]);
 
   // Client-side pagination
-  const paginatedEmployees = useMemo(() => {
+  const paginatedEmployees = useMemo((): Employee[] => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     return filteredEmployees.slice(startIndex, endIndex);
@@ -112,43 +129,43 @@ export default function TeamPage({ params }: PageProps) {
 
   // Load ALL employees once
   useEffect(() => {
-    async function loadEmployees() {
-      if (activeRole.companyId) {
-        setLoading(true);
-        const users = await getCompanyUsers(activeRole.companyId);
-        setAllEmployees(users);
-        setLoading(false);
-      }
+    async function loadEmployees(): Promise<void> {
+      if (!targetCompanyId || targetCompanyId <= 0) return;
+
+      setLoading(true);
+      const users = await getCompanyUsers(targetCompanyId);
+      setAllEmployees(users);
+      setLoading(false);
     }
 
-    if (hasAccess) {
+    if (hasAccess && !roleLoading) {
       loadEmployees();
     }
-  }, [activeRole.companyId, hasAccess]);
+  }, [targetCompanyId, hasAccess, roleLoading, selectedCompanyForAdmin]);
 
   // Reset to page 1 when filter changes
-  const handleRoleChange = useCallback((role: string) => {
+  const handleRoleChange = useCallback((role: string): void => {
     setSelectedRole(role);
     setCurrentPage(1);
   }, []);
 
   // Refresh employees after edit
-  const refreshEmployees = useCallback(async () => {
-    if (activeRole.companyId) {
-      const users = await getCompanyUsers(activeRole.companyId);
+  const refreshEmployees = useCallback(async (): Promise<void> => {
+    if (targetCompanyId && targetCompanyId > 0) {
+      const users = await getCompanyUsers(targetCompanyId);
       setAllEmployees(users);
     }
-  }, [activeRole.companyId]);
+  }, [targetCompanyId]);
 
   // Access control
   useEffect(() => {
-    if (!hasAccess) {
+    if (!hasAccess && !roleLoading) {
       router.push(`/${lang}/dashboard`);
     }
-  }, [hasAccess, router, lang]);
+  }, [hasAccess, router, lang, roleLoading]);
 
-  // Show loading while translations load
-  if (!ready) {
+  // Show loading while translations load or role is loading
+  if (!ready || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
