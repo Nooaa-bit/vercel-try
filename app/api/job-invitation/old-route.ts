@@ -1,22 +1,28 @@
-//hype-hire/vercel/app/api/job-invitation/route.ts
+//1st version, all internal. No Rate Limiting or Transaction Timeout Risk or Email Sending Fire-and-Forget Issues
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { sendJobInvitationEmail } from "@/lib/email/send-job-invitation-email";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 
-// ✅ FIX #1: Use Vercel KV for rate limiting (works in serverless)
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+const rateLimitMap = new Map<string, number[]>();
 
-const ratelimit = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(100, "60 s"), // 100 requests per 60 seconds
-  prefix: "ratelimit:job-invitations",
-});
+function checkRateLimit(
+  userId: string,
+  maxRequests = 100,
+  windowMs = 60000
+): boolean {
+  const now = Date.now();
+  const userRequests = rateLimitMap.get(userId) || [];
+  const recentRequests = userRequests.filter((time) => now - time < windowMs);
+
+  if (recentRequests.length >= maxRequests) {
+    return false;
+  }
+
+  recentRequests.push(now);
+  rateLimitMap.set(userId, recentRequests);
+  return true;
+}
 
 async function getUserByAuthId(authUserId: string) {
   return prisma.user.findUnique({
@@ -43,19 +49,12 @@ export async function POST(request: Request) {
 
     console.log("✅ Auth user:", user.id);
 
-    // ✅ 2. Rate limiting (now works in serverless)
-    try {
-      const { success } = await ratelimit.limit(user.id);
-
-      if (!success) {
-        return NextResponse.json(
-          { error: "Too many requests. Please try again later." },
-          { status: 429 }
-        );
-      }
-    } catch (rateLimitError) {
-      console.warn("⚠️ Rate limit check failed:", rateLimitError);
-      // Don't block if rate limit service fails
+    // ✅ 2. Rate limiting
+    if (!checkRateLimit(user.id)) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
     }
 
     // ✅ 3. Parse request
@@ -92,13 +91,13 @@ export async function POST(request: Request) {
     });
 
     // ✅ 5. Check if user is a superadmin
-    const isSuperAdmin = await prisma.user_company_role.findFirst({
-      where: {
-        userId: inviterUser.id,
-        role: "superadmin",
-        revokedAt: null,
-      },
-    });
+const isSuperAdmin = await prisma.user_company_role.findFirst({
+  where: {
+    userId: inviterUser.id,
+    role: "superadmin",
+    revokedAt: null,
+  },
+});
 
     console.log("🔑 Is superadmin:", !!isSuperAdmin);
 
@@ -111,10 +110,13 @@ export async function POST(request: Request) {
       where: {
         id: parseInt(jobId),
         deletedAt: null,
+        // If superadmin, no authorization needed. Otherwise check permissions
         OR: isSuperAdmin
-          ? undefined
+          ? undefined // Superadmins can access any job
           : [
+              // User created the job
               { createdBy: inviterUser.id },
+              // OR user is admin of this company
               {
                 company: {
                   userCompanyRoles: {
@@ -137,6 +139,7 @@ export async function POST(request: Request) {
     if (!job) {
       console.log("❌ Job not found or unauthorized");
 
+      // Debug: Check if job exists at all
       const jobExists = await prisma.job.findUnique({
         where: { id: parseInt(jobId) },
         select: { id: true, createdBy: true, position: true },
@@ -163,10 +166,11 @@ export async function POST(request: Request) {
       company: job.company.name,
     });
 
-    // ✅ 7. Verify target users exist in some company
+    // ✅ 7. Verify target users exist in some company (superadmins can invite anyone)
     let targetUsers;
 
     if (isSuperAdmin) {
+      // Superadmins can invite any users
       targetUsers = await prisma.user.findMany({
         where: {
           id: { in: userIds },
@@ -174,6 +178,7 @@ export async function POST(request: Request) {
         select: { id: true, email: true, firstName: true, lastName: true },
       });
     } else {
+      // Regular users can only invite from their company
       targetUsers = await prisma.user.findMany({
         where: {
           id: { in: userIds },
@@ -209,58 +214,66 @@ export async function POST(request: Request) {
 
     console.log("📅 Invitations expire at:", expiresAt);
 
-    // ✅ 9. Create invitations (FIX #2: Use Promise.all instead of loop)
+    // ✅ 9. Create invitations in transaction
     console.log("🔄 Creating invitations in transaction...");
 
-    const createdInvitations = await prisma.$transaction(
-      targetUsers.map((targetUser) =>
-        prisma.jobInvitation.create({
-          data: {
-            jobId: parseInt(jobId),
-            userId: targetUser.id,
-            invitedBy: inviterUser.id,
-            status: "pending",
-            expiresAt,
-          },
-          include: {
-            job: { select: { position: true } },
-            invitee: { select: { email: true, firstName: true } },
-          },
+    const createdInvitations = await prisma.$transaction(async (tx) => {
+      const invitations = [];
+
+      for (const targetUser of targetUsers) {
+        try {
+          const invitation = await tx.jobInvitation.create({
+            data: {
+              jobId: parseInt(jobId),
+              userId: targetUser.id,
+              invitedBy: inviterUser.id,
+              status: "pending",
+              expiresAt,
+            },
+            include: {
+              job: { select: { position: true } },
+              invitee: { select: { email: true, firstName: true } },
+            },
+          });
+
+          console.log("✅ Created invitation for:", targetUser.email);
+          invitations.push(invitation);
+        } catch (err) {
+          console.error(
+            "❌ Error creating invitation for",
+            targetUser.email,
+            err
+          );
+          throw err;
+        }
+      }
+
+      return invitations;
+    });
+
+    console.log("✅ All invitations created:", createdInvitations.length);
+
+    // ✅ 10. Send notifications (fire and forget)
+    Promise.allSettled(
+      createdInvitations.map((invitation) =>
+        sendJobInvitationNotifications(
+          invitation,
+          job,
+          inviterUser,
+          expiresAt
+        ).catch((err) => {
+          console.error(
+            `Failed to send notification for user ${invitation.userId}:`,
+            err
+          );
         })
       )
     );
 
-    console.log("✅ All invitations created:", createdInvitations.length);
-
-    // ✅ 10. Send notifications (FIX #3: Better error handling with partial success)
-    const emailResults = await Promise.allSettled(
-      createdInvitations.map((invitation) =>
-        sendJobInvitationNotifications(invitation, job, inviterUser, expiresAt)
-      )
-    );
-
-    // Count successes and failures
-    const successfulEmails = emailResults.filter(
-      (r) => r.status === "fulfilled"
-    ).length;
-    const failedEmails = emailResults.filter(
-      (r) => r.status === "rejected"
-    ).length;
-
-    if (failedEmails > 0) {
-      console.warn(
-        `⚠️  ${failedEmails} email(s) failed to send out of ${createdInvitations.length}`
-      );
-    }
-
-    // ✅ 11. Return success with email status
+    // ✅ 11. Return success
     return NextResponse.json({
       success: true,
       message: `Invitations sent to ${createdInvitations.length} employee(s)`,
-      emailStatus: {
-        successful: successfulEmails,
-        failed: failedEmails,
-      },
       invitations: createdInvitations.map((inv) => ({
         id: inv.id,
         userId: inv.userId,
@@ -307,16 +320,17 @@ async function sendJobInvitationNotifications(
       invitationId: invitation.id,
       jobPosition: job.position,
       companyName: job.company.name,
-      jobStartDate: new Date().toISOString().split("T")[0],
-      jobEndDate: new Date().toISOString().split("T")[0],
+      jobStartDate: new Date().toISOString().split("T")[0], // TODO: Get from job
+      jobEndDate: new Date().toISOString().split("T")[0], // TODO: Get from job
       inviterName,
       expiresAt: expiresAt.toISOString(),
-      language: "en",
+      language: "en", // TODO: Get from user preferences
     });
 
     console.log("✅ Job invitation email sent to:", invitation.invitee.email);
   } catch (error) {
     console.error("❌ Failed to send job invitation email:", error);
-    throw error; // Now properly tracked by Promise.allSettled
+    // Don't throw - invitation was created successfully
   }
 }
+
