@@ -252,7 +252,7 @@ model Shift {
   // Audit
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
-  
+  deletedBy       Int?      @map("deleted_by")
   // Relations
   job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   assignments     ShiftAssignment[]
@@ -284,7 +284,7 @@ model ShiftAssignment {
   markedNoShowBy  Int?      @map("marked_no_show_by")
   
   // Metadata
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)  // Admin cancells shift or job
   
   // Relations
   shift           Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)

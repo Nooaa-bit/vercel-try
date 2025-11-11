@@ -2,14 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, X, Plus } from "lucide-react";
 import JobDialog from "./JobDialog";
+import { ShiftEditDialog } from "./ShiftEditDialog";
 
 interface Shift {
   id: number;
+  job_id: number;
   position: string;
   start_date: string;
   end_date: string;
@@ -39,6 +42,15 @@ interface DayViewProps {
   targetCompanyId: number;
 }
 
+interface ShiftFromDB {
+  id: number;
+  job_id: number;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  workers_needed: number;
+}
+
 const SWIMLANE_WIDTH_PX = 140;
 const SWIMLANE_GAP_PX = 8;
 
@@ -55,9 +67,15 @@ export function DayView({
 }: DayViewProps) {
   const { t } = useTranslation("jobs");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [shiftEditDialogOpen, setShiftEditDialogOpen] = useState(false);
+  const [editingShiftData, setEditingShiftData] = useState<ShiftFromDB | null>(
+    null
+  );
+  const [shiftAssignmentCount, setShiftAssignmentCount] = useState(0);
+  const [shiftPosition, setShiftPosition] = useState("");
   const shiftsScrollRef = useRef<HTMLDivElement>(null);
   const hoursScrollRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     const shiftsDiv = shiftsScrollRef.current;
@@ -162,26 +180,49 @@ export function DayView({
   });
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) {
-      setEditingShift(null);
-    }
     setDialogOpen(open);
   };
 
   // ✅ Handle shift click to edit
-  const handleShiftClick = (shift: Shift) => {
-    setEditingShift(shift);
-    setDialogOpen(true);
+  const handleShiftClick = async (shift: Shift) => {
+    try {
+      // Fetch full shift data from database
+      const { data: shiftData, error: shiftError } = await supabase
+        .from("shift")
+        .select("id, job_id, shift_date, start_time, end_time, workers_needed")
+        .eq("id", shift.id)
+        .single();
+
+      if (shiftError) throw shiftError;
+
+      // Fetch assignment count
+      const { count, error: countError } = await supabase
+        .from("shift_assignment")
+        .select("*", { count: "exact", head: true })
+        .eq("shift_id", shift.id)
+        .is("cancelled_at", null)
+        .is("marked_no_show_at", null)
+        .is("deleted_at", null);
+
+      if (countError) throw countError;
+
+      setEditingShiftData(shiftData);
+      setShiftAssignmentCount(count || 0);
+      setShiftPosition(shift.position);
+      setShiftEditDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching shift data:", error);
+    }
   };
 
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose} // ✅ Add this to close on backdrop click
+      onClick={onClose}
     >
       <Card
         className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()} // ✅ Prevent card clicks from closing
+        onClick={(e) => e.stopPropagation()}
       >
         <CardHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
@@ -215,7 +256,7 @@ export function DayView({
                       {t("card.addButton")}
                     </Button>
                   </DialogTrigger>
-                  {dialogOpen && !editingShift && (
+                  {dialogOpen && (
                     <JobDialog
                       editingJob={null}
                       locations={locations}
@@ -226,36 +267,6 @@ export function DayView({
                       }}
                       onCancel={() => {
                         setDialogOpen(false);
-                      }}
-                      companyId={targetCompanyId}
-                    />
-                  )}
-                  {dialogOpen && editingShift && (
-                    <JobDialog
-                      editingJob={{
-                        id: editingShift.id,
-                        company_id: targetCompanyId,
-                        location_id: null,
-                        position: editingShift.position,
-                        seniority: "junior",
-                        description: null,
-                        workers_needed: editingShift.workers_needed,
-                        start_date: editingShift.start_date,
-                        end_date: editingShift.end_date,
-                        created_at: "",
-                        created_by: 0,
-                        deleted_at: null,
-                        deleted_by: null,
-                      }}
-                      locations={locations}
-                      onSave={async () => {
-                        setDialogOpen(false);
-                        setEditingShift(null);
-                        onSave();
-                      }}
-                      onCancel={() => {
-                        setDialogOpen(false);
-                        setEditingShift(null);
                       }}
                       companyId={targetCompanyId}
                     />
@@ -359,6 +370,31 @@ export function DayView({
           </div>
         </CardContent>
       </Card>
+
+      {/* ✅ Shift Edit Dialog */}
+      {shiftEditDialogOpen && editingShiftData && (
+        <Dialog
+          open={shiftEditDialogOpen}
+          onOpenChange={setShiftEditDialogOpen}
+        >
+          <ShiftEditDialog
+            shift={{
+              ...editingShiftData,
+              position: shiftPosition,
+            }}
+            assignmentCount={shiftAssignmentCount}
+            onSave={() => {
+              setShiftEditDialogOpen(false);
+              setEditingShiftData(null);
+              onSave();
+            }}
+            onCancel={() => {
+              setShiftEditDialogOpen(false);
+              setEditingShiftData(null);
+            }}
+          />
+        </Dialog>
+      )}
     </div>
   );
 }

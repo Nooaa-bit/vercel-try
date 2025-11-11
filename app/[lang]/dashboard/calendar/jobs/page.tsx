@@ -13,6 +13,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Select,
@@ -25,11 +26,14 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import {
   Plus,
   Briefcase,
-  Trash2,
+  // Trash2, // ✅ a) Commented out
   Pencil,
   Calendar,
   Users,
   MapPin,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import JobDialog from "../JobDialog";
@@ -69,7 +73,9 @@ export default function JobsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [filterLocation, setFilterLocation] = useState<string>("all");
-  const [filterSeniority, setFilterSeniority] = useState<string>("all");
+  const [filterJobStatus, setFilterJobStatus] = useState<string>("active"); // ✅ c) Changed from seniority
+  const [currentPage, setCurrentPage] = useState(1); // ✅ e) Pagination state
+  const ITEMS_PER_PAGE = 6; // ✅ e) Max 6 cards per page
   const supabase = createClient();
 
   // ✅ Get the correct company ID
@@ -80,24 +86,52 @@ export default function JobsPage() {
   // ✅ Calculate stats
   const stats = useMemo(() => {
     const total = jobs.length;
-    const draft = jobs.filter((job) => !job.start_date).length;
+    const today = new Date().toISOString().split("T")[0];
 
-    return { total, draft };
+    // Active jobs = jobs with end_date >= today
+    const active = jobs.filter((job) => job.end_date >= today).length;
+
+    // Past jobs = jobs with end_date < today
+    const past = jobs.filter((job) => job.end_date < today).length;
+
+    return { total, active, past };
   }, [jobs]);
 
   // ✅ Filter jobs
   const filteredJobs = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+
     return jobs.filter((job) => {
       const locationMatch =
         filterLocation === "all"
           ? true
           : job.location_id?.toString() === filterLocation;
-      const seniorityMatch =
-        filterSeniority === "all" ? true : job.seniority === filterSeniority;
 
-      return locationMatch && seniorityMatch;
+      // ✅ c) Job status filter (active or past)
+      const statusMatch =
+        filterJobStatus === "all"
+          ? true
+          : filterJobStatus === "active"
+          ? job.end_date >= today
+          : job.end_date < today;
+
+      return locationMatch && statusMatch;
     });
-  }, [jobs, filterLocation, filterSeniority]);
+  }, [jobs, filterLocation, filterJobStatus]);
+
+  // ✅ e) Paginated jobs
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredJobs.slice(startIndex, endIndex);
+  }, [filteredJobs, currentPage]);
+
+  const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterLocation, filterJobStatus]);
 
   // Fetch jobs and locations
   const fetchData = useCallback(async () => {
@@ -111,7 +145,7 @@ export default function JobsPage() {
         .select("*")
         .eq("company_id", targetCompanyId)
         .is("deleted_at", null)
-        .order("start_date", { ascending: true });
+        .order("start_date", { ascending: false }); // ✅ Show newest first
 
       if (!jobsError && jobsData) {
         setJobs(jobsData);
@@ -135,38 +169,128 @@ export default function JobsPage() {
 
   useEffect(() => {
     if (roleLoading || !ready || !targetCompanyId) return;
-    if (activeRole.role === "supervisor" || activeRole.role === "talent") {
-      return;
-    }
     fetchData();
-  }, [roleLoading, ready, activeRole.role, targetCompanyId, fetchData]);
+  }, [roleLoading, ready, targetCompanyId, fetchData]);
 
   const handleEdit = useCallback((job: Job) => {
     setEditingJob(job);
     setDialogOpen(true);
   }, []);
 
-  const handleDelete = useCallback(
-    async (jobId: number, position: string) => {
+  // ✅ a) Commented out delete functionality
+  // const handleDelete = useCallback(
+  //   async (jobId: number, position: string) => {
+  //     toast.promise(
+  //       async () => {
+  //         const now = new Date().toISOString();
+  //         const { error } = await supabase
+  //           .from("job")
+  //           .update({ deleted_at: now })
+  //           .eq("id", jobId);
+
+  //         if (error) throw error;
+  //         await fetchData();
+  //       },
+  //       {
+  //         loading: t("toast.deletingJob", { position }),
+  //         success: t("toast.deleteSuccess", { position }),
+  //         error: t("toast.deleteFailed"),
+  //       }
+  //     );
+  //   },
+  //   [supabase, fetchData, t]
+  // );
+
+  // ✅ b) Cancel all remaining shifts and update job end_date
+  // ✅ Dynamic cancel/delete based on job status
+  const handleCancelJob = useCallback(
+    async (job: Job) => {
+      const today = new Date().toISOString().split("T")[0];
+      const jobHasStarted = job.start_date <= today;
+
+      // Different confirmation messages based on job status
+      const confirmMessage = jobHasStarted
+        ? `Cancel all remaining shifts for "${job.position}"? The job end date will be updated to yesterday. This cannot be undone.`
+        : `Delete the job "${job.position}"? This will delete the job and all its shifts. This cannot be undone.`;
+
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+
+      const actionMessage = jobHasStarted ? "Cancelling" : "Deleting";
+      const successMessage = jobHasStarted
+        ? `All remaining shifts cancelled for ${job.position}`
+        : `Job "${job.position}" and all shifts deleted successfully`;
+
       toast.promise(
         async () => {
           const now = new Date().toISOString();
-          const { error } = await supabase
-            .from("job")
-            .update({ deleted_at: now })
-            .eq("id", jobId);
 
-          if (error) throw error;
+          if (jobHasStarted) {
+            // ✅ Job has started - Cancel remaining shifts and update end_date
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+            // Soft delete all future shifts (today and onwards)
+            const { error: shiftError } = await supabase
+              .from("shift")
+              .update({
+                deleted_at: now,
+              })
+              .eq("job_id", job.id)
+              .gte("shift_date", today)
+              .is("deleted_at", null);
+
+            if (shiftError) throw shiftError;
+
+            // Update job end_date to yesterday
+            const { error: jobError } = await supabase
+              .from("job")
+              .update({
+                end_date: yesterdayStr,
+              })
+              .eq("id", job.id);
+
+            if (jobError) throw jobError;
+          } else {
+            // ✅ Job hasn't started - Delete entire job (soft delete)
+            const { error: jobError } = await supabase
+              .from("job")
+              .update({
+                deleted_at: now,
+                deleted_by: activeRole?.id || null,
+              })
+              .eq("id", job.id);
+
+            if (jobError) throw jobError;
+
+            // Note: Shifts will be cascade soft-deleted or hidden by filtering deleted jobs
+            // If you want to explicitly delete shifts too:
+            const { error: shiftError } = await supabase
+              .from("shift")
+              .update({
+                deleted_at: now,
+              })
+              .eq("job_id", job.id)
+              .is("deleted_at", null);
+
+            if (shiftError) {
+              console.error("Error deleting shifts:", shiftError);
+              // Don't throw - job was deleted successfully
+            }
+          }
+
           await fetchData();
         },
         {
-          loading: t("toast.deletingJob", { position }),
-          success: t("toast.deleteSuccess", { position }),
-          error: t("toast.deleteFailed"),
+          loading: `${actionMessage} "${job.position}"...`,
+          success: successMessage,
+          error: `Failed to ${actionMessage.toLowerCase()} job`,
         }
       );
     },
-    [supabase, fetchData, t]
+    [supabase, fetchData, activeRole]
   );
 
   const handleDialogClose = (open: boolean) => {
@@ -179,7 +303,7 @@ export default function JobsPage() {
   if (!ready || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -210,41 +334,41 @@ export default function JobsPage() {
             </Select>
           </div>
 
-          {/* Seniority Filter */}
+          {/* ✅ c) Job Status Filter (replaced Seniority) */}
           <div>
-            <label className="text-sm font-medium mb-2 block">Seniority</label>
-            <Select value={filterSeniority} onValueChange={setFilterSeniority}>
+            <label className="text-sm font-medium mb-2 block">Status</label>
+            <Select value={filterJobStatus} onValueChange={setFilterJobStatus}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="junior">Junior</SelectItem>
-                <SelectItem value="senior">Senior</SelectItem>
+                <SelectItem value="all">All Jobs</SelectItem>
+                <SelectItem value="active">Active Jobs</SelectItem>
+                <SelectItem value="past">Past Jobs</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Total Jobs Stat */}
+          {/* Active Jobs Stat */}
           <Card>
             <CardContent className="p-0 pt-3">
               <div className="text-center">
                 <p className="text-muted-foreground text-xs mb-0.5">
-                  Total Jobs
+                  Active Jobs
                 </p>
-                <p className="text-lg font-bold text-primary">{stats.total}</p>
+                <p className="text-lg font-bold text-primary">{stats.active}</p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Draft Jobs Stat */}
+          {/* Past Jobs Stat */}
           <Card>
             <CardContent className="p-0 pt-3">
               <div className="text-center">
                 <p className="text-muted-foreground text-xs mb-0.5">
-                  Draft Jobs
+                  Past Jobs
                 </p>
-                <p className="text-lg font-bold text-primary">{stats.draft}</p>
+                <p className="text-lg font-bold text-primary">{stats.past}</p>
               </div>
             </CardContent>
           </Card>
@@ -263,7 +387,7 @@ export default function JobsPage() {
 
               <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
                 <DialogTrigger asChild>
-                  <Button className="bg-pulse-500 hover:bg-pulse-600">
+                  <Button className="bg-primary hover:bg-primary/90">
                     <Plus className="w-4 h-4 mr-2" />
                     {t("card.addButton")}
                   </Button>
@@ -291,7 +415,7 @@ export default function JobsPage() {
           <CardContent className="p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filteredJobs.length === 0 ? (
               <div className="text-center py-12">
@@ -304,82 +428,185 @@ export default function JobsPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredJobs.map((job) => (
-                  <Card
-                    key={job.id}
-                    className="hover:shadow-md transition-shadow"
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="w-5 h-5 text-pulse-500" />
-                          <CardTitle className="text-lg">
-                            {job.position}
-                          </CardTitle>
-                        </div>
-                        <span className="text-xs bg-muted px-2 py-1 rounded capitalize">
-                          {job.seniority}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {job.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {job.description}
-                        </p>
-                      )}
+              <>
+                {/* ✅ d) Structured Job Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {paginatedJobs.map((job) => {
+                    const isPast =
+                      job.end_date < new Date().toISOString().split("T")[0];
 
-                      <div className="space-y-2">
-                        {/* ✅ Location */}
-                        {job.location_id && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <MapPin className="w-4 h-4 text-muted-foreground" />
-                            <span>
-                              {locations.find(
-                                (loc) => loc.id === job.location_id
-                              )?.name || "Unknown Location"}
+                    return (
+                      <Card
+                        key={job.id}
+                        className={`hover:shadow-md transition-shadow flex flex-col ${
+                          isPast ? "opacity-75" : ""
+                        }`}
+                      >
+                        {/* ✅ d) Fixed Header Section */}
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Briefcase className="w-5 h-5 text-primary flex-shrink-0" />
+                              <CardTitle className="text-lg truncate">
+                                {job.position}
+                              </CardTitle>
+                            </div>
+                            <span className="text-xs bg-muted px-2 py-1 rounded capitalize flex-shrink-0">
+                              {job.seniority}
                             </span>
                           </div>
-                        )}
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span>
-                            {new Date(job.start_date).toLocaleDateString()} -{" "}
-                            {new Date(job.end_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Users className="w-4 h-4 text-muted-foreground" />
-                          <span>
-                            {job.workers_needed} {t("card.workersNeeded")}
-                          </span>
-                        </div>
-                      </div>
+                        </CardHeader>
 
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleEdit(job)}
-                        >
-                          <Pencil className="w-3 h-3 mr-1" />
-                          {t("card.editButton")}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(job.id, job.position)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                        {/* ✅ d) Fixed Content Section */}
+                        <CardContent className="space-y-3 flex-1">
+                          {job.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
+                              {job.description}
+                            </p>
+                          )}
+
+                          <div className="space-y-2">
+                            {/* Location */}
+                            {job.location_id && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                <span className="truncate">
+                                  {locations.find(
+                                    (loc) => loc.id === job.location_id
+                                  )?.name || "Unknown Location"}
+                                </span>
+                              </div>
+                            )}
+                            {/* Dates */}
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">
+                                {job.start_date} - {job.end_date}
+                              </span>
+                            </div>
+                            {/* Workers */}
+                            <div className="flex items-center gap-2 text-sm">
+                              <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <span>
+                                {job.workers_needed} {t("card.workersNeeded")}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+
+                        {/* ✅ d) Fixed Footer Section with Buttons */}
+                        <CardFooter className="pt-3 border-t">
+                          <div className="flex gap-2 w-full">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleEdit(job)}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" />
+                              {t("card.editButton")}
+                            </Button>
+                            {!isPast &&
+                              (() => {
+                                const today = new Date()
+                                  .toISOString()
+                                  .split("T")[0];
+                                const jobHasStarted = job.start_date <= today;
+
+                                return (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className={
+                                      jobHasStarted
+                                        ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                        : "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    }
+                                    onClick={() => handleCancelJob(job)}
+                                    title={
+                                      jobHasStarted
+                                        ? "Cancel all remaining shifts"
+                                        : "Delete job and all shifts"
+                                    }
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                );
+                              })()}
+
+                            {/* ✅ a) Commented out Delete button */}
+                            {/* <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDelete(job.id, job.position)}
+                              title="Delete job"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button> */}
+                          </div>
+                        </CardFooter>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* ✅ e) Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-6 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
+                      {Math.min(
+                        currentPage * ITEMS_PER_PAGE,
+                        filteredJobs.length
+                      )}{" "}
+                      of {filteredJobs.length} jobs
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from(
+                          { length: totalPages },
+                          (_, i) => i + 1
+                        ).map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

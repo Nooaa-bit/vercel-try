@@ -3374,7 +3374,7 @@ npx prisma migrate dev --name added_inviter_fkey\
 
 npx prisma migrate dev --name added_inviter_fkey\
 
-npx prisma migrate dev --name added_inviter_fkey\
+npx prisma migrate dev --name added_deleted_by_shift\
 
 npx prisma migrate resolve --rolled-back 20251101225907_added_inviter_fkey\
 

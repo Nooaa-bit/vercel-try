@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/[lang]/dashboard/calendar/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -55,6 +54,7 @@ interface ShiftFromDB {
 
 interface Shift {
   id: number;
+  job_id: number;
   position: string;
   start_date: string;
   end_date: string;
@@ -63,6 +63,7 @@ interface Shift {
   status: "draft" | "active" | "completed";
   startTime: string;
   endTime: string;
+  assignmentCount?: number;
 }
 
 interface Location {
@@ -89,7 +90,7 @@ export default function CalendarPage() {
     ? selectedCompanyForAdmin
     : activeRole?.companyId;
 
-  // ✅ Fetch shifts with job data
+  // ✅ Fetch shifts with job data and assignment counts
   const fetchShifts = async () => {
     if (!targetCompanyId || targetCompanyId <= 0) return;
 
@@ -101,24 +102,41 @@ export default function CalendarPage() {
         activeRole.role === "company_admin" ||
         activeRole.role === "superadmin"
       ) {
+        const { data: jobsData, error: jobsError } = await supabase
+          .from("job")
+          .select("id")
+          .eq("company_id", targetCompanyId)
+          .is("deleted_at", null);
+
+        if (jobsError) throw jobsError;
+
+        if (!jobsData || jobsData.length === 0) {
+          setShifts([]);
+          setPageLoading(false);
+          return;
+        }
+
+        const jobIds = jobsData.map((job) => job.id);
+
+        // Now get shifts for these jobs
         const { data: shiftsData, error: shiftError } = await supabase
           .from("shift")
           .select(
             `
-            id, shift_date, start_time, end_time, workers_needed, job_id,
-            job:job_id(
-              id, position, seniority, description, workers_needed, start_date, end_date, location_id,
-              location:location_id(id, name)
-            )
-          `
+          id, shift_date, start_time, end_time, workers_needed, job_id,
+          job:job_id(
+            id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+            location:location_id(id, name)
           )
-          .eq("job.company_id", targetCompanyId)
+        `
+          )
+          .in("job_id", jobIds)
           .is("deleted_at", null)
           .order("shift_date", { ascending: true });
 
         if (shiftError) throw shiftError;
 
-        const transformedShifts = transformShifts(
+        const transformedShifts = await transformShifts(
           (shiftsData as unknown as ShiftFromDB[]) || []
         );
         setShifts(transformedShifts);
@@ -155,12 +173,12 @@ export default function CalendarPage() {
           .from("shift")
           .select(
             `
-            id, shift_date, start_time, end_time, workers_needed, job_id,
-            job:job_id(
-              id, position, seniority, description, workers_needed, start_date, end_date, location_id,
-              location:location_id(id, name)
-            )
-          `
+          id, shift_date, start_time, end_time, workers_needed, job_id,
+          job:job_id(
+            id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+            location:location_id(id, name)
+          )
+        `
           )
           .in("id", shiftIds)
           .is("deleted_at", null)
@@ -168,7 +186,7 @@ export default function CalendarPage() {
 
         if (shiftError) throw shiftError;
 
-        const transformedShifts = transformShifts(
+        const transformedShifts = await transformShifts(
           (shiftsData as unknown as ShiftFromDB[]) || []
         );
         setShifts(transformedShifts);
@@ -181,13 +199,37 @@ export default function CalendarPage() {
     }
   };
 
-  // ✅ Transform shifts with location + position title
-  const transformShifts = (shiftsData: ShiftFromDB[]): Shift[] => {
+  // ✅ Transform shifts with location + position title + assignment count
+  const transformShifts = async (
+    shiftsData: ShiftFromDB[]
+  ): Promise<Shift[]> => {
+    // Get assignment counts for all shifts in one query
+    const shiftIds = shiftsData.map((s) => s.id);
+    const assignmentCounts: Record<number, number> = {};
+
+    if (shiftIds.length > 0) {
+      const { data: assignmentsData } = await supabase
+        .from("shift_assignment")
+        .select("shift_id")
+        .in("shift_id", shiftIds)
+        .is("cancelled_at", null)
+        .is("marked_no_show_at", null)
+        .is("deleted_at", null);
+
+      if (assignmentsData) {
+        assignmentsData.forEach((assignment: { shift_id: number }) => {
+          assignmentCounts[assignment.shift_id] =
+            (assignmentCounts[assignment.shift_id] || 0) + 1;
+        });
+      }
+    }
+
     return shiftsData.map((shift) => {
       const jobData = shift.job;
       if (!jobData) {
         return {
           id: shift.id,
+          job_id: shift.job_id,
           position: "Unknown Position",
           start_date: shift.shift_date,
           end_date: shift.shift_date,
@@ -196,15 +238,16 @@ export default function CalendarPage() {
           status: "active" as const,
           startTime: shift.start_time,
           endTime: shift.end_time,
+          assignmentCount: assignmentCounts[shift.id] || 0,
         };
       }
 
       const locationName = jobData.location?.name || "No Location";
-      //const displayTitle = `${locationName} - ${jobData.position}`;
       const displayTitle = `${jobData.position}`;
 
       return {
         id: shift.id,
+        job_id: shift.job_id,
         position: displayTitle,
         start_date: shift.shift_date,
         end_date: shift.shift_date,
@@ -213,6 +256,7 @@ export default function CalendarPage() {
         status: "active" as const,
         startTime: shift.start_time,
         endTime: shift.end_time,
+        assignmentCount: assignmentCounts[shift.id] || 0,
       };
     });
   };
@@ -493,20 +537,34 @@ export default function CalendarPage() {
                         {day}
                       </div>
                       <div className="flex-1 overflow-y-auto space-y-1">
-                        {dayShifts.slice(0, 3).map((shift) => (
-                          <div
-                            key={shift.id}
-                            className="text-xs p-1.5 rounded bg-primary hover:bg-primary/90 text-primary-foreground truncate hover:shadow-md transition-all cursor-pointer group"
-                            title={`${shift.position} - ${shift.startTime}`}
-                          >
-                            <div className="truncate font-medium">
-                              {shift.position}
+                        {dayShifts.slice(0, 3).map((shift) => {
+                          const needsAttention =
+                            shift.assignmentCount !== undefined &&
+                            shift.assignmentCount !== shift.workers_needed;
+
+                          return (
+                            <div
+                              key={shift.id}
+                              className="text-xs p-1.5 rounded bg-primary hover:bg-primary/90 text-primary-foreground truncate hover:shadow-md transition-all cursor-pointer group"
+                              title={`${shift.position} - ${shift.startTime}`}
+                            >
+                              <div className="truncate font-medium">
+                                {shift.position}
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="text-primary-foreground/80 text-xs">
+                                  {shift.startTime.slice(0, 5)}
+                                </div>
+                                {needsAttention && (
+                                  <div className="text-xs bg-orange-500 text-white px-1 rounded">
+                                    {shift.assignmentCount}/
+                                    {shift.workers_needed}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-primary-foreground/80 text-xs">
-                              {shift.startTime.slice(0, 5)}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {dayShifts.length > 3 && (
                           <div className="text-xs text-accent font-semibold px-1">
                             +{dayShifts.length - 3} more

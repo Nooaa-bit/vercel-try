@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/layout.tsx
 "use client";
 
 import { ReactNode } from "react";

@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Users, Search } from "lucide-react";
 import { getCompanyUsers } from "@/lib/company-users";
+import { TimePickerSelect } from "@/components/TimePickerSelect";
 
 interface Job {
   id: number;
@@ -101,7 +102,12 @@ export default function JobDialog({
   const [isMultipleDays, setIsMultipleDays] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ✅ NEW: Staffing modal state
+  // ✅ B) State for shift times when editing
+  const [shiftStartTime, setShiftStartTime] = useState("09:00");
+  const [shiftEndTime, setShiftEndTime] = useState("17:00");
+  const [loadingShiftTimes, setLoadingShiftTimes] = useState(false);
+
+  // ✅ Staffing modal state
   const [staffingOpen, setStaffingOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<number>>(
@@ -110,6 +116,9 @@ export default function JobDialog({
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvites, setSendingInvites] = useState(false);
+
+  // ✅ Get today's date in YYYY-MM-DD format for min date
+  const today = new Date().toISOString().split("T")[0];
 
   // ✅ Pre-fill if editing
   useEffect(() => {
@@ -124,6 +133,40 @@ export default function JobDialog({
       setIsMultipleDays(editingJob.start_date !== editingJob.end_date);
     }
   }, [editingJob]);
+
+  // ✅ B) Load existing shift times when editing a job
+  useEffect(() => {
+    if (editingJob) {
+      const loadShiftTimes = async () => {
+        setLoadingShiftTimes(true);
+        try {
+          const todayStr = new Date().toISOString().split("T")[0];
+
+          // Get the first remaining shift's times
+          const { data: shiftData, error } = await supabase
+            .from("shift")
+            .select("start_time, end_time")
+            .eq("job_id", editingJob.id)
+            .gte("shift_date", todayStr)
+            .is("deleted_at", null)
+            .order("shift_date", { ascending: true })
+            .limit(1)
+            .single();
+
+          if (!error && shiftData) {
+            setShiftStartTime(shiftData.start_time.slice(0, 5));
+            setShiftEndTime(shiftData.end_time.slice(0, 5));
+          }
+        } catch (error) {
+          console.error("Error loading shift times:", error);
+        } finally {
+          setLoadingShiftTimes(false);
+        }
+      };
+
+      loadShiftTimes();
+    }
+  }, [editingJob, supabase]);
 
   // ✅ Auto-set end date when start date changes if not multiple days
   useEffect(() => {
@@ -186,9 +229,6 @@ export default function JobDialog({
     setSendingInvites(true);
 
     try {
-      console.log("🔍 Sending invitations for jobId:", editingJob.id);
-      console.log("🔍 Selected employees:", Array.from(selectedEmployees));
-
       const response = await fetch(`/api/job-invitation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,15 +240,10 @@ export default function JobDialog({
 
       const data = await response.json();
 
-      console.log("📡 API Response Status:", response.status);
-      console.log("📡 API Response Data:", data);
-
       if (!response.ok) {
-        console.error("❌ API Error:", data.error || "Unknown error");
         throw new Error(data.error || "Failed to send invitations");
       }
 
-      console.log("✅ Success:", data);
       toast.success(
         `Invitations sent to ${selectedEmployees.size} employee(s)`
       );
@@ -223,17 +258,158 @@ export default function JobDialog({
     }
   };
 
+  // ✅ Dynamic cancel/delete based on job status (same as X button)
+  const handleCancelAllShifts = async () => {
+    if (!editingJob) return;
 
-  const handleSave = async () => {
-    if (!position || !startDate || !startTime || !endTime) {
-      toast.error("Please fill in all required fields");
+    const todayStr = new Date().toISOString().split("T")[0];
+    const jobHasStarted = editingJob.start_date <= todayStr;
+
+    // Different confirmation messages based on job status
+    const confirmMessage = jobHasStarted
+      ? `Cancel all remaining shifts for "${position}"? The job end date will be updated to yesterday. This cannot be undone.`
+      : `Delete the job "${position}"? This will delete the job and all its shifts. This cannot be undone.`;
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 
     setSaving(true);
 
     try {
+      const now = new Date().toISOString();
+
+      if (jobHasStarted) {
+        // ✅ Job has started - Cancel remaining shifts and update end_date
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+        // Soft delete all future shifts (today and onwards)
+        const { error: shiftError } = await supabase
+          .from("shift")
+          .update({
+            deleted_at: now,
+          })
+          .eq("job_id", editingJob.id)
+          .gte("shift_date", todayStr)
+          .is("deleted_at", null);
+
+        if (shiftError) throw shiftError;
+
+        // Update job end_date to yesterday
+        const { error: jobError } = await supabase
+          .from("job")
+          .update({
+            end_date: yesterdayStr,
+          })
+          .eq("id", editingJob.id);
+
+        if (jobError) throw jobError;
+
+        toast.success(`All remaining shifts cancelled for ${position}`);
+      } else {
+        // ✅ Job hasn't started - Delete entire job (soft delete)
+        const { error: jobError } = await supabase
+          .from("job")
+          .update({
+            deleted_at: now,
+            deleted_by: activeRole?.id || null,
+          })
+          .eq("id", editingJob.id);
+
+        if (jobError) throw jobError;
+
+        // Soft delete all shifts
+        const { error: shiftError } = await supabase
+          .from("shift")
+          .update({
+            deleted_at: now,
+          })
+          .eq("job_id", editingJob.id)
+          .is("deleted_at", null);
+
+        if (shiftError) {
+          console.error("Error deleting shifts:", shiftError);
+          // Don't throw - job was deleted successfully
+        }
+
+        toast.success(`Job "${position}" and all shifts deleted successfully`);
+      }
+
+      onSave();
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      console.error("Error:", errorMessage);
+      toast.error(
+        `Failed to ${jobHasStarted ? "cancel shifts" : "delete job"}`
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!position || !startDate) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // ✅ Validate times only when creating
+    if (!editingJob) {
+      if (!startTime || !endTime) {
+        toast.error("Please fill in start and end times");
+        return;
+      }
+
+      if (endTime <= startTime) {
+        toast.error("End time must be after start time");
+        return;
+      }
+
+      // Validate that job is not in the past
+      const now = new Date();
+      const selectedDateTime = new Date(startDate + "T" + startTime + ":00");
+
+      if (selectedDateTime < now) {
+        toast.error(
+          "Cannot create jobs in the past. Please select a future date/time."
+        );
+        return;
+      }
+
+      // If multiple days, validate end date is not before start date
+      if (isMultipleDays) {
+        if (!endDate) {
+          toast.error("Please set an end date");
+          return;
+        }
+
+        if (endDate < startDate) {
+          toast.error("End date cannot be before start date");
+          return;
+        }
+      }
+    }
+
+    // ✅ Validate shift times when editing
+    if (editingJob) {
+      if (shiftEndTime <= shiftStartTime) {
+        toast.error("Shift end time must be after start time");
+        return;
+      }
+    }
+
+    setSaving(true);
+
+    try {
       const finalEndDate = isMultipleDays ? endDate : startDate;
+
+      if (!finalEndDate) {
+        toast.error("Please set an end date");
+        setSaving(false);
+        return;
+      }
 
       if (!activeRole || !activeRole.id) {
         toast.error("User not authenticated");
@@ -263,7 +439,26 @@ export default function JobDialog({
           throw error;
         }
 
-        toast.success("Job updated successfully");
+        // ✅ B) Update shift times AND workers_needed for remaining shifts
+        const todayStr = new Date().toISOString().split("T")[0];
+
+        const { error: shiftUpdateError } = await supabase
+          .from("shift")
+          .update({
+            start_time: shiftStartTime + ":00",
+            end_time: shiftEndTime + ":00",
+            workers_needed: workersNeeded,
+          })
+          .eq("job_id", editingJob.id)
+          .gte("shift_date", todayStr)
+          .is("deleted_at", null);
+
+        if (shiftUpdateError) {
+          console.error("Shift update error:", shiftUpdateError);
+          // Don't throw - job was updated successfully
+        }
+
+        toast.success("Job and remaining shifts updated successfully");
       } else {
         // ✅ CREATE new job
         const { data: jobData, error: jobError } = await supabase
@@ -352,8 +547,8 @@ export default function JobDialog({
       shifts.push({
         job_id: jobId,
         shift_date: shiftDate,
-        start_time: startTimeStr,
-        end_time: endTimeStr,
+        start_time: startTimeStr + ":00",
+        end_time: endTimeStr + ":00",
         workers_needed: workersNeeded,
         created_at: now,
       });
@@ -370,13 +565,13 @@ export default function JobDialog({
     <>
       {/* ✅ Main Job Dialog */}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&_button[data-radix-dialog-close]]:z-50">
-        <DialogHeader className="top-0 bg-background z-8 pt-6 border-b">
+        <DialogHeader className="top-0 bg-background z-8 pt-6 border-b pb-4">
           <DialogTitle>
             {editingJob ? "Edit Job" : "Create New Job"}
           </DialogTitle>
           <DialogDescription>
             {editingJob
-              ? "Update the job details"
+              ? "Update the job details and shift times for remaining shifts"
               : "Create a new job and shifts will be generated for each day"}
           </DialogDescription>
         </DialogHeader>
@@ -485,36 +680,14 @@ export default function JobDialog({
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              min={editingJob ? undefined : today}
               className="mt-2"
             />
-          </div>
-
-          {/* Start Time */}
-          <div>
-            <Label htmlFor="startTime" className="text-sm font-medium">
-              Start Time *
-            </Label>
-            <Input
-              id="startTime"
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="mt-2"
-            />
-          </div>
-
-          {/* End Time */}
-          <div>
-            <Label htmlFor="endTime" className="text-sm font-medium">
-              End Time *
-            </Label>
-            <Input
-              id="endTime"
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="mt-2"
-            />
+            {!editingJob && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Must be today or a future date
+              </p>
+            )}
           </div>
 
           {/* Multiple Days Checkbox */}
@@ -545,30 +718,107 @@ export default function JobDialog({
               />
             </div>
           )}
+
+          {/* ✅ Time Pickers - Show appropriate ones based on create/edit mode */}
+          {!editingJob ? (
+            <>
+              {/* Creating: Show job times */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-3">Shift Times</h4>
+              </div>
+
+              <TimePickerSelect
+                value={startTime}
+                onChange={setStartTime}
+                label="Start Time"
+                required
+              />
+
+              <TimePickerSelect
+                value={endTime}
+                onChange={setEndTime}
+                label="End Time"
+                required
+              />
+              <p className="text-xs text-muted-foreground -mt-2">
+                These times will be applied to all shifts
+              </p>
+            </>
+          ) : (
+            <>
+              {/* ✅ B) Editing: Show shift times for remaining shifts */}
+              {!loadingShiftTimes && (
+                <>
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium mb-1">
+                      Update Remaining Shift Times
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Change the times for all remaining shifts (today and
+                      future). Past shifts will not be affected.
+                    </p>
+                  </div>
+
+                  <TimePickerSelect
+                    value={shiftStartTime}
+                    onChange={setShiftStartTime}
+                    label="Shift Start Time"
+                  />
+
+                  <TimePickerSelect
+                    value={shiftEndTime}
+                    onChange={setShiftEndTime}
+                    label="Shift End Time"
+                  />
+                </>
+              )}
+            </>
+          )}
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-6 border-t bottom-0 bg-background">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          {editingJob && (
-            <Button
-              variant="outline"
-              onClick={handleStaffingClick}
-              className="gap-2"
-            >
-              <Users className="h-4 w-4" />
-              Staff
+        <div className="flex gap-3 justify-between pt-6 border-t bottom-0 bg-background">
+          <div>
+            {editingJob &&
+              (() => {
+                const todayStr = new Date().toISOString().split("T")[0];
+                const jobHasStarted = editingJob.start_date <= todayStr;
+
+                return (
+                  <Button
+                    variant="destructive"
+                    onClick={handleCancelAllShifts}
+                    disabled={saving}
+                  >
+                    {jobHasStarted
+                      ? "Cancel All Remaining Shifts"
+                      : "Delete Job"}
+                  </Button>
+                );
+              })()}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onCancel}>
+              Close
             </Button>
-          )}
-          <Button
-            className="bg-primary hover:bg-primary/90"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? "Saving..." : editingJob ? "Update Job" : "Create Job"}
-          </Button>
+            {editingJob && (
+              <Button
+                variant="outline"
+                onClick={handleStaffingClick}
+                className="gap-2"
+              >
+                <Users className="h-4 w-4" />
+                Staff
+              </Button>
+            )}
+            <Button
+              className="bg-primary hover:bg-primary/90"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : editingJob ? "Update Job" : "Create Job"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
 
