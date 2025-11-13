@@ -27,6 +27,16 @@ import { toast } from "sonner";
 import { Users, Search } from "lucide-react";
 import { getCompanyUsers } from "@/lib/company-users";
 import { TimePickerSelect } from "@/components/TimePickerSelect";
+import {
+  fetchRemainingShifts,
+  calculateAllEmployeesAvailability,
+  assignStaffToShifts,
+  calculateShiftCapacity,
+  fetchShiftAssignments,
+  type EmployeeAvailability,
+  type Shift,
+  type Employee,
+} from "./staffing-utils";
 
 interface Job {
   id: number;
@@ -47,17 +57,6 @@ interface Job {
 interface Location {
   id: number;
   name: string;
-}
-
-interface Employee {
-  userId: number;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  profilePicture: string | null;
-  role: string;
-  roleId: number;
-  joinedAt: Date;
 }
 
 interface JobDialogProps {
@@ -102,12 +101,10 @@ export default function JobDialog({
   const [isMultipleDays, setIsMultipleDays] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ✅ B) State for shift times when editing
   const [shiftStartTime, setShiftStartTime] = useState("09:00");
   const [shiftEndTime, setShiftEndTime] = useState("17:00");
   const [loadingShiftTimes, setLoadingShiftTimes] = useState(false);
 
-  // ✅ Staffing modal state
   const [staffingOpen, setStaffingOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<number>>(
@@ -117,10 +114,19 @@ export default function JobDialog({
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvites, setSendingInvites] = useState(false);
 
-  // ✅ Get today's date in YYYY-MM-DD format for min date
+  const [remainingShifts, setRemainingShifts] = useState<Shift[]>([]);
+  const [employeeAvailabilities, setEmployeeAvailabilities] = useState<
+    EmployeeAvailability[]
+  >([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [shiftCapacity, setShiftCapacity] = useState({
+    total: 0,
+    filled: 0,
+    remaining: 0,
+  });
+
   const today = new Date().toISOString().split("T")[0];
 
-  // ✅ Pre-fill if editing
   useEffect(() => {
     if (editingJob) {
       setPosition(editingJob.position);
@@ -134,7 +140,6 @@ export default function JobDialog({
     }
   }, [editingJob]);
 
-  // ✅ B) Load existing shift times when editing a job
   useEffect(() => {
     if (editingJob) {
       const loadShiftTimes = async () => {
@@ -142,7 +147,6 @@ export default function JobDialog({
         try {
           const todayStr = new Date().toISOString().split("T")[0];
 
-          // Get the first remaining shift's times
           const { data: shiftData, error } = await supabase
             .from("shift")
             .select("start_time, end_time")
@@ -168,32 +172,55 @@ export default function JobDialog({
     }
   }, [editingJob, supabase]);
 
-  // ✅ Auto-set end date when start date changes if not multiple days
   useEffect(() => {
     if (!isMultipleDays && startDate) {
       setEndDate(startDate);
     }
   }, [startDate, isMultipleDays]);
 
-  // ✅ Load employees when staffing modal opens
   const handleStaffingClick = async () => {
+    if (!editingJob) return;
+
     setStaffingOpen(true);
     setLoadingEmployees(true);
+    setLoadingAvailability(true);
 
     try {
       const users = await getCompanyUsers(companyId);
       setEmployees(users);
       setSelectedEmployees(new Set());
       setSearchTerm("");
+
+      const shifts = await fetchRemainingShifts(supabase, editingJob.id);
+      setRemainingShifts(shifts);
+
+      if (shifts.length === 0) {
+        setLoadingAvailability(false);
+        setLoadingEmployees(false);
+        toast.error("No remaining shifts for this job");
+        return;
+      }
+
+      const shiftIds = shifts.map((s) => s.id);
+      const assignmentsMap = await fetchShiftAssignments(supabase, shiftIds);
+      const capacity = calculateShiftCapacity(shifts, assignmentsMap);
+      setShiftCapacity(capacity);
+
+      const availabilities = await calculateAllEmployeesAvailability(
+        supabase,
+        users,
+        shifts
+      );
+      setEmployeeAvailabilities(availabilities);
     } catch (error) {
-      console.error("Failed to load employees:", error);
-      toast.error("Failed to load employees");
+      console.error("Failed to load staffing data:", error);
+      toast.error("Failed to load staffing data");
     } finally {
       setLoadingEmployees(false);
+      setLoadingAvailability(false);
     }
   };
 
-  // ✅ Toggle employee selection
   const toggleEmployee = (userId: number) => {
     const newSelected = new Set(selectedEmployees);
     if (newSelected.has(userId)) {
@@ -204,17 +231,6 @@ export default function JobDialog({
     setSelectedEmployees(newSelected);
   };
 
-  // ✅ Filter employees by search
-  const filteredEmployees = employees.filter((emp) => {
-    const fullName = `${emp.firstName || ""} ${
-      emp.lastName || ""
-    }`.toLowerCase();
-    const email = emp.email.toLowerCase();
-    const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
-  });
-
-  // ✅ Send invitations
   const handleSendInvites = async () => {
     if (selectedEmployees.size === 0) {
       toast.error("Please select at least one employee");
@@ -258,14 +274,65 @@ export default function JobDialog({
     }
   };
 
-  // ✅ Dynamic cancel/delete based on job status (same as X button)
+  const handleAssignStaff = async () => {
+    if (selectedEmployees.size === 0) {
+      toast.error("Please select at least one employee");
+      return;
+    }
+
+    if (!editingJob || !activeRole?.id) {
+      toast.error("Invalid job or user");
+      return;
+    }
+
+    if (remainingShifts.length === 0) {
+      toast.error("No shifts to assign");
+      return;
+    }
+
+    setSendingInvites(true);
+
+    try {
+      const result = await assignStaffToShifts(
+        supabase,
+        Array.from(selectedEmployees),
+        remainingShifts,
+        activeRole.id,
+        employeeAvailabilities
+      );
+
+      if (result.success > 0) {
+        toast.success(
+          `Assigned ${result.success} shift(s) to ${selectedEmployees.size} employee(s)`,
+          {
+            description: result.details.join(", "),
+          }
+        );
+      }
+
+      if (result.skipped > 0) {
+        toast.warning(
+          `${result.skipped} shift(s) skipped due to conflicts or capacity`
+        );
+      }
+
+      setStaffingOpen(false);
+      setSelectedEmployees(new Set());
+      onSave();
+    } catch (error) {
+      console.error("Error assigning staff:", error);
+      toast.error("Failed to assign staff");
+    } finally {
+      setSendingInvites(false);
+    }
+  };
+
   const handleCancelAllShifts = async () => {
     if (!editingJob) return;
 
     const todayStr = new Date().toISOString().split("T")[0];
     const jobHasStarted = editingJob.start_date <= todayStr;
 
-    // Different confirmation messages based on job status
     const confirmMessage = jobHasStarted
       ? `Cancel all remaining shifts for "${position}"? The job end date will be updated to yesterday. This cannot be undone.`
       : `Delete the job "${position}"? This will delete the job and all its shifts. This cannot be undone.`;
@@ -280,12 +347,10 @@ export default function JobDialog({
       const now = new Date().toISOString();
 
       if (jobHasStarted) {
-        // ✅ Job has started - Cancel remaining shifts and update end_date
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-        // Soft delete all future shifts (today and onwards)
         const { error: shiftError } = await supabase
           .from("shift")
           .update({
@@ -297,7 +362,6 @@ export default function JobDialog({
 
         if (shiftError) throw shiftError;
 
-        // Update job end_date to yesterday
         const { error: jobError } = await supabase
           .from("job")
           .update({
@@ -309,7 +373,6 @@ export default function JobDialog({
 
         toast.success(`All remaining shifts cancelled for ${position}`);
       } else {
-        // ✅ Job hasn't started - Delete entire job (soft delete)
         const { error: jobError } = await supabase
           .from("job")
           .update({
@@ -320,7 +383,6 @@ export default function JobDialog({
 
         if (jobError) throw jobError;
 
-        // Soft delete all shifts
         const { error: shiftError } = await supabase
           .from("shift")
           .update({
@@ -331,7 +393,6 @@ export default function JobDialog({
 
         if (shiftError) {
           console.error("Error deleting shifts:", shiftError);
-          // Don't throw - job was deleted successfully
         }
 
         toast.success(`Job "${position}" and all shifts deleted successfully`);
@@ -355,7 +416,6 @@ export default function JobDialog({
       return;
     }
 
-    // ✅ Validate times only when creating
     if (!editingJob) {
       if (!startTime || !endTime) {
         toast.error("Please fill in start and end times");
@@ -367,7 +427,6 @@ export default function JobDialog({
         return;
       }
 
-      // Validate that job is not in the past
       const now = new Date();
       const selectedDateTime = new Date(startDate + "T" + startTime + ":00");
 
@@ -378,7 +437,6 @@ export default function JobDialog({
         return;
       }
 
-      // If multiple days, validate end date is not before start date
       if (isMultipleDays) {
         if (!endDate) {
           toast.error("Please set an end date");
@@ -392,7 +450,6 @@ export default function JobDialog({
       }
     }
 
-    // ✅ Validate shift times when editing
     if (editingJob) {
       if (shiftEndTime <= shiftStartTime) {
         toast.error("Shift end time must be after start time");
@@ -420,7 +477,6 @@ export default function JobDialog({
       const now = new Date().toISOString();
 
       if (editingJob) {
-        // ✅ UPDATE existing job
         const { error } = await supabase
           .from("job")
           .update({
@@ -439,7 +495,6 @@ export default function JobDialog({
           throw error;
         }
 
-        // ✅ B) Update shift times AND workers_needed for remaining shifts
         const todayStr = new Date().toISOString().split("T")[0];
 
         const { error: shiftUpdateError } = await supabase
@@ -455,12 +510,10 @@ export default function JobDialog({
 
         if (shiftUpdateError) {
           console.error("Shift update error:", shiftUpdateError);
-          // Don't throw - job was updated successfully
         }
 
         toast.success("Job and remaining shifts updated successfully");
       } else {
-        // ✅ CREATE new job
         const { data: jobData, error: jobError } = await supabase
           .from("job")
           .insert({
@@ -483,7 +536,6 @@ export default function JobDialog({
           throw jobError;
         }
 
-        // ✅ Generate shifts for each day
         const shifts = generateShifts(
           jobData.id,
           startDate,
@@ -563,7 +615,6 @@ export default function JobDialog({
 
   return (
     <>
-      {/* ✅ Main Job Dialog */}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&_button[data-radix-dialog-close]]:z-50">
         <DialogHeader className="top-0 bg-background z-8 pt-6 border-b pb-4">
           <DialogTitle>
@@ -577,7 +628,6 @@ export default function JobDialog({
         </DialogHeader>
 
         <div className="space-y-6 pr-4">
-          {/* Position */}
           <div>
             <Label htmlFor="position" className="text-sm font-medium">
               Position *
@@ -591,7 +641,6 @@ export default function JobDialog({
             />
           </div>
 
-          {/* Description */}
           <div>
             <Label htmlFor="description" className="text-sm font-medium">
               Description
@@ -606,7 +655,6 @@ export default function JobDialog({
             />
           </div>
 
-          {/* Seniority & Workers */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="seniority" className="text-sm font-medium">
@@ -645,7 +693,6 @@ export default function JobDialog({
             </div>
           </div>
 
-          {/* Location */}
           <div>
             <Label htmlFor="location" className="text-sm font-medium">
               Location
@@ -670,7 +717,6 @@ export default function JobDialog({
             </Select>
           </div>
 
-          {/* Start Date */}
           <div>
             <Label htmlFor="startDate" className="text-sm font-medium">
               Start Date *
@@ -690,7 +736,6 @@ export default function JobDialog({
             )}
           </div>
 
-          {/* Multiple Days Checkbox */}
           <div className="flex items-center space-x-2 p-4 bg-muted rounded-lg">
             <Checkbox
               id="multipleDays"
@@ -702,7 +747,6 @@ export default function JobDialog({
             </Label>
           </div>
 
-          {/* End Date (only show if multiple days) */}
           {isMultipleDays && (
             <div>
               <Label htmlFor="endDate" className="text-sm font-medium">
@@ -719,10 +763,8 @@ export default function JobDialog({
             </div>
           )}
 
-          {/* ✅ Time Pickers - Show appropriate ones based on create/edit mode */}
           {!editingJob ? (
             <>
-              {/* Creating: Show job times */}
               <div className="border-t pt-4">
                 <h4 className="text-sm font-medium mb-3">Shift Times</h4>
               </div>
@@ -746,7 +788,6 @@ export default function JobDialog({
             </>
           ) : (
             <>
-              {/* ✅ B) Editing: Show shift times for remaining shifts */}
               {!loadingShiftTimes && (
                 <>
                   <div className="border-t pt-4">
@@ -776,7 +817,6 @@ export default function JobDialog({
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3 justify-between pt-6 border-t bottom-0 bg-background">
           <div>
             {editingJob &&
@@ -822,85 +862,220 @@ export default function JobDialog({
         </div>
       </DialogContent>
 
-      {/* ✅ Staffing Modal */}
-      <Dialog open={staffingOpen} onOpenChange={setStaffingOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+      {/* ✅ COMPACT Staffing Modal */}
+      <Dialog open={staffingOpen} onOpenChange={setStaffingOpen} modal={true}>
+        <DialogContent
+          className="max-w-3xl h-[75vh] flex flex-col"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="flex-shrink-0 pb-3">
             <DialogTitle>Staff Job: {position || "Untitled"}</DialogTitle>
-            <DialogDescription>
-              Select employees to invite to this job
+            <DialogDescription className="text-xs">
+              Assign employees to remaining shifts for this job
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          {loadingEmployees || loadingAvailability ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  Loading employees and availability...
+                </p>
+              </div>
             </div>
+          ) : (
+            <>
+              <div className="flex-1 flex flex-col min-h-0 space-y-3">
+                {/* Compact Capacity Overview */}
+                <div className="flex-shrink-0 p-2 bg-muted rounded-lg flex items-center justify-between text-sm">
+                  <div>
+                    <span className="font-medium">Capacity: </span>
+                    <span className="text-primary font-bold">
+                      {shiftCapacity.filled}/{shiftCapacity.total}
+                    </span>
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    {remainingShifts.length} shift(s) ·{" "}
+                    {shiftCapacity.remaining} position(s) available
+                  </div>
+                </div>
 
-            {/* Employee List */}
-            {loadingEmployees ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Loading employees...
-              </div>
-            ) : filteredEmployees.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No employees found
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-4">
-                {filteredEmployees.map((emp) => (
-                  <div
-                    key={emp.userId}
-                    className="flex items-center space-x-3 p-2 hover:bg-muted rounded cursor-pointer"
-                    onClick={() => toggleEmployee(emp.userId)}
-                  >
-                    <Checkbox
-                      checked={selectedEmployees.has(emp.userId)}
-                      onCheckedChange={() => toggleEmployee(emp.userId)}
+                {/* Compact Search */}
+                <div className="flex-shrink-0">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search employees..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9 h-9"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium">
-                        {emp.firstName && emp.lastName
-                          ? `${emp.firstName} ${emp.lastName}`
-                          : emp.email}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {emp.email}
-                      </div>
+                  </div>
+                </div>
+
+                {/* Scrollable Employee List */}
+                <div className="flex-1 min-h-0 border rounded-lg">
+                  <div className="h-full overflow-y-auto p-3">
+                    <div className="space-y-1.5">
+                      {(() => {
+                        const filtered = employeeAvailabilities.filter(
+                          (avail) => {
+                            const fullName = `${
+                              avail.employee.firstName || ""
+                            } ${avail.employee.lastName || ""}`.toLowerCase();
+                            const email = avail.employee.email.toLowerCase();
+                            const search = searchTerm.toLowerCase();
+                            return (
+                              fullName.includes(search) ||
+                              email.includes(search)
+                            );
+                          }
+                        );
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-muted-foreground text-sm">
+                              No employees found
+                            </div>
+                          );
+                        }
+
+                        return filtered.map((avail) => {
+                          const isDisabled =
+                            avail.isFullyAssigned || avail.isUnavailable;
+                          const canSelect = !isDisabled;
+
+                          return (
+                            <div
+                              key={avail.employee.userId}
+                              className={`flex items-start space-x-2 p-2 rounded transition-colors ${
+                                isDisabled
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : "hover:bg-muted cursor-pointer"
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canSelect) {
+                                  toggleEmployee(avail.employee.userId);
+                                }
+                              }}
+                            >
+                              <Checkbox
+                                checked={selectedEmployees.has(
+                                  avail.employee.userId
+                                )}
+                                onCheckedChange={() => {
+                                  if (canSelect) {
+                                    toggleEmployee(avail.employee.userId);
+                                  }
+                                }}
+                                disabled={isDisabled}
+                                className="mt-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium">
+                                  {avail.employee.firstName &&
+                                  avail.employee.lastName
+                                    ? `${avail.employee.firstName} ${avail.employee.lastName}`
+                                    : avail.employee.email}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {avail.employee.email}
+                                </div>
+
+                                {avail.isFullyAssigned ? (
+                                  <div className="text-xs text-green-600 mt-0.5">
+                                    ✓ Assigned to all {avail.total} shift(s)
+                                  </div>
+                                ) : avail.isUnavailable ? (
+                                  <div className="text-xs text-red-600 mt-0.5">
+                                    ✗ Unavailable (conflicts or full)
+                                  </div>
+                                ) : (
+                                  <div className="text-xs mt-0.5">
+                                    <span
+                                      className={`font-medium ${
+                                        avail.available === avail.total
+                                          ? "text-green-600"
+                                          : "text-orange-600"
+                                      }`}
+                                    >
+                                      {avail.available}/{avail.total} shift(s)
+                                    </span>
+                                    {avail.alreadyAssigned > 0 && (
+                                      <span className="text-muted-foreground ml-1">
+                                        ({avail.alreadyAssigned} assigned)
+                                      </span>
+                                    )}
+                                    {avail.conflicts > 0 && (
+                                      <span className="text-orange-600 ml-1">
+                                        ({avail.conflicts} conflicts)
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Compact Selection Count */}
+                <div className="flex-shrink-0 text-sm text-muted-foreground">
+                  {selectedEmployees.size} employee(s) selected
+                </div>
               </div>
-            )}
 
-            {/* Selection Count */}
-            <div className="text-sm text-muted-foreground">
-              {selectedEmployees.size} selected
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 justify-end pt-6 border-t">
-            <Button variant="outline" onClick={() => setStaffingOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSendInvites}
-              disabled={selectedEmployees.size === 0 || sendingInvites}
-              className="bg-primary hover:bg-primary/90"
-            >
-              {sendingInvites
-                ? "Sending..."
-                : `Send Invitations (${selectedEmployees.size})`}
-            </Button>
-          </div>
+              {/* Fixed Actions */}
+              <div className="flex-shrink-0 flex gap-2 justify-end pt-3 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStaffingOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendInvites();
+                  }}
+                  disabled={selectedEmployees.size === 0 || sendingInvites}
+                >
+                  {sendingInvites ? "Sending..." : "Send Invitations"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAssignStaff();
+                  }}
+                  disabled={
+                    selectedEmployees.size === 0 ||
+                    sendingInvites ||
+                    loadingAvailability
+                  }
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  {sendingInvites ? "Assigning..." : "Assign to Shifts"}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

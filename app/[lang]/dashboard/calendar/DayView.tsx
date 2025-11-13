@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/DayView.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -21,6 +22,7 @@ interface Shift {
   status: "draft" | "active" | "completed";
   startTime: string;
   endTime: string;
+  assignmentCount?: number; // ✅ Added
 }
 
 interface Location {
@@ -183,10 +185,8 @@ export function DayView({
     setDialogOpen(open);
   };
 
-  // ✅ Handle shift click to edit
   const handleShiftClick = async (shift: Shift) => {
     try {
-      // Fetch full shift data from database
       const { data: shiftData, error: shiftError } = await supabase
         .from("shift")
         .select("id, job_id, shift_date, start_time, end_time, workers_needed")
@@ -195,7 +195,6 @@ export function DayView({
 
       if (shiftError) throw shiftError;
 
-      // Fetch assignment count
       const { count, error: countError } = await supabase
         .from("shift_assignment")
         .select("*", { count: "exact", head: true })
@@ -332,6 +331,12 @@ export function DayView({
                         shift.endTime
                       );
 
+                      // ✅ Calculate staffing status
+                      const assignmentCount = shift.assignmentCount ?? 0;
+                      const workersNeeded = shift.workers_needed;
+                      const isFullyStaffed = assignmentCount === workersNeeded;
+                      const isOverstaffed = assignmentCount > workersNeeded;
+
                       return (
                         <div
                           key={shift.id}
@@ -353,8 +358,19 @@ export function DayView({
                           <div className="text-xs text-primary-foreground/70 mt-1 truncate">
                             {shift.location}
                           </div>
-                          <div className="text-xs text-primary-foreground/70">
-                            {shift.workers_needed} needed
+                          {/* ✅ Always show staffing counter with color coding */}
+                          <div className="flex items-center gap-1 mt-1">
+                            <div
+                              className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                isFullyStaffed
+                                  ? "bg-green-500 text-white"
+                                  : isOverstaffed
+                                  ? "bg-red-500 text-white"
+                                  : "bg-orange-500 text-white"
+                              }`}
+                            >
+                              {assignmentCount}/{workersNeeded}
+                            </div>
                           </div>
                         </div>
                       );
@@ -371,7 +387,6 @@ export function DayView({
         </CardContent>
       </Card>
 
-      {/* ✅ Shift Edit Dialog */}
       {shiftEditDialogOpen && editingShiftData && (
         <Dialog
           open={shiftEditDialogOpen}

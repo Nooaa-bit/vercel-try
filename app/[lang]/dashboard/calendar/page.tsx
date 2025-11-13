@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -90,7 +91,6 @@ export default function CalendarPage() {
     ? selectedCompanyForAdmin
     : activeRole?.companyId;
 
-  // ✅ Fetch shifts with job data and assignment counts
   const fetchShifts = async () => {
     if (!targetCompanyId || targetCompanyId <= 0) return;
 
@@ -118,7 +118,6 @@ export default function CalendarPage() {
 
         const jobIds = jobsData.map((job) => job.id);
 
-        // Now get shifts for these jobs
         const { data: shiftsData, error: shiftError } = await supabase
           .from("shift")
           .select(
@@ -199,11 +198,9 @@ export default function CalendarPage() {
     }
   };
 
-  // ✅ Transform shifts with location + position title + assignment count
   const transformShifts = async (
     shiftsData: ShiftFromDB[]
   ): Promise<Shift[]> => {
-    // Get assignment counts for all shifts in one query
     const shiftIds = shiftsData.map((s) => s.id);
     const assignmentCounts: Record<number, number> = {};
 
@@ -374,9 +371,7 @@ export default function CalendarPage() {
 
   return (
     <div className="w-full space-y-4 py-0">
-      {/* ✅ Filters and Stats Row */}
       <div className="grid grid-cols-4 gap-4">
-        {/* Location Filter */}
         <div>
           <label className="text-sm font-medium mb-2 block">Location</label>
           <Select value={filterLocation} onValueChange={setFilterLocation}>
@@ -394,7 +389,6 @@ export default function CalendarPage() {
           </Select>
         </div>
 
-        {/* Status Filter */}
         <div>
           <label className="text-sm font-medium mb-2 block">Status</label>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -410,7 +404,6 @@ export default function CalendarPage() {
           </Select>
         </div>
 
-        {/* Upcoming Shifts Stat */}
         <Card>
           <CardContent className="p-0 pt-3">
             <div className="text-center">
@@ -424,7 +417,6 @@ export default function CalendarPage() {
           </CardContent>
         </Card>
 
-        {/* Today's Shifts Stat */}
         <Card>
           <CardContent className="p-0 pt-3">
             <div className="text-center">
@@ -439,7 +431,6 @@ export default function CalendarPage() {
         </Card>
       </div>
 
-      {/* ✅ Error Message */}
       {error && (
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
           <AlertCircle className="w-5 h-5 text-red-600" />
@@ -447,7 +438,6 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* ✅ Calendar Card */}
       <Card className="w-full">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -480,7 +470,6 @@ export default function CalendarPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Week day headers */}
               <div className="grid grid-cols-7 gap-2">
                 {weekDays.map((day) => (
                   <div
@@ -492,7 +481,6 @@ export default function CalendarPage() {
                 ))}
               </div>
 
-              {/* Calendar grid */}
               <div className="grid grid-cols-7 gap-2">
                 {Array.from({ length: firstDay }).map((_, i) => (
                   <div
@@ -538,9 +526,14 @@ export default function CalendarPage() {
                       </div>
                       <div className="flex-1 overflow-y-auto space-y-1">
                         {dayShifts.slice(0, 3).map((shift) => {
-                          const needsAttention =
-                            shift.assignmentCount !== undefined &&
-                            shift.assignmentCount !== shift.workers_needed;
+                          // ✅ FIXED: Always show counter, with different colors
+                          const assignmentCount = shift.assignmentCount ?? 0;
+                          const workersNeeded = shift.workers_needed;
+                          const isFullyStaffed =
+                            assignmentCount === workersNeeded;
+                          const isOverstaffed = assignmentCount > workersNeeded;
+                          const isUnderstaffed =
+                            assignmentCount < workersNeeded;
 
                           return (
                             <div
@@ -551,16 +544,22 @@ export default function CalendarPage() {
                               <div className="truncate font-medium">
                                 {shift.position}
                               </div>
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between gap-1">
                                 <div className="text-primary-foreground/80 text-xs">
                                   {shift.startTime.slice(0, 5)}
                                 </div>
-                                {needsAttention && (
-                                  <div className="text-xs bg-orange-500 text-white px-1 rounded">
-                                    {shift.assignmentCount}/
-                                    {shift.workers_needed}
-                                  </div>
-                                )}
+                                {/* ✅ Always show counter */}
+                                <div
+                                  className={`text-xs px-1 rounded font-medium ${
+                                    isFullyStaffed
+                                      ? "bg-green-500 text-white"
+                                      : isOverstaffed
+                                      ? "bg-red-500 text-white"
+                                      : "bg-orange-500 text-white"
+                                  }`}
+                                >
+                                  {assignmentCount}/{workersNeeded}
+                                </div>
                               </div>
                             </div>
                           );
@@ -580,7 +579,6 @@ export default function CalendarPage() {
         </CardContent>
       </Card>
 
-      {/* ✅ Floating Action Button */}
       {(activeRole.role === "company_admin" ||
         activeRole.role === "superadmin") &&
         targetCompanyId &&
@@ -608,7 +606,6 @@ export default function CalendarPage() {
           </Dialog>
         )}
 
-      {/* ✅ Day View Modal */}
       {selectedDay && (
         <DayView
           date={selectedDay}
