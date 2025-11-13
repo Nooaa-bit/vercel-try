@@ -22,7 +22,7 @@ interface Shift {
   status: "draft" | "active" | "completed";
   startTime: string;
   endTime: string;
-  assignmentCount?: number; // ✅ Added
+  assignmentCount?: number;
 }
 
 interface Location {
@@ -78,6 +78,10 @@ export function DayView({
   const shiftsScrollRef = useRef<HTMLDivElement>(null);
   const hoursScrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  // ✅ Check if user can edit (only company_admin and superadmin)
+  const canEdit =
+    activeRole.role === "company_admin" || activeRole.role === "superadmin";
 
   useEffect(() => {
     const shiftsDiv = shiftsScrollRef.current;
@@ -185,7 +189,13 @@ export function DayView({
     setDialogOpen(open);
   };
 
+  // ✅ Handle shift click - only allow editing for admins
   const handleShiftClick = async (shift: Shift) => {
+    // ✅ Prevent editing for talent and supervisor
+    if (!canEdit) {
+      return;
+    }
+
     try {
       const { data: shiftData, error: shiftError } = await supabase
         .from("shift")
@@ -246,8 +256,8 @@ export function DayView({
             </div>
 
             <div className="flex gap-2">
-              {(activeRole.role === "company_admin" ||
-                activeRole.role === "superadmin") && (
+              {/* ✅ Only show "Add Job" button for admins */}
+              {canEdit && (
                 <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
                   <DialogTrigger asChild>
                     <Button className="bg-primary hover:bg-primary/90">
@@ -331,7 +341,6 @@ export function DayView({
                         shift.endTime
                       );
 
-                      // ✅ Calculate staffing status
                       const assignmentCount = shift.assignmentCount ?? 0;
                       const workersNeeded = shift.workers_needed;
                       const isFullyStaffed = assignmentCount === workersNeeded;
@@ -340,12 +349,20 @@ export function DayView({
                       return (
                         <div
                           key={shift.id}
-                          className="absolute bg-primary text-primary-foreground rounded-lg p-2 border border-primary/20 hover:shadow-lg transition-shadow cursor-pointer overflow-hidden left-1 right-1"
+                          className={`absolute bg-primary text-primary-foreground rounded-lg p-2 border border-primary/20 transition-shadow overflow-hidden left-1 right-1 ${
+                            canEdit
+                              ? "hover:shadow-lg cursor-pointer"
+                              : "cursor-default"
+                          }`}
                           style={{
                             top: `${startPosition * 64}px`,
                             height: `${height * 64}px`,
                           }}
-                          title={`${shift.position} - ${shift.location}`}
+                          title={
+                            canEdit
+                              ? `${shift.position} - ${shift.location} (Click to edit)`
+                              : `${shift.position} - ${shift.location}`
+                          }
                           onClick={() => handleShiftClick(shift)}
                         >
                           <div className="text-xs font-semibold truncate">
@@ -358,7 +375,6 @@ export function DayView({
                           <div className="text-xs text-primary-foreground/70 mt-1 truncate">
                             {shift.location}
                           </div>
-                          {/* ✅ Always show staffing counter with color coding */}
                           <div className="flex items-center gap-1 mt-1">
                             <div
                               className={`text-xs px-1.5 py-0.5 rounded font-medium ${
@@ -387,7 +403,8 @@ export function DayView({
         </CardContent>
       </Card>
 
-      {shiftEditDialogOpen && editingShiftData && (
+      {/* ✅ Only render edit dialog for admins */}
+      {canEdit && shiftEditDialogOpen && editingShiftData && (
         <Dialog
           open={shiftEditDialogOpen}
           onOpenChange={setShiftEditDialogOpen}

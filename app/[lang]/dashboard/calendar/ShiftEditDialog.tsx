@@ -15,7 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { AlertTriangle, Info, Users, Search, X as XIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Info,
+  Users,
+  Search,
+  X as XIcon,
+  Loader2,
+} from "lucide-react";
 import { TimePickerSelect } from "@/components/TimePickerSelect";
 import {
   fetchAssignedStaffForShift,
@@ -73,6 +80,9 @@ export function ShiftEditDialog({
   const [remainingShiftCount, setRemainingShiftCount] = useState(0);
   const supabase = createClient();
 
+  // ✅ NEW: Loading states
+  const [loadingInitialData, setLoadingInitialData] = useState(true);
+
   const [originalStaff, setOriginalStaff] = useState<StaffEmployee[]>([]);
   const [currentStaff, setCurrentStaff] = useState<StaffEmployee[]>([]);
   const [staffToAdd, setStaffToAdd] = useState<Set<number>>(new Set());
@@ -91,44 +101,47 @@ export function ShiftEditDialog({
   const [companyId, setCompanyId] = useState<number>(0);
   const [sendingInvites, setSendingInvites] = useState(false);
 
+  // ✅ Load initial data with loading state
   useEffect(() => {
-    const fetchRemainingShiftCount = async () => {
-      const today = new Date().toISOString().split("T")[0];
+    const loadInitialData = async () => {
+      setLoadingInitialData(true);
 
-      const { count } = await supabase
-        .from("shift")
-        .select("*", { count: "exact", head: true })
-        .eq("job_id", shift.job_id)
-        .gte("shift_date", today)
-        .is("deleted_at", null);
+      try {
+        // Fetch remaining shift count
+        const today = new Date().toISOString().split("T")[0];
+        const { count } = await supabase
+          .from("shift")
+          .select("*", { count: "exact", head: true })
+          .eq("job_id", shift.job_id)
+          .gte("shift_date", today)
+          .is("deleted_at", null);
 
-      setRemainingShiftCount(count || 0);
-    };
+        setRemainingShiftCount(count || 0);
 
-    fetchRemainingShiftCount();
-  }, [shift.job_id, supabase]);
+        // Load assigned staff
+        const staff = await fetchAssignedStaffForShift(supabase, shift.id);
+        setOriginalStaff(staff);
+        setCurrentStaff(staff);
 
-  useEffect(() => {
-    const loadAssignedStaff = async () => {
-      const staff = await fetchAssignedStaffForShift(supabase, shift.id);
-      setOriginalStaff(staff);
-      setCurrentStaff(staff);
-    };
+        // Get company ID
+        const { data } = await supabase
+          .from("job")
+          .select("company_id")
+          .eq("id", shift.job_id)
+          .single();
 
-    loadAssignedStaff();
-
-    const fetchCompanyId = async () => {
-      const { data } = await supabase
-        .from("job")
-        .select("company_id")
-        .eq("id", shift.job_id)
-        .single();
-      if (data) {
-        setCompanyId(data.company_id);
+        if (data) {
+          setCompanyId(data.company_id);
+        }
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+        toast.error("Failed to load shift data");
+      } finally {
+        setLoadingInitialData(false);
       }
     };
 
-    fetchCompanyId();
+    loadInitialData();
   }, [shift.id, shift.job_id, supabase]);
 
   const timeValidation = {
@@ -288,8 +301,6 @@ export function ShiftEditDialog({
     toast.info(`${userName} removed (pending save)`);
   };
 
-  // ✅ FIXED: Direct assignment function with duplicate error handling
-  // ✅ FIXED: Undelete existing assignments or create new ones
   const assignStaffDirectly = async (
     userIds: number[],
     shiftIds: number[],
@@ -303,7 +314,6 @@ export function ShiftEditDialog({
     const now = new Date().toISOString();
     let successCount = 0;
 
-    // ✅ Get ALL assignments (including deleted ones) for these shifts
     const { data: allAssignments } = await supabase
       .from("shift_assignment")
       .select("id, shift_id, user_id, deleted_at, cancelled_at")
@@ -312,7 +322,6 @@ export function ShiftEditDialog({
 
     console.log("All assignments (including deleted):", allAssignments);
 
-    // Create maps for fast lookup
     const activeAssignments = new Set(
       (allAssignments || [])
         .filter((a) => !a.deleted_at && !a.cancelled_at)
@@ -332,7 +341,6 @@ export function ShiftEditDialog({
       for (const shiftId of shiftIds) {
         const key = `${shiftId}-${userId}`;
 
-        // ✅ Check if active assignment exists
         if (activeAssignments.has(key)) {
           console.log(
             `⏭️ Skipping - active assignment exists for user ${userId}, shift ${shiftId}`
@@ -340,7 +348,6 @@ export function ShiftEditDialog({
           continue;
         }
 
-        // ✅ Check if deleted/cancelled assignment exists - UNDELETE IT
         const deletedAssignment = deletedAssignments.get(key);
         if (deletedAssignment) {
           console.log(
@@ -369,7 +376,6 @@ export function ShiftEditDialog({
           continue;
         }
 
-        // ✅ No assignment exists - CREATE NEW
         console.log(
           `➕ Creating new assignment for user ${userId}, shift ${shiftId}`
         );
@@ -453,7 +459,6 @@ export function ShiftEditDialog({
     setSaving(true);
 
     try {
-      // ✅ 1. Update shift times and workers
       if (applyToRestOfJob) {
         const todayStr = new Date().toISOString().split("T")[0];
 
@@ -482,12 +487,10 @@ export function ShiftEditDialog({
         if (error) throw error;
       }
 
-      // ✅ 2. Get shifts to modify
       const shiftsToModify = applyToRestOfJob
         ? (await fetchRemainingShifts(supabase, shift.job_id)).map((s) => s.id)
         : [shift.id];
 
-      // ✅ 3. Remove staff
       if (staffToRemove.size > 0) {
         for (const userId of staffToRemove) {
           await removeStaffFromShifts(supabase, userId, shiftsToModify);
@@ -497,7 +500,6 @@ export function ShiftEditDialog({
         );
       }
 
-      // ✅ 4. Add staff - FIXED: Better user lookup
       if (staffToAdd.size > 0) {
         const {
           data: { user: authUser },
@@ -511,10 +513,8 @@ export function ShiftEditDialog({
 
         console.log("Auth user ID:", authUser.id);
 
-        // Try multiple approaches to find the user
         let adminUserId: number | null = null;
 
-        // Approach 1: Try auth_user_id
         const { data: userData1 } = await supabase
           .from("user")
           .select("id")
@@ -526,7 +526,6 @@ export function ShiftEditDialog({
           console.log("Found user via auth_user_id:", adminUserId);
         }
 
-        // Approach 2: Try supabase_user_id if first approach failed
         if (!adminUserId) {
           const { data: userData2 } = await supabase
             .from("user")
@@ -540,7 +539,6 @@ export function ShiftEditDialog({
           }
         }
 
-        // Approach 3: Try getting from user_role table
         if (!adminUserId) {
           const { data: roleData } = await supabase
             .from("user_role")
@@ -558,7 +556,6 @@ export function ShiftEditDialog({
         if (!adminUserId) {
           console.error("Could not find user ID in database");
           toast.error("Could not find user data. Staff changes not applied.");
-          // Continue with other updates but skip staff assignment
         } else {
           const assignedCount = await assignStaffDirectly(
             Array.from(staffToAdd),
@@ -578,7 +575,6 @@ export function ShiftEditDialog({
         }
       }
 
-      // ✅ 5. Reload staff to get updated count
       const updatedStaff = await fetchAssignedStaffForShift(supabase, shift.id);
       setOriginalStaff(updatedStaff);
       setCurrentStaff(updatedStaff);
@@ -591,7 +587,6 @@ export function ShiftEditDialog({
 
       toast.success(message);
 
-      // ✅ Refresh parent
       onSave();
     } catch (error) {
       console.error("Error updating shift:", error);
@@ -637,6 +632,23 @@ export function ShiftEditDialog({
       setSaving(false);
     }
   };
+
+  // ✅ Show loading state while fetching initial data
+  if (loadingInitialData) {
+    return (
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Loading Shift</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+          <p className="text-sm text-muted-foreground">
+            Loading shift details...
+          </p>
+        </div>
+      </DialogContent>
+    );
+  }
 
   if (shiftIsPast) {
     return (
@@ -926,7 +938,14 @@ export function ShiftEditDialog({
             onClick={handleCancel}
             disabled={saving}
           >
-            Cancel Shift
+            {saving ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                Cancelling...
+              </>
+            ) : (
+              "Cancel Shift"
+            )}
           </Button>
           <div className="flex gap-2">
             <Button
@@ -942,7 +961,14 @@ export function ShiftEditDialog({
               onClick={handleSave}
               disabled={saving || !timeValidation.isValid}
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </div>
         </div>
@@ -970,9 +996,9 @@ export function ShiftEditDialog({
           {loadingStaff ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">
-                  Loading employees...
+                  Loading employees and calculating availability...
                 </p>
               </div>
             </div>
@@ -1107,7 +1133,14 @@ export function ShiftEditDialog({
                   }}
                   disabled={selectedStaffIds.size === 0 || sendingInvites}
                 >
-                  {sendingInvites ? "Sending..." : "Send Invitations"}
+                  {sendingInvites ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Invitations"
+                  )}
                 </Button>
                 <Button
                   type="button"
