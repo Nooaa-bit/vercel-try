@@ -1,80 +1,72 @@
 //hype-hire/vercel/app/[lang]/dashboard/page.tsx
+// app/[lang]/dashboard/page.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { TrendingUp,
-  TrendingDown,
-  Users,
-  DollarSign,
-  Activity,
-  FileText,
-  UserPlus,
-  BarChart3,
-  Settings,
-  Download,
-  Plus,
-  Building2,
-} from "lucide-react";
 import { useActiveRole } from "../../hooks/useActiveRole";
 import { useTranslation } from "react-i18next";
+import { PendingInvitations } from "./PendingInvitations";
+import { MyShifts } from "./MyShifts";
+import { Loader2 } from "lucide-react";
 
-const MetricCard = ({
-  title,
-  value,
-  change,
-  trend,
-  description,
-  icon: Icon,
-}: {
-  title: string;
-  value: string;
-  change: string;
-  trend: "up" | "down";
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <Icon className="h-4 w-4 text-muted-foreground" />
-    </CardHeader>
-    <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-        {trend === "up" ? (
-          <TrendingUp className="h-4 w-4 text-green-500" />
-        ) : (
-          <TrendingDown className="h-4 w-4 text-red-500" />
-        )}
-        <span className={trend === "up" ? "text-green-500" : "text-red-500"}>
-          {change}
-        </span>
-        <span>{description}</span>
-      </div>
-    </CardContent>
-  </Card>
-);
-
-export default function Dashboard2Page() {
+export default function DashboardPage() {
   const { t } = useTranslation("dashboard");
-  const { activeRole, activeCompanyId, hasPermission, loading } =
-    useActiveRole();
+  const { activeRole, loading } = useActiveRole();
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background pt-20 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
         <span className="ml-3 text-muted-foreground">{t("loading")}</span>
       </div>
     );
   }
 
+  // ✅ Show invitations and shifts for talent/supervisors
+  const isTalent = activeRole?.role === "talent" || activeRole?.role === "supervisor";
+
+  if (isTalent) {
+    return (
+      <div className="min-h-screen bg-background pt-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold">My Dashboard</h1>
+            <p className="text-muted-foreground mt-2">
+              Manage your job invitations and upcoming shifts
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PendingInvitations userId={activeRole.id} />
+            <MyShifts userId={activeRole.id} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Admin view (company_admin, superadmin)
   return (
     <div className="min-h-screen bg-background pt-20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {/*  I deleted a lot of stuff which are in actual_page. Although its all front end without any functionality*/}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage your company operations
+          </p>
+        </div>
+
+        {/* ✅ Admin dashboard content - you can add metrics, charts, etc. here */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome, Admin</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Use the navigation menu to manage jobs, calendar, and company settings.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

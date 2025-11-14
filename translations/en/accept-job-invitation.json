@@ -1,0 +1,32 @@
+{
+  "loading": {
+    "title": "Processing Your Invitation",
+    "description": "Please wait while we confirm your shift assignments..."
+  },
+  "authRequired": {
+    "title": "Login Required",
+    "description": "You need to log in to accept this job invitation.",
+    "button": "Log In to Accept"
+  },
+  "success": {
+    "title": "Invitation Accepted!",
+    "description": "You've successfully been added to the job.",
+    "descriptionWithShifts": "{{count}} shift(s) have been added to your schedule.",
+    "position": "Position",
+    "redirecting": "Redirecting to your dashboard..."
+  },
+  "error": {
+    "title": "Unable to Accept",
+    "generic": "Something went wrong. Please try again.",
+    "redirecting": "Redirecting to dashboard..."
+  },
+  "errors": {
+    "noToken": "No invitation token provided.",
+    "invalidToken": "Invalid invitation link.",
+    "loginRequired": "Please log in to accept this invitation.",
+    "invitationNotFound": "This invitation doesn't exist or has expired.",
+    "spotsFilled": "Sorry, all positions have been filled.",
+    "processingFailed": "Failed to process invitation. Please contact support.",
+    "unexpectedError": "An unexpected error occurred."
+  }
+}

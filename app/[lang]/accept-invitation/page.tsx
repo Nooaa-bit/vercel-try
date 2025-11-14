@@ -1,28 +1,35 @@
 //hype-hire/vercel/app/[lang]/accept-invitation/page.tsx
+// app/[lang]/invite/accept/[token]/page.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Info } from "lucide-react";
+import { useAuth } from "@/app/hooks/useAuth";
 
-export default function AcceptInvitationPage() {
+export default function AcceptJobInvitationPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useParams();
   const pathname = usePathname();
-  const { t, ready } = useTranslation("accept-invitation");
+  const { t, ready } = useTranslation("accept-job-invitation");
+  const { user, loading: authLoading } = useAuth();
 
-  const [status, setStatus] = useState<"loading" | "success" | "error">(
-    "loading"
-  );
+  const [status, setStatus] = useState<
+    "loading" | "success" | "error" | "auth_required"
+  >("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [successDetails, setSuccessDetails] = useState<{
+    shiftsAssigned?: number;
+    position?: string;
+  }>({});
 
   // ✅ Prevent duplicate runs
   const hasRun = useRef(false);
 
   // Extract language from pathname
   const lang = pathname.split("/")[1] || "en";
+  const token = params.token as string;
 
   useEffect(() => {
     // ✅ Guard against double execution (React 18 StrictMode, fast refresh)
@@ -30,9 +37,17 @@ export default function AcceptInvitationPage() {
     hasRun.current = true;
 
     const accept = async () => {
-      // 1. Get and validate token
-      const token = searchParams.get("token");
+      // 1. Wait for auth to load
+      if (authLoading) return;
 
+      // 2. Check if user is authenticated
+      if (!user) {
+        setStatus("auth_required");
+        setErrorMessage(t("errors.loginRequired"));
+        return;
+      }
+
+      // 3. Validate token
       if (!token) {
         setStatus("error");
         setErrorMessage(t("errors.noToken"));
@@ -40,8 +55,8 @@ export default function AcceptInvitationPage() {
         return;
       }
 
-      // 2. Basic token format validation (UUID is 36 chars)
-      if (token.length !== 36 || !/^[a-f0-9-]+$/i.test(token)) {
+      // 4. Basic token format validation (cuid is ~25 chars)
+      if (token.length < 20 || !/^[a-z0-9]+$/i.test(token)) {
         setStatus("error");
         setErrorMessage(t("errors.invalidToken"));
         setTimeout(() => router.replace(`/${lang}/?error=invalid-token`), 2000);
@@ -49,73 +64,83 @@ export default function AcceptInvitationPage() {
       }
 
       try {
-        // 3. Call API to process invitation
-        const response = await fetch(`/api/invitations/accept?token=${token}`);
+        // 5. Call API to accept job invitation
+        const response = await fetch("/api/invite/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+
+        const data = await response.json();
 
         if (!response.ok) {
-          const error = await response.json();
-
-          // ✅ Special handling for "already accepted" (user might have refreshed)
-          if (error.error === "already-used") {
-            // Check if they're already logged in
-            const supabase = createClient();
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-
-            if (user) {
-              // They're logged in, just redirect to dashboard
-              setStatus("success");
-              setTimeout(() => router.replace(`/${lang}/dashboard`), 1000);
-              return;
-            }
+          // ✅ Handle specific error cases
+          if (response.status === 404) {
+            setStatus("error");
+            setErrorMessage(t("errors.invitationNotFound"));
+            setTimeout(
+              () => router.replace(`/${lang}/dashboard?error=invite-not-found`),
+              2000
+            );
+            return;
           }
 
+          if (response.status === 410) {
+            // Shifts are full
+            setStatus("error");
+            setErrorMessage(t("errors.spotsFilled"));
+            setTimeout(
+              () => router.replace(`/${lang}/dashboard?error=spots-filled`),
+              2000
+            );
+            return;
+          }
+
+          if (response.status === 400 && data.error?.includes("already")) {
+            // Already accepted - redirect to dashboard
+            setStatus("success");
+            setSuccessDetails({ shiftsAssigned: 0 });
+            setTimeout(() => router.replace(`/${lang}/dashboard`), 1000);
+            return;
+          }
+
+          // Generic error
           setStatus("error");
-          setErrorMessage(error.error || t("errors.processingFailed"));
+          setErrorMessage(data.error || t("errors.processingFailed"));
           setTimeout(
-            () => router.replace(`/${lang}/?error=${error.error || "failed"}`),
+            () =>
+              router.replace(`/${lang}/dashboard?error=${data.error || "failed"}`),
             2000
           );
           return;
         }
 
-        const { hashedToken } = await response.json();
-
-        // 4. Verify OTP to create session
-        const supabase = createClient();
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: hashedToken,
-          type: "magiclink",
-        });
-
-        if (error) {
-          console.error("OTP verification error:", error);
-          setStatus("error");
-          setErrorMessage(t("errors.sessionCreationFailed"));
-          setTimeout(() => router.replace(`/${lang}/?error=auth-failed`), 2000);
-          return;
-        }
-
-        // 5. Success - redirect to dashboard
+        // 6. Success
         setStatus("success");
-        setTimeout(() => router.replace(`/${lang}/dashboard`), 1000);
+        setSuccessDetails({
+          shiftsAssigned: data.shiftsAssigned,
+          position: data.position,
+        });
+        setTimeout(() => router.replace(`/${lang}/dashboard`), 2000);
       } catch (error) {
-        console.error("Invitation acceptance error:", error);
+        console.error("Job invitation acceptance error:", error);
         setStatus("error");
         setErrorMessage(t("errors.unexpectedError"));
-        setTimeout(() => router.replace(`/${lang}/?error=unexpected`), 2000);
+        setTimeout(
+          () => router.replace(`/${lang}/dashboard?error=unexpected`),
+          2000
+        );
       }
     };
 
     accept();
-  }, []); // ✅ Empty deps + ref guard prevents double execution
+  }, [authLoading, user]); // ✅ Run when auth state changes
 
   // Loading state while translations load
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pulse-500" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
       </div>
     );
   }
@@ -126,8 +151,8 @@ export default function AcceptInvitationPage() {
         {/* Loading State */}
         {status === "loading" && (
           <>
-            <div className="w-16 h-16 bg-pulse-100 rounded-full flex items-center justify-center mx-auto">
-              <Loader2 className="w-8 h-8 text-pulse-500 animate-spin" />
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground mb-2">
@@ -139,17 +164,42 @@ export default function AcceptInvitationPage() {
             </div>
             <div className="flex gap-1 justify-center">
               <div
-                className="w-2 h-2 bg-pulse-500 rounded-full animate-bounce"
+                className="w-2 h-2 bg-primary rounded-full animate-bounce"
                 style={{ animationDelay: "0ms" }}
               />
               <div
-                className="w-2 h-2 bg-pulse-500 rounded-full animate-bounce"
+                className="w-2 h-2 bg-primary rounded-full animate-bounce"
                 style={{ animationDelay: "150ms" }}
               />
               <div
-                className="w-2 h-2 bg-pulse-500 rounded-full animate-bounce"
+                className="w-2 h-2 bg-primary rounded-full animate-bounce"
                 style={{ animationDelay: "300ms" }}
               />
+            </div>
+          </>
+        )}
+
+        {/* Auth Required State */}
+        {status === "auth_required" && (
+          <>
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+              <Info className="w-8 h-8 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground mb-2">
+                {t("authRequired.title")}
+              </h1>
+              <p className="text-muted-foreground mb-6">
+                {t("authRequired.description")}
+              </p>
+              <button
+                onClick={() =>
+                  router.push(`/${lang}/login?redirect=/invite/accept/${token}`)
+                }
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                {t("authRequired.button")}
+              </button>
             </div>
           </>
         )}
@@ -164,8 +214,20 @@ export default function AcceptInvitationPage() {
               <h1 className="text-2xl font-bold text-foreground mb-2">
                 {t("success.title")}
               </h1>
-              <p className="text-muted-foreground">
-                {t("success.description")}
+              <p className="text-muted-foreground mb-2">
+                {successDetails.shiftsAssigned
+                  ? t("success.descriptionWithShifts", {
+                      count: successDetails.shiftsAssigned,
+                    })
+                  : t("success.description")}
+              </p>
+              {successDetails.position && (
+                <p className="text-sm text-muted-foreground">
+                  {t("success.position")}: <strong>{successDetails.position}</strong>
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground mt-4">
+                {t("success.redirecting")}
               </p>
             </div>
           </>

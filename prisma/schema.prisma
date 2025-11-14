@@ -306,25 +306,26 @@ model JobInvitation {
   jobId         Int       @map("job_id")
   userId        Int       @map("user_id")
   
-  // Who sent it
   invitedBy     Int       @map("invited_by")
+  token         String    @unique @default(cuid())
   
-  // Lifecycle
+  shiftIds      Int[]     @map("shift_ids")
+  
   status        job_invitation_status @default(pending)
-  expiresAt     DateTime  @map("expires_at")
   respondedAt   DateTime? @map("responded_at")
+  spotsFilledAt DateTime? @map("spots_filled_at") @db.Timestamptz(6)
   
-  // Audit
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   
-  // Relations
   job           Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   invitee       user      @relation("JobInvitationInvitee", fields: [userId], references: [id], onDelete: Cascade)
   inviter       user      @relation("JobInvitationInvitedBy", fields: [invitedBy], references: [id])
   
-  @@index([jobId, status])
-  @@index([userId, status])
+  //@@index([jobId, status])
+ // @@index([userId, status])
+  //@@index([token])
+  @@index([shiftIds])
   @@map("job_invitation")
 }
 
