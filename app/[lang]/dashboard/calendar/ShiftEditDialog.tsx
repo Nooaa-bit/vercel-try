@@ -247,42 +247,77 @@ export function ShiftEditDialog({
     setSelectedStaffIds(new Set());
   };
 
-  const handleSendInvites = async () => {
-    if (selectedStaffIds.size === 0) {
-      toast.error(t("shiftEditToast.selectEmployee"));
+const handleSendInvites = async () => {
+  if (selectedStaffIds.size === 0) {
+    toast.error(t("shiftEditToast.selectEmployee"));
+    return;
+  }
+
+  setSendingInvites(true);
+
+  try {
+    // Get the admin's user_id
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
       return;
     }
 
-    setSendingInvites(true);
+    const { data: userData } = await supabase
+      .from("user")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single();
 
-    try {
-      const response = await fetch(`/api/job-invitation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId: shift.job_id,
-          userIds: Array.from(selectedStaffIds),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send invitations");
-      }
-
-      toast.success(
-        t("shiftEditToast.invitationsSent", { count: selectedStaffIds.size })
-      );
-      setStaffModalOpen(false);
-      setSelectedStaffIds(new Set());
-    } catch (error) {
-      console.error("Error sending invitations:", error);
-      toast.error(t("shiftEditToast.invitationsFailed"));
-    } finally {
-      setSendingInvites(false);
+    if (!userData) {
+      toast.error("User not found");
+      return;
     }
-  };
+
+    // Determine which shifts to include in the invitation
+    let shiftIds: number[];
+
+    if (applyToRestOfJob) {
+      // Get all remaining shifts for the job
+      const remainingShifts = await fetchRemainingShifts(
+        supabase,
+        shift.job_id
+      );
+      shiftIds = remainingShifts.map((s) => s.id);
+    } else {
+      // Just this shift
+      shiftIds = [shift.id];
+    }
+
+    // Create invitations
+    const invitations = Array.from(selectedStaffIds).map((userId) => ({
+      job_id: shift.job_id,
+      user_id: userId,
+      invited_by: userData.id,
+      shift_ids: shiftIds,
+      status: "pending",
+    }));
+
+    const { error } = await supabase.from("job_invitation").insert(invitations);
+
+    if (error) throw error;
+
+    toast.success(
+      t("shiftEditToast.invitationsSent", { count: selectedStaffIds.size })
+    );
+
+    setStaffModalOpen(false);
+    setSelectedStaffIds(new Set());
+  } catch (error) {
+    console.error("Error sending invitations:", error);
+    toast.error(t("shiftEditToast.invitationsFailed"));
+  } finally {
+    setSendingInvites(false);
+  }
+};
+
 
   const handleRemoveStaff = (
     e: React.MouseEvent,

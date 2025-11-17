@@ -1,5 +1,4 @@
 //hype-hire/vercel/app/[lang]/accept-invitation/page.tsx
-// app/[lang]/invite/accept/[token]/page.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";

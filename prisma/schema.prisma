@@ -294,7 +294,7 @@ model ShiftAssignment {
   
   checkIns        CheckInOut[]
   
-  @@unique([shiftId, userId], map: "shift_user_unique") // One assignment per user per shift
+  @@unique([shiftId, userId, deletedAt], name: "shift_user_unique")
 @@index([userId, cancelledAt, markedNoShowAt], map: "idx_assignment_user_status")
   @@index([shiftId, cancelledAt, deletedAt], map: "idx_assignment_shift_active")
   @@map("shift_assignment")
@@ -313,7 +313,7 @@ model JobInvitation {
   spotsFilledAt DateTime? @map("spots_filled_at") @db.Timestamptz(6)
   
   createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  updatedAt     DateTime?  @updatedAt @map("updated_at")
   
   job           Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   invitee       user      @relation("JobInvitationInvitee", fields: [userId], references: [id], onDelete: Cascade)
@@ -589,6 +589,7 @@ enum job_invitation_status {
   declined
   expired
   cancelled
+  spots_filled
   @@map("job_invitation_status")
 }
 

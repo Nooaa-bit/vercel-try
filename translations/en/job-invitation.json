@@ -1,0 +1,18 @@
+{
+  "title": "Pending Invitations",
+  "noPending": "No pending invitations",
+  "shiftsCount": "Shifts: {{count}}",
+  "shiftSchedule": "Shift Schedule",
+  "moreShifts": "+{{count}} more",
+  "accept": "Accept",
+  "decline": "Decline",
+  "confirmDecline": "Are you sure you want to decline this invitation?",
+  "toast": {
+    "loadFailed": "Failed to load invitations",
+    "acceptSuccess": "Invitation accepted! {{count}} shift(s) assigned.",
+    "acceptFailed": "Failed to accept invitation",
+    "spotsFilled": "Sorry, the positions have been filled",
+    "declined": "Invitation declined",
+    "declineFailed": "Failed to decline invitation"
+  }
+}

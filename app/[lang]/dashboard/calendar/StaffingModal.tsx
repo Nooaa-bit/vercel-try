@@ -151,48 +151,82 @@ export function StaffingModal({
     setSelectedEmployees(newSelected);
   };
 
-  const handleSendInvites = async () => {
-    if (selectedEmployees.size === 0) {
-      toast.error(t("staffingToast.selectEmployee"));
+const handleSendInvites = async () => {
+  if (selectedEmployees.size === 0) {
+    toast.error(t("staffingToast.selectEmployee"));
+    return;
+  }
+
+  setSendingInvites(true);
+
+  try {
+    // Get the admin's user_id
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
       return;
     }
 
-    setSendingInvites(true);
+    const { data: userData } = await supabase
+      .from("user")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single();
 
-    try {
-      const response = await fetch(`/api/job-invitation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId: job.id,
-          userIds: Array.from(selectedEmployees),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send invitations");
-      }
-
-      toast.success(
-        t("staffingToast.invitationsSent", { count: selectedEmployees.size }),
-        {
-          description: t("staffingToast.invitationsDescription"),
-        }
-      );
-      onOpenChange(false);
-      setSelectedEmployees(new Set());
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      console.error("❌ Error sending invitations:", errorMessage);
-      toast.error(
-        t("staffingToast.invitationsFailed", { error: errorMessage })
-      );
-    } finally {
-      setSendingInvites(false);
+    if (!userData) {
+      toast.error("User not found");
+      return;
     }
-  };
+
+    // Get remaining shifts for the job
+    const now = new Date().toISOString().split("T")[0];
+    const { data: shifts } = await supabase
+      .from("shift")
+      .select("id")
+      .eq("job_id", job.id)
+      .gte("shift_date", now)
+      .is("deleted_at", null);
+
+    if (!shifts || shifts.length === 0) {
+      toast.error("No available shifts");
+      return;
+    }
+
+    const shiftIds = shifts.map((s) => s.id);
+
+    // Create invitations for each selected employee
+    const invitations = Array.from(selectedEmployees).map((userId) => ({
+      job_id: job.id,
+      user_id: userId,
+      invited_by: userData.id,
+      shift_ids: shiftIds,
+      status: "pending",
+    }));
+
+    const { error } = await supabase.from("job_invitation").insert(invitations);
+
+    if (error) throw error;
+
+    toast.success(
+      t("staffingToast.invitationsSent", { count: selectedEmployees.size }),
+      {
+        description: t("staffingToast.invitationsDescription"),
+      }
+    );
+
+    onOpenChange(false);
+    setSelectedEmployees(new Set());
+  } catch (error) {
+    const errorMessage = getErrorMessage(error);
+    console.error("❌ Error sending invitations:", errorMessage);
+    toast.error(t("staffingToast.invitationsFailed", { error: errorMessage }));
+  } finally {
+    setSendingInvites(false);
+  }
+};
+
 
   const handleAssignStaff = async () => {
     if (selectedEmployees.size === 0) {

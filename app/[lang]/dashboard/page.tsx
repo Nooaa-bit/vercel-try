@@ -36,8 +36,8 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PendingInvitations userId={activeRole.id} />
-            <MyShifts userId={activeRole.id} />
+            <PendingInvitations userId={activeRole.userId} />
+            <MyShifts userId={activeRole.userId} />
           </div>
         </div>
       </div>
