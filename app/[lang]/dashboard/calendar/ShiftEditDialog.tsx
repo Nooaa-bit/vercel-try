@@ -80,7 +80,6 @@ export function ShiftEditDialog({
   const [remainingShiftCount, setRemainingShiftCount] = useState(0);
   const supabase = createClient();
 
-  // ✅ NEW: Loading states
   const [loadingInitialData, setLoadingInitialData] = useState(true);
 
   const [originalStaff, setOriginalStaff] = useState<StaffEmployee[]>([]);
@@ -101,14 +100,17 @@ export function ShiftEditDialog({
   const [companyId, setCompanyId] = useState<number>(0);
   const [sendingInvites, setSendingInvites] = useState(false);
 
-  // ✅ Load initial data with loading state
   useEffect(() => {
     const loadInitialData = async () => {
       setLoadingInitialData(true);
 
       try {
-        // Fetch remaining shift count
-        const today = new Date().toISOString().split("T")[0];
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const today = `${year}-${month}-${day}`;
+
         const { count } = await supabase
           .from("shift")
           .select("*", { count: "exact", head: true })
@@ -118,12 +120,10 @@ export function ShiftEditDialog({
 
         setRemainingShiftCount(count || 0);
 
-        // Load assigned staff
         const staff = await fetchAssignedStaffForShift(supabase, shift.id);
         setOriginalStaff(staff);
         setCurrentStaff(staff);
 
-        // Get company ID
         const { data } = await supabase
           .from("job")
           .select("company_id")
@@ -460,7 +460,11 @@ export function ShiftEditDialog({
 
     try {
       if (applyToRestOfJob) {
-        const todayStr = new Date().toISOString().split("T")[0];
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const todayStr = `${year}-${month}-${day}`;
 
         const { error } = await supabase
           .from("shift")
@@ -612,18 +616,78 @@ export function ShiftEditDialog({
     setSaving(true);
 
     try {
-      const now = new Date().toISOString();
+      const now = new Date();
 
-      const { error } = await supabase
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const todayStr = `${year}-${month}-${day}`;
+      const nowIso = now.toISOString();
+
+      const { data: remainingShifts, count: remainingCount } = await supabase
+        .from("shift")
+        .select("id", { count: "exact" })
+        .eq("job_id", shift.job_id)
+        .gte("shift_date", todayStr)
+        .is("deleted_at", null);
+
+      console.log("Remaining shifts for job:", remainingCount);
+      console.log("Current shift ID:", shift.id);
+
+      const isLastShift =
+        remainingCount === 1 && remainingShifts?.[0]?.id === shift.id;
+
+      console.log("Is this the last shift?", isLastShift);
+
+      const { error: shiftError } = await supabase
         .from("shift")
         .update({
-          deleted_at: now,
+          deleted_at: nowIso,
         })
         .eq("id", shift.id);
 
-      if (error) throw error;
+      if (shiftError) throw shiftError;
 
-      toast.success("Shift cancelled successfully");
+      if (isLastShift) {
+        console.log("Deleting job because this was the last shift");
+
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        let deletedByUserId: number | null = null;
+
+        if (authUser) {
+          const { data: userData } = await supabase
+            .from("user")
+            .select("id")
+            .eq("auth_user_id", authUser.id)
+            .single();
+
+          if (userData) {
+            deletedByUserId = userData.id;
+          }
+        }
+
+        const { error: jobError } = await supabase
+          .from("job")
+          .update({
+            deleted_at: nowIso,
+            deleted_by: deletedByUserId,
+          })
+          .eq("id", shift.job_id);
+
+        if (jobError) {
+          console.error("Error deleting job:", jobError);
+          throw jobError;
+        }
+
+        toast.success(
+          "Shift cancelled successfully. Job also deleted as it was the last shift."
+        );
+      } else {
+        toast.success("Shift cancelled successfully");
+      }
+
       onSave();
     } catch (error) {
       console.error("Error cancelling shift:", error);
@@ -633,346 +697,357 @@ export function ShiftEditDialog({
     }
   };
 
-  // ✅ Show loading state while fetching initial data
   if (loadingInitialData) {
     return (
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Loading Shift</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
-          <p className="text-sm text-muted-foreground">
-            Loading shift details...
-          </p>
-        </div>
-      </DialogContent>
+      <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Loading Shift</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+            <p className="text-sm text-muted-foreground">
+              Loading shift details...
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   if (shiftIsPast) {
     return (
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>View Shift (Past)</DialogTitle>
-          <DialogDescription>
-            {shift.position} -{" "}
-            {new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
-              "en-US",
-              {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }
-            )}
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>View Shift (Past)</DialogTitle>
+            <DialogDescription>
+              {shift.position} -{" "}
+              {new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
+                "en-US",
+                {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                }
+              )}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <Alert className="border-gray-500 bg-gray-50">
-            <Info className="h-4 w-4 text-gray-600" />
-            <AlertDescription className="text-gray-800">
-              This shift has already started and cannot be edited.
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-4">
+            <Alert className="border-gray-500 bg-gray-50">
+              <Info className="h-4 w-4 text-gray-600" />
+              <AlertDescription className="text-gray-800">
+                This shift has already started and cannot be edited.
+              </AlertDescription>
+            </Alert>
 
-          <div className="space-y-3 text-sm">
-            <div>
-              <Label className="text-muted-foreground">Time</Label>
-              <p className="font-medium">
-                {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
-              </p>
-            </div>
-            <div>
-              <Label className="text-muted-foreground">Workers Needed</Label>
-              <p className="font-medium">{shift.workers_needed}</p>
-            </div>
-            <div>
-              <Label className="text-muted-foreground">Workers Assigned</Label>
-              <p className="font-medium">{originalStaff.length}</p>
-            </div>
-
-            {originalStaff.length > 0 && (
+            <div className="space-y-3 text-sm">
               <div>
-                <Label className="text-muted-foreground">Assigned Staff</Label>
-                <div className="space-y-1 mt-2">
-                  {originalStaff.map((staff) => (
-                    <div
-                      key={staff.userId}
-                      className="text-sm p-2 bg-muted rounded"
-                    >
-                      {staff.firstName && staff.lastName
-                        ? `${staff.firstName} ${staff.lastName}`
-                        : staff.email}
-                    </div>
-                  ))}
-                </div>
+                <Label className="text-muted-foreground">Time</Label>
+                <p className="font-medium">
+                  {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
+                </p>
               </div>
-            )}
-          </div>
-        </div>
+              <div>
+                <Label className="text-muted-foreground">Workers Needed</Label>
+                <p className="font-medium">{shift.workers_needed}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">
+                  Workers Assigned
+                </Label>
+                <p className="font-medium">{originalStaff.length}</p>
+              </div>
 
-        <div className="flex justify-end pt-4 border-t">
-          <Button variant="outline" onClick={onCancel}>
-            Close
-          </Button>
-        </div>
-      </DialogContent>
+              {originalStaff.length > 0 && (
+                <div>
+                  <Label className="text-muted-foreground">
+                    Assigned Staff
+                  </Label>
+                  <div className="space-y-1 mt-2">
+                    {originalStaff.map((staff) => (
+                      <div
+                        key={staff.userId}
+                        className="text-sm p-2 bg-muted rounded"
+                      >
+                        {staff.firstName && staff.lastName
+                          ? `${staff.firstName} ${staff.lastName}`
+                          : staff.email}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button variant="outline" onClick={onCancel}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
     <>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Shift</DialogTitle>
-          <DialogDescription>
-            {shift.position} -{" "}
-            {new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
-              "en-US",
-              {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }
+      <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Shift</DialogTitle>
+            <DialogDescription>
+              {shift.position} -{" "}
+              {new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
+                "en-US",
+                {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                }
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pb-4">
+            {workersValidation.isOverstaffed && (
+              <Alert className="border-orange-500 bg-orange-50">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  <strong>Overstaffed:</strong> {currentStaff.length} workers
+                  assigned, {workersNeeded} needed
+                </AlertDescription>
+              </Alert>
             )}
-          </DialogDescription>
-        </DialogHeader>
 
-        <div className="space-y-4 pb-4">
-          {workersValidation.isOverstaffed && (
-            <Alert className="border-orange-500 bg-orange-50">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800">
-                <strong>Overstaffed:</strong> {currentStaff.length} workers
-                assigned, {workersNeeded} needed
-              </AlertDescription>
-            </Alert>
-          )}
+            {workersValidation.isUnderstaffed && (
+              <Alert className="border-blue-500 bg-blue-50">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Understaffed:</strong> {currentStaff.length} workers
+                  assigned, {workersNeeded} needed
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {workersValidation.isUnderstaffed && (
-            <Alert className="border-blue-500 bg-blue-50">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>Understaffed:</strong> {currentStaff.length} workers
-                assigned, {workersNeeded} needed
-              </AlertDescription>
-            </Alert>
-          )}
+            {workersValidation.isPerfect && currentStaff.length > 0 && (
+              <Alert className="border-green-500 bg-green-50">
+                <Info className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <strong>Fully Staffed:</strong> {currentStaff.length}/
+                  {workersNeeded} workers assigned
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {workersValidation.isPerfect && currentStaff.length > 0 && (
-            <Alert className="border-green-500 bg-green-50">
-              <Info className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                <strong>Fully Staffed:</strong> {currentStaff.length}/
-                {workersNeeded} workers assigned
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <TimePickerSelect
-            value={startTime}
-            onChange={setStartTime}
-            label="Start Time"
-            required
-          />
-
-          <div>
             <TimePickerSelect
-              value={endTime}
-              onChange={setEndTime}
-              label="End Time"
+              value={startTime}
+              onChange={setStartTime}
+              label="Start Time"
               required
             />
-            {!timeValidation.isValid && (
-              <p className="text-sm text-red-600 mt-1">
-                {timeValidation.message}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="workersNeeded">Workers Needed *</Label>
-            <Input
-              id="workersNeeded"
-              type="number"
-              min={1}
-              value={workersNeeded}
-              onChange={(e) => setWorkersNeeded(parseInt(e.target.value) || 1)}
-              className="mt-2"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Currently {currentStaff.length} worker(s) assigned
-            </p>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-sm font-medium">
-                Current Staff ({currentStaff.length}/{workersNeeded})
-                {(staffToAdd.size > 0 || staffToRemove.size > 0) && (
-                  <span className="text-xs text-orange-600 ml-2">
-                    (Pending changes)
-                  </span>
-                )}
-              </Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddStaff}
-                className="gap-2"
-              >
-                <Users className="w-3 h-3" />
-                Add Staff
-              </Button>
-            </div>
-
-            {currentStaff.length === 0 ? (
-              <div className="text-sm text-muted-foreground italic py-2">
-                No staff assigned yet
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {currentStaff.map((staff) => {
-                  const staffName =
-                    staff.firstName && staff.lastName
-                      ? `${staff.firstName} ${staff.lastName}`
-                      : staff.email;
-
-                  const isNewlyAdded = staffToAdd.has(staff.userId);
-                  const isMarkedForRemoval = staffToRemove.has(staff.userId);
-
-                  return (
-                    <div
-                      key={staff.userId}
-                      className={`flex items-center justify-between p-2 rounded ${
-                        isNewlyAdded
-                          ? "bg-green-50 border border-green-200"
-                          : isMarkedForRemoval
-                          ? "bg-red-50 border border-red-200 opacity-50"
-                          : "bg-muted"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate flex items-center gap-2">
-                          {staffName}
-                          {isNewlyAdded && (
-                            <span className="text-xs text-green-600">
-                              (New)
-                            </span>
-                          )}
-                          {isMarkedForRemoval && (
-                            <span className="text-xs text-red-600">
-                              (To remove)
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {staff.email}
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) =>
-                          handleRemoveStaff(e, staff.userId, staffName)
-                        }
-                        className="text-destructive hover:text-destructive flex-shrink-0 ml-2"
-                      >
-                        <XIcon className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {remainingShiftCount > 1 && (
-            <div
-              className="flex items-start space-x-2 p-3 bg-muted rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Checkbox
-                id="applyToRestOfJob"
-                checked={applyToRestOfJob}
-                onCheckedChange={(checked) => {
-                  setApplyToRestOfJob(checked === true);
-                }}
-                onClick={(e) => e.stopPropagation()}
+            <div>
+              <TimePickerSelect
+                value={endTime}
+                onChange={setEndTime}
+                label="End Time"
+                required
               />
-              <div
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setApplyToRestOfJob(!applyToRestOfJob);
-                }}
-              >
-                <Label
-                  htmlFor="applyToRestOfJob"
-                  className="cursor-pointer text-sm font-medium"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Apply changes to all remaining shifts
-                </Label>
-                <p
-                  className="text-xs text-muted-foreground mt-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Updates times, workers needed, and staffing for{" "}
-                  {remainingShiftCount} shift(s)
+              {!timeValidation.isValid && (
+                <p className="text-sm text-red-600 mt-1">
+                  {timeValidation.message}
                 </p>
-              </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="flex gap-2 justify-between pt-4 border-t">
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleCancel}
-            disabled={saving}
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                Cancelling...
-              </>
-            ) : (
-              "Cancel Shift"
+            <div>
+              <Label htmlFor="workersNeeded">Workers Needed *</Label>
+              <Input
+                id="workersNeeded"
+                type="number"
+                min={1}
+                value={workersNeeded}
+                onChange={(e) =>
+                  setWorkersNeeded(parseInt(e.target.value) || 1)
+                }
+                className="mt-2"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Currently {currentStaff.length} worker(s) assigned
+              </p>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-sm font-medium">
+                  Current Staff ({currentStaff.length}/{workersNeeded})
+                  {(staffToAdd.size > 0 || staffToRemove.size > 0) && (
+                    <span className="text-xs text-orange-600 ml-2">
+                      (Pending changes)
+                    </span>
+                  )}
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddStaff}
+                  className="gap-2"
+                >
+                  <Users className="w-3 h-3" />
+                  Add Staff
+                </Button>
+              </div>
+
+              {currentStaff.length === 0 ? (
+                <div className="text-sm text-muted-foreground italic py-2">
+                  No staff assigned yet
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {currentStaff.map((staff) => {
+                    const staffName =
+                      staff.firstName && staff.lastName
+                        ? `${staff.firstName} ${staff.lastName}`
+                        : staff.email;
+
+                    const isNewlyAdded = staffToAdd.has(staff.userId);
+                    const isMarkedForRemoval = staffToRemove.has(staff.userId);
+
+                    return (
+                      <div
+                        key={staff.userId}
+                        className={`flex items-center justify-between p-2 rounded ${
+                          isNewlyAdded
+                            ? "bg-green-50 border border-green-200"
+                            : isMarkedForRemoval
+                            ? "bg-red-50 border border-red-200 opacity-50"
+                            : "bg-muted"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate flex items-center gap-2">
+                            {staffName}
+                            {isNewlyAdded && (
+                              <span className="text-xs text-green-600">
+                                (New)
+                              </span>
+                            )}
+                            {isMarkedForRemoval && (
+                              <span className="text-xs text-red-600">
+                                (To remove)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {staff.email}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) =>
+                            handleRemoveStaff(e, staff.userId, staffName)
+                          }
+                          className="text-destructive hover:text-destructive flex-shrink-0 ml-2"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {remainingShiftCount > 1 && (
+              <div
+                className="flex items-start space-x-2 p-3 bg-muted rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Checkbox
+                  id="applyToRestOfJob"
+                  checked={applyToRestOfJob}
+                  onCheckedChange={(checked) => {
+                    setApplyToRestOfJob(checked === true);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setApplyToRestOfJob(!applyToRestOfJob);
+                  }}
+                >
+                  <Label
+                    htmlFor="applyToRestOfJob"
+                    className="cursor-pointer text-sm font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Apply changes to all remaining shifts
+                  </Label>
+                  <p
+                    className="text-xs text-muted-foreground mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Updates times, workers needed, and staffing for{" "}
+                    {remainingShiftCount} shift(s)
+                  </p>
+                </div>
+              </div>
             )}
-          </Button>
-          <div className="flex gap-2">
+          </div>
+
+          <div className="flex gap-2 justify-between pt-4 border-t">
             <Button
               type="button"
-              variant="outline"
-              onClick={onCancel}
+              variant="destructive"
+              onClick={handleCancel}
               disabled={saving}
-            >
-              Close
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !timeValidation.isValid}
             >
               {saving ? (
                 <>
                   <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                  Saving...
+                  Cancelling...
                 </>
               ) : (
-                "Save Changes"
+                "Cancel Shift"
               )}
             </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={saving}
+              >
+                Close
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !timeValidation.isValid}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={staffModalOpen}

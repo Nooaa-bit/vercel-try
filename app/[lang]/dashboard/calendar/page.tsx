@@ -24,7 +24,6 @@ interface Job {
   position: string;
   seniority: "junior" | "senior";
   description: string | null;
-  workers_needed: number;
   start_date: string;
   end_date: string;
   location_id: number | null;
@@ -42,7 +41,6 @@ interface ShiftFromDB {
     position: string;
     seniority: "junior" | "senior";
     description: string | null;
-    workers_needed: number;
     start_date: string;
     end_date: string;
     location_id: number | null;
@@ -61,7 +59,6 @@ interface Shift {
   end_date: string;
   workers_needed: number;
   location: string;
-  status: "draft" | "active" | "completed";
   startTime: string;
   endTime: string;
   assignmentCount?: number;
@@ -73,7 +70,7 @@ interface Location {
 }
 
 export default function CalendarPage() {
-  const { t, ready } = useTranslation("jobs");
+  const { t, ready, i18n } = useTranslation("jobs");
   const { activeRole, loading, isSuperAdmin, selectedCompanyForAdmin } =
     useActiveRole();
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -82,7 +79,6 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterLocation, setFilterLocation] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const supabase = createClient();
@@ -92,7 +88,9 @@ export default function CalendarPage() {
     : activeRole?.companyId;
 
   const fetchShifts = async () => {
-    if (!targetCompanyId || targetCompanyId <= 0) return;
+    if (!targetCompanyId || targetCompanyId <= 0) {
+      return;
+    }
 
     setPageLoading(true);
     setError(null);
@@ -124,7 +122,7 @@ export default function CalendarPage() {
             `
           id, shift_date, start_time, end_time, workers_needed, job_id,
           job:job_id(
-            id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+            id, position, seniority, description, start_date, end_date, location_id,
             location:location_id(id, name)
           )
         `
@@ -147,20 +145,22 @@ export default function CalendarPage() {
           .is("deleted_at", null)
           .order("name", { ascending: true });
 
-        if (locationsError) throw locationsError;
-        setLocations(locationsData || []);
+        if (!locationsError && locationsData) {
+          setLocations(locationsData);
+        }
       } else {
         const { data: assignments, error: assignmentError } = await supabase
           .from("shift_assignment")
-          .select("shift_id")
-          .eq("user_id", activeRole.id)
+          .select("*")
+          .eq("user_id", activeRole.userId)
           .is("cancelled_at", null)
-          .is("marked_no_show_at", null);
+          .is("deleted_at", null);
 
         if (assignmentError) throw assignmentError;
 
         if (!assignments || assignments.length === 0) {
           setShifts([]);
+          setPageLoading(false);
           return;
         }
 
@@ -174,7 +174,7 @@ export default function CalendarPage() {
             `
           id, shift_date, start_time, end_time, workers_needed, job_id,
           job:job_id(
-            id, position, seniority, description, workers_needed, start_date, end_date, location_id,
+            id, position, seniority, description, start_date, end_date, location_id,
             location:location_id(id, name)
           )
         `
@@ -185,13 +185,19 @@ export default function CalendarPage() {
 
         if (shiftError) throw shiftError;
 
+        if (!shiftsData || shiftsData.length === 0) {
+          setShifts([]);
+          setPageLoading(false);
+          return;
+        }
+
         const transformedShifts = await transformShifts(
           (shiftsData as unknown as ShiftFromDB[]) || []
         );
         setShifts(transformedShifts);
       }
     } catch (err) {
-      console.error("Error fetching shifts:", err);
+      console.error("Error in fetchShifts:", err);
       setError(t("calendar.loadError"));
     } finally {
       setPageLoading(false);
@@ -210,8 +216,8 @@ export default function CalendarPage() {
         .select("shift_id")
         .in("shift_id", shiftIds)
         .is("cancelled_at", null)
-        .is("marked_no_show_at", null)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .is("marked_no_show_at", null);
 
       if (assignmentsData) {
         assignmentsData.forEach((assignment: { shift_id: number }) => {
@@ -221,25 +227,24 @@ export default function CalendarPage() {
       }
     }
 
-    return shiftsData.map((shift) => {
+    const transformed = shiftsData.map((shift) => {
       const jobData = shift.job;
       if (!jobData) {
         return {
           id: shift.id,
           job_id: shift.job_id,
-          position: "Unknown Position",
+          position: t("calendar.unknownPosition"),
           start_date: shift.shift_date,
           end_date: shift.shift_date,
           workers_needed: shift.workers_needed,
-          location: "Unspecified",
-          status: "active" as const,
+          location: t("calendar.unspecified"),
           startTime: shift.start_time,
           endTime: shift.end_time,
           assignmentCount: assignmentCounts[shift.id] || 0,
         };
       }
 
-      const locationName = jobData.location?.name || "No Location";
+      const locationName = jobData.location?.name || t("calendar.noLocation");
       const displayTitle = `${jobData.position}`;
 
       return {
@@ -250,16 +255,20 @@ export default function CalendarPage() {
         end_date: shift.shift_date,
         workers_needed: shift.workers_needed,
         location: locationName,
-        status: "active" as const,
         startTime: shift.start_time,
         endTime: shift.end_time,
         assignmentCount: assignmentCounts[shift.id] || 0,
       };
     });
+
+    return transformed;
   };
 
   useEffect(() => {
-    if (loading || !ready || !activeRole || !targetCompanyId) return;
+    if (loading || !ready || !activeRole || !targetCompanyId) {
+      return;
+    }
+
     fetchShifts();
   }, [loading, ready, activeRole, targetCompanyId]);
 
@@ -312,13 +321,10 @@ export default function CalendarPage() {
 
     return shifts.filter((shift) => {
       const isOnDate = shift.start_date === dateStr;
-
       const matchesLocation =
         filterLocation === "all" || shift.location === filterLocation;
-      const matchesStatus =
-        filterStatus === "all" || shift.status === filterStatus;
 
-      return isOnDate && matchesLocation && matchesStatus;
+      return isOnDate && matchesLocation;
     });
   };
 
@@ -350,12 +356,20 @@ export default function CalendarPage() {
     }
   };
 
-  const monthName = currentDate.toLocaleDateString("en-US", {
+  const monthName = currentDate.toLocaleDateString(i18n.language, {
     month: "long",
     year: "numeric",
   });
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekDays = [
+    t("calendar.weekDays.mon"),
+    t("calendar.weekDays.tue"),
+    t("calendar.weekDays.wed"),
+    t("calendar.weekDays.thu"),
+    t("calendar.weekDays.fri"),
+    t("calendar.weekDays.sat"),
+    t("calendar.weekDays.sun"),
+  ];
 
   const handleDialogClose = (open: boolean) => {
     setDialogOpen(open);
@@ -371,15 +385,17 @@ export default function CalendarPage() {
 
   return (
     <div className="w-full space-y-4 py-0">
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="text-sm font-medium mb-2 block">Location</label>
+          <label className="text-sm font-medium mb-2 block">
+            {t("calendar.location")}
+          </label>
           <Select value={filterLocation} onValueChange={setFilterLocation}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
+              <SelectItem value="all">{t("calendar.allLocations")}</SelectItem>
               {Array.from(new Set(locationsFromShifts)).map((location) => (
                 <SelectItem key={location} value={location}>
                   {location}
@@ -389,26 +405,11 @@ export default function CalendarPage() {
           </Select>
         </div>
 
-        <div>
-          <label className="text-sm font-medium mb-2 block">Status</label>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <Card>
           <CardContent className="p-0 pt-3">
             <div className="text-center">
               <p className="text-muted-foreground text-xs mb-0.5">
-                Upcoming Shifts
+                {t("calendar.upcomingShifts")}
               </p>
               <p className="text-lg font-bold text-primary">
                 {stats.totalEvents}
@@ -421,7 +422,7 @@ export default function CalendarPage() {
           <CardContent className="p-0 pt-3">
             <div className="text-center">
               <p className="text-muted-foreground text-xs mb-0.5">
-                Today&apos;s Shifts
+                {t("calendar.todaysShifts")}
               </p>
               <p className="text-lg font-bold text-primary">
                 {stats.todaysEvents}
@@ -526,14 +527,11 @@ export default function CalendarPage() {
                       </div>
                       <div className="flex-1 overflow-y-auto space-y-1">
                         {dayShifts.slice(0, 3).map((shift) => {
-                          // ✅ FIXED: Always show counter, with different colors
                           const assignmentCount = shift.assignmentCount ?? 0;
                           const workersNeeded = shift.workers_needed;
                           const isFullyStaffed =
                             assignmentCount === workersNeeded;
                           const isOverstaffed = assignmentCount > workersNeeded;
-                          const isUnderstaffed =
-                            assignmentCount < workersNeeded;
 
                           return (
                             <div
@@ -548,25 +546,30 @@ export default function CalendarPage() {
                                 <div className="text-primary-foreground/80 text-xs">
                                   {shift.startTime.slice(0, 5)}
                                 </div>
-                                {/* ✅ Always show counter */}
-                                <div
-                                  className={`text-xs px-1 rounded font-medium ${
-                                    isFullyStaffed
-                                      ? "bg-green-500 text-white"
-                                      : isOverstaffed
-                                      ? "bg-red-500 text-white"
-                                      : "bg-orange-500 text-white"
-                                  }`}
-                                >
-                                  {assignmentCount}/{workersNeeded}
-                                </div>
+                                {(activeRole.role === "company_admin" ||
+                                  activeRole.role === "superadmin") && (
+                                  <div
+                                    className={`text-xs px-1 rounded font-medium ${
+                                      isFullyStaffed
+                                        ? "bg-green-500 text-white"
+                                        : isOverstaffed
+                                        ? "bg-red-500 text-white"
+                                        : "bg-orange-500 text-white"
+                                    }`}
+                                  >
+                                    {assignmentCount}/{workersNeeded}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
                         })}
+
                         {dayShifts.length > 3 && (
                           <div className="text-xs text-accent font-semibold px-1">
-                            +{dayShifts.length - 3} more
+                            {t("calendar.more", {
+                              count: dayShifts.length - 3,
+                            })}
                           </div>
                         )}
                       </div>

@@ -19,7 +19,6 @@ interface Shift {
   end_date: string;
   workers_needed: number;
   location: string;
-  status: "draft" | "active" | "completed";
   startTime: string;
   endTime: string;
   assignmentCount?: number;
@@ -67,7 +66,7 @@ export function DayView({
   activeRole,
   targetCompanyId,
 }: DayViewProps) {
-  const { t } = useTranslation("jobs");
+  const { t, i18n } = useTranslation("jobs");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shiftEditDialogOpen, setShiftEditDialogOpen] = useState(false);
   const [editingShiftData, setEditingShiftData] = useState<ShiftFromDB | null>(
@@ -79,7 +78,6 @@ export function DayView({
   const hoursScrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
-  // ✅ Check if user can edit (only company_admin and superadmin)
   const canEdit =
     activeRole.role === "company_admin" || activeRole.role === "superadmin";
 
@@ -178,7 +176,8 @@ export function DayView({
 
   const swimlanes = getSwimlanesLayout();
 
-  const dayName = date.toLocaleDateString("en-US", {
+  // ✅ Use locale-aware date formatting
+  const dayName = date.toLocaleDateString(i18n.language, {
     weekday: "long",
     month: "short",
     day: "numeric",
@@ -189,9 +188,7 @@ export function DayView({
     setDialogOpen(open);
   };
 
-  // ✅ Handle shift click - only allow editing for admins
   const handleShiftClick = async (shift: Shift) => {
-    // ✅ Prevent editing for talent and supervisor
     if (!canEdit) {
       return;
     }
@@ -210,7 +207,6 @@ export function DayView({
         .select("*", { count: "exact", head: true })
         .eq("shift_id", shift.id)
         .is("cancelled_at", null)
-        .is("marked_no_show_at", null)
         .is("deleted_at", null);
 
       if (countError) throw countError;
@@ -225,185 +221,195 @@ export function DayView({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <Card
-        className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+    <>
+      <div
+        className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+        onClick={onClose}
       >
-        <CardHeader className="border-b pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onPreviousDay}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <CardTitle className="text-xl min-w-fit">{dayName}</CardTitle>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onNextDay}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+        <Card
+          className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CardHeader className="border-b pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onPreviousDay}
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <CardTitle className="text-xl min-w-fit">{dayName}</CardTitle>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onNextDay}
+                  className="h-8 w-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="flex gap-2">
+                {canEdit && (
+                  <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-primary hover:bg-primary/90">
+                        <Plus className="w-4 h-4 mr-2" />
+                        {t("dayView.addButton")}
+                      </Button>
+                    </DialogTrigger>
+                    {dialogOpen && (
+                      <JobDialog
+                        editingJob={null}
+                        locations={locations}
+                        defaultStartDate={dateStr}
+                        onSave={async () => {
+                          setDialogOpen(false);
+                          onSave();
+                        }}
+                        onCancel={() => {
+                          setDialogOpen(false);
+                        }}
+                        companyId={targetCompanyId}
+                      />
+                    )}
+                  </Dialog>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="h-8 w-8"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="flex-1 overflow-hidden p-0 flex">
+            {/* Hours Column */}
+            <div
+              ref={hoursScrollRef}
+              className="w-20 border-r bg-muted/30 flex flex-col overflow-y-scroll scrollbar-hide"
+            >
+              {hours.map((hour) => (
+                <div
+                  key={hour}
+                  className="h-16 border-b px-2 py-1 text-xs font-medium text-muted-foreground flex items-start justify-center flex-shrink-0"
+                >
+                  {String(hour).padStart(2, "0")}:00
+                </div>
+              ))}
             </div>
 
-            <div className="flex gap-2">
-              {/* ✅ Only show "Add Job" button for admins */}
-              {canEdit && (
-                <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-primary hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-2" />
-                      {t("card.addButton")}
-                    </Button>
-                  </DialogTrigger>
-                  {dialogOpen && (
-                    <JobDialog
-                      editingJob={null}
-                      locations={locations}
-                      defaultStartDate={dateStr}
-                      onSave={async () => {
-                        setDialogOpen(false);
-                        onSave();
+            {/* Shifts Swimlanes */}
+            <div
+              ref={shiftsScrollRef}
+              className="flex-1 overflow-y-scroll overflow-x-auto relative"
+            >
+              {/* Hour dividers background */}
+              {hours.map((hour) => (
+                <div
+                  key={`divider-${hour}`}
+                  className="h-16 border-b border-muted/50 relative flex-shrink-0"
+                >
+                  <div className="absolute top-1/2 w-full border-t border-muted/30" />
+                </div>
+              ))}
+
+              {/* Shifts */}
+              {dayShifts.length > 0 ? (
+                <div className="absolute inset-0 flex">
+                  {swimlanes.map((swimlane) => (
+                    <div
+                      key={`swimlane-${swimlane.id}`}
+                      className="relative flex-shrink-0 border-r border-muted/30"
+                      style={{
+                        width: `${SWIMLANE_WIDTH_PX}px`,
+                        marginRight: `${SWIMLANE_GAP_PX}px`,
                       }}
-                      onCancel={() => {
-                        setDialogOpen(false);
-                      }}
-                      companyId={targetCompanyId}
-                    />
-                  )}
-                </Dialog>
-              )}
+                    >
+                      {swimlane.shifts.map((shift) => {
+                        const startPosition = getShiftPosition(shift.startTime);
+                        const height = getShiftHeight(
+                          shift.startTime,
+                          shift.endTime
+                        );
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+                        const assignmentCount = shift.assignmentCount ?? 0;
+                        const workersNeeded = shift.workers_needed;
+                        const isFullyStaffed =
+                          assignmentCount === workersNeeded;
+                        const isOverstaffed = assignmentCount > workersNeeded;
 
-        <CardContent className="flex-1 overflow-hidden p-0 flex">
-          <div
-            ref={hoursScrollRef}
-            className="w-20 border-r bg-muted/30 flex flex-col overflow-y-scroll scrollbar-hide"
-          >
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="h-16 border-b px-2 py-1 text-xs font-medium text-muted-foreground flex items-start justify-center flex-shrink-0"
-              >
-                {String(hour).padStart(2, "0")}:00
-              </div>
-            ))}
-          </div>
-
-          <div
-            ref={shiftsScrollRef}
-            className="flex-1 overflow-y-scroll overflow-x-auto relative"
-          >
-            {hours.map((hour) => (
-              <div
-                key={`divider-${hour}`}
-                className="h-16 border-b border-muted/50 relative flex-shrink-0"
-              >
-                <div className="absolute top-1/2 w-full border-t border-muted/30" />
-              </div>
-            ))}
-
-            {dayShifts.length > 0 ? (
-              <div className="absolute inset-0 flex">
-                {swimlanes.map((swimlane) => (
-                  <div
-                    key={`swimlane-${swimlane.id}`}
-                    className="relative flex-shrink-0 border-r border-muted/30"
-                    style={{
-                      width: `${SWIMLANE_WIDTH_PX}px`,
-                      marginRight: `${SWIMLANE_GAP_PX}px`,
-                    }}
-                  >
-                    {swimlane.shifts.map((shift) => {
-                      const startPosition = getShiftPosition(shift.startTime);
-                      const height = getShiftHeight(
-                        shift.startTime,
-                        shift.endTime
-                      );
-
-                      const assignmentCount = shift.assignmentCount ?? 0;
-                      const workersNeeded = shift.workers_needed;
-                      const isFullyStaffed = assignmentCount === workersNeeded;
-                      const isOverstaffed = assignmentCount > workersNeeded;
-
-                      return (
-                        <div
-                          key={shift.id}
-                          className={`absolute bg-primary text-primary-foreground rounded-lg p-2 border border-primary/20 transition-shadow overflow-hidden left-1 right-1 ${
-                            canEdit
-                              ? "hover:shadow-lg cursor-pointer"
-                              : "cursor-default"
-                          }`}
-                          style={{
-                            top: `${startPosition * 64}px`,
-                            height: `${height * 64}px`,
-                          }}
-                          title={
-                            canEdit
-                              ? `${shift.position} - ${shift.location} (Click to edit)`
-                              : `${shift.position} - ${shift.location}`
-                          }
-                          onClick={() => handleShiftClick(shift)}
-                        >
-                          <div className="text-xs font-semibold truncate">
-                            {shift.position}
-                          </div>
-                          <div className="text-xs text-primary-foreground/80">
-                            {shift.startTime.slice(0, 5)} -{" "}
-                            {shift.endTime.slice(0, 5)}
-                          </div>
-                          <div className="text-xs text-primary-foreground/70 mt-1 truncate">
-                            {shift.location}
-                          </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <div
-                              className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                isFullyStaffed
-                                  ? "bg-green-500 text-white"
-                                  : isOverstaffed
-                                  ? "bg-red-500 text-white"
-                                  : "bg-orange-500 text-white"
-                              }`}
-                            >
-                              {assignmentCount}/{workersNeeded}
+                        return (
+                          <div
+                            key={shift.id}
+                            className={`absolute bg-primary text-primary-foreground rounded-lg p-2 border border-primary/20 transition-shadow overflow-hidden left-1 right-1 ${
+                              canEdit
+                                ? "hover:shadow-lg cursor-pointer"
+                                : "cursor-default"
+                            }`}
+                            style={{
+                              top: `${startPosition * 64}px`,
+                              height: `${height * 64}px`,
+                            }}
+                            title={
+                              canEdit
+                                ? `${shift.position} - ${shift.location} (${t(
+                                    "dayView.clickToEdit"
+                                  )})`
+                                : `${shift.position} - ${shift.location}`
+                            }
+                            onClick={() => handleShiftClick(shift)}
+                          >
+                            <div className="text-xs font-semibold truncate">
+                              {shift.position}
                             </div>
+                            <div className="text-xs text-primary-foreground/80">
+                              {shift.startTime.slice(0, 5)} -{" "}
+                              {shift.endTime.slice(0, 5)}
+                            </div>
+                            <div className="text-xs text-primary-foreground/70 mt-1 truncate">
+                              {shift.location}
+                            </div>
+                            {canEdit && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <div
+                                  className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                    isFullyStaffed
+                                      ? "bg-green-500 text-white"
+                                      : isOverstaffed
+                                      ? "bg-red-500 text-white"
+                                      : "bg-orange-500 text-white"
+                                  }`}
+                                >
+                                  {assignmentCount}/{workersNeeded}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                <p>No shifts scheduled for this day</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                  <p>{t("dayView.noShifts")}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* ✅ Only render edit dialog for admins */}
+      {/* ShiftEditDialog */}
       {canEdit && shiftEditDialogOpen && editingShiftData && (
         <Dialog
           open={shiftEditDialogOpen}
@@ -427,6 +433,6 @@ export function DayView({
           />
         </Dialog>
       )}
-    </div>
+    </>
   );
 }

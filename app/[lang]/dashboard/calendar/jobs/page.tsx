@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/jobs/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -44,15 +45,15 @@ interface Job {
   position: string;
   seniority: "junior" | "senior";
   description: string | null;
-  workers_needed: number;
   start_date: string;
   end_date: string;
   created_at: string;
   created_by: number;
   deleted_at: string | null;
   deleted_by: number | null;
-  // ✅ NEW: Added shift and assignment counts
+  max_workers_per_shift?: number;
   total_shifts?: number;
+  total_positions_needed?: number;
   total_assignments?: number;
 }
 
@@ -87,29 +88,24 @@ export default function JobsPage() {
   const stats = useMemo(() => {
     const total = jobs.length;
     const today = new Date().toISOString().split("T")[0];
-
     const active = jobs.filter((job) => job.end_date >= today).length;
     const past = jobs.filter((job) => job.end_date < today).length;
-
     return { total, active, past };
   }, [jobs]);
 
   const filteredJobs = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
-
     return jobs.filter((job) => {
       const locationMatch =
         filterLocation === "all"
           ? true
           : job.location_id?.toString() === filterLocation;
-
       const statusMatch =
         filterJobStatus === "all"
           ? true
           : filterJobStatus === "active"
           ? job.end_date >= today
           : job.end_date < today;
-
       return locationMatch && statusMatch;
     });
   }, [jobs, filterLocation, filterJobStatus]);
@@ -126,13 +122,11 @@ export default function JobsPage() {
     setCurrentPage(1);
   }, [filterLocation, filterJobStatus]);
 
-  // ✅ Fetch jobs with shift and assignment counts
   const fetchData = useCallback(async () => {
     if (!targetCompanyId || targetCompanyId <= 0) return;
-
     setLoading(true);
+
     try {
-      // Fetch jobs
       const { data: jobsData, error: jobsError } = await supabase
         .from("job")
         .select("*")
@@ -145,14 +139,12 @@ export default function JobsPage() {
       if (jobsData && jobsData.length > 0) {
         const jobIds = jobsData.map((job) => job.id);
 
-        // ✅ Get shift counts for all jobs
         const { data: shiftsData } = await supabase
           .from("shift")
-          .select("id, job_id")
+          .select("id, job_id, workers_needed")
           .in("job_id", jobIds)
           .is("deleted_at", null);
 
-        // ✅ Get assignment counts for all shifts
         const shiftIds = (shiftsData || []).map((s) => s.id);
         const { data: assignmentsData } = await supabase
           .from("shift_assignment")
@@ -161,37 +153,58 @@ export default function JobsPage() {
           .is("cancelled_at", null)
           .is("deleted_at", null);
 
-        // ✅ Group counts by job
-        const shiftCountsByJob: Record<number, number> = {};
-        const assignmentCountsByJob: Record<number, number> = {};
+        const jobAggregates: Record<
+          number,
+          {
+            shiftCount: number;
+            maxWorkersPerShift: number;
+            totalPositionsNeeded: number;
+            assignmentCount: number;
+          }
+        > = {};
 
-        (shiftsData || []).forEach((shift) => {
-          shiftCountsByJob[shift.job_id] =
-            (shiftCountsByJob[shift.job_id] || 0) + 1;
+        jobIds.forEach((jobId) => {
+          jobAggregates[jobId] = {
+            shiftCount: 0,
+            maxWorkersPerShift: 0,
+            totalPositionsNeeded: 0,
+            assignmentCount: 0,
+          };
         });
 
-        // Map assignments to jobs through shifts
+        (shiftsData || []).forEach((shift) => {
+          const agg = jobAggregates[shift.job_id];
+          agg.shiftCount++;
+          agg.totalPositionsNeeded += shift.workers_needed;
+          agg.maxWorkersPerShift = Math.max(
+            agg.maxWorkersPerShift,
+            shift.workers_needed
+          );
+        });
+
         (assignmentsData || []).forEach((assignment) => {
           const shift = shiftsData?.find((s) => s.id === assignment.shift_id);
           if (shift) {
-            assignmentCountsByJob[shift.job_id] =
-              (assignmentCountsByJob[shift.job_id] || 0) + 1;
+            jobAggregates[shift.job_id].assignmentCount++;
           }
         });
 
-        // ✅ Attach counts to jobs
-        const jobsWithCounts = jobsData.map((job) => ({
-          ...job,
-          total_shifts: shiftCountsByJob[job.id] || 0,
-          total_assignments: assignmentCountsByJob[job.id] || 0,
-        }));
+        const jobsWithCounts = jobsData.map((job) => {
+          const agg = jobAggregates[job.id];
+          return {
+            ...job,
+            total_shifts: agg.shiftCount,
+            max_workers_per_shift: agg.maxWorkersPerShift,
+            total_positions_needed: agg.totalPositionsNeeded,
+            total_assignments: agg.assignmentCount,
+          };
+        });
 
         setJobs(jobsWithCounts);
       } else {
         setJobs([]);
       }
 
-      // Fetch locations
       const { data: locationsData, error: locationsError } = await supabase
         .from("location")
         .select("id, name")
@@ -204,6 +217,7 @@ export default function JobsPage() {
     } catch (error) {
       console.error("Error fetching data:", error);
     }
+
     setLoading(false);
   }, [targetCompanyId, supabase]);
 
@@ -219,84 +233,145 @@ export default function JobsPage() {
 
   const handleCancelJob = useCallback(
     async (job: Job) => {
-      const today = new Date().toISOString().split("T")[0];
-      const jobHasStarted = job.start_date <= today;
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const today = `${year}-${month}-${day}`;
 
-      const confirmMessage = jobHasStarted
-        ? `Cancel all remaining shifts for "${job.position}"? The job end date will be updated to yesterday. This cannot be undone.`
-        : `Delete the job "${job.position}"? This will delete the job and all its shifts. This cannot be undone.`;
+      const jobHasStartedOrStartsToday = job.start_date <= today;
+
+      let canCancelToday = true;
+      let todayShiftStartTime = null;
+      let todayHasAssignments = false;
+
+      if (jobHasStartedOrStartsToday) {
+        const { data: todayShift } = await supabase
+          .from("shift")
+          .select("id, start_time")
+          .eq("job_id", job.id)
+          .eq("shift_date", today)
+          .is("deleted_at", null)
+          .single();
+
+        if (todayShift) {
+          const { count } = await supabase
+            .from("shift_assignment")
+            .select("id", { count: "exact", head: true })
+            .eq("shift_id", todayShift.id)
+            .is("cancelled_at", null)
+            .is("deleted_at", null);
+
+          todayHasAssignments = (count || 0) > 0;
+
+          const [hours, minutes, seconds] = todayShift.start_time.split(":");
+          const shiftStartDateTime = new Date();
+          shiftStartDateTime.setHours(
+            parseInt(hours),
+            parseInt(minutes),
+            parseInt(seconds || "0"),
+            0
+          );
+
+          const timeDiffInHours =
+            (shiftStartDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+          if (todayHasAssignments && timeDiffInHours < 1) {
+            canCancelToday = false;
+            todayShiftStartTime = todayShift.start_time;
+          }
+        }
+      }
+
+      // ✅ Updated with translations
+      let confirmMessage = "";
+      let actionDescription = "";
+      let toastLoadingKey = "";
+      let toastSuccessKey = "";
+
+      if (!jobHasStartedOrStartsToday) {
+        confirmMessage = t("confirmations.deleteJob", {
+          position: job.position,
+        });
+        actionDescription = t("toast.deleting", { position: job.position });
+        toastLoadingKey = "toast.deleting";
+        toastSuccessKey = "toast.deleteSuccess";
+      } else if (canCancelToday) {
+        const noAssignmentsNote = !todayHasAssignments
+          ? t("confirmations.noAssignmentsNote")
+          : "";
+        confirmMessage = t("confirmations.cancelAllShifts", {
+          position: job.position,
+          noAssignments: noAssignmentsNote,
+        });
+        actionDescription = t("toast.cancelling", { position: job.position });
+        toastLoadingKey = "toast.cancelling";
+        toastSuccessKey = "toast.cancelSuccess";
+      } else {
+        confirmMessage = t("confirmations.cancelFutureShifts", {
+          position: job.position,
+          time: todayShiftStartTime,
+        });
+        actionDescription = t("toast.cancellingFutureShifts", {
+          position: job.position,
+        });
+        toastLoadingKey = "toast.cancellingFutureShifts";
+        toastSuccessKey = "toast.cancelFutureSuccess";
+      }
 
       if (!confirm(confirmMessage)) {
         return;
       }
 
-      const actionMessage = jobHasStarted ? "Cancelling" : "Deleting";
-      const successMessage = jobHasStarted
-        ? `All remaining shifts cancelled for ${job.position}`
-        : `Job "${job.position}" and all shifts deleted successfully`;
+      let deleteFromDate = today;
+      if (jobHasStartedOrStartsToday && !canCancelToday) {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowYear = tomorrow.getFullYear();
+        const tomorrowMonth = String(tomorrow.getMonth() + 1).padStart(2, "0");
+        const tomorrowDay = String(tomorrow.getDate()).padStart(2, "0");
+        deleteFromDate = `${tomorrowYear}-${tomorrowMonth}-${tomorrowDay}`;
+      }
 
       toast.promise(
         async () => {
-          const now = new Date().toISOString();
-
-          if (jobHasStarted) {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-            const { error: shiftError } = await supabase
-              .from("shift")
-              .update({
-                deleted_at: now,
-              })
-              .eq("job_id", job.id)
-              .gte("shift_date", today)
-              .is("deleted_at", null);
-
-            if (shiftError) throw shiftError;
-
-            const { error: jobError } = await supabase
-              .from("job")
-              .update({
-                end_date: yesterdayStr,
-              })
-              .eq("id", job.id);
-
-            if (jobError) throw jobError;
+          if (!jobHasStartedOrStartsToday) {
+            const { data, error } = await supabase.rpc(
+              "delete_job_and_shifts",
+              {
+                p_job_id: job.id,
+                p_deleted_by: activeRole?.userId || null,
+              }
+            );
+            if (error) throw error;
           } else {
-            const { error: jobError } = await supabase
-              .from("job")
-              .update({
-                deleted_at: now,
-                deleted_by: activeRole?.id || null,
-              })
-              .eq("id", job.id);
+            const endDate = new Date(deleteFromDate);
+            endDate.setDate(endDate.getDate() - 1);
+            const endYear = endDate.getFullYear();
+            const endMonth = String(endDate.getMonth() + 1).padStart(2, "0");
+            const endDay = String(endDate.getDate()).padStart(2, "0");
+            const endDateStr = `${endYear}-${endMonth}-${endDay}`;
 
-            if (jobError) throw jobError;
-
-            const { error: shiftError } = await supabase
-              .from("shift")
-              .update({
-                deleted_at: now,
-              })
-              .eq("job_id", job.id)
-              .is("deleted_at", null);
-
-            if (shiftError) {
-              console.error("Error deleting shifts:", shiftError);
-            }
+            const { data, error } = await supabase.rpc(
+              "cancel_shifts_from_date",
+              {
+                p_job_id: job.id,
+                p_from_date: deleteFromDate,
+                p_new_end_date: endDateStr,
+              }
+            );
+            if (error) throw error;
           }
-
           await fetchData();
         },
         {
-          loading: `${actionMessage} "${job.position}"...`,
-          success: successMessage,
-          error: `Failed to ${actionMessage.toLowerCase()} job`,
+          loading: actionDescription,
+          success: t(toastSuccessKey, { position: job.position }),
+          error: t("toast.deleteFailed"),
         }
       );
     },
-    [supabase, fetchData, activeRole]
+    [supabase, fetchData, activeRole, t]
   );
 
   const handleDialogClose = (open: boolean) => {
@@ -320,15 +395,18 @@ export default function JobsPage() {
       redirectTo="/dashboard/calendar"
     >
       <div className="w-full space-y-8 py-2">
+        {/* ✅ Filters with translations */}
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">Location</label>
+            <label className="text-sm font-medium mb-2 block">
+              {t("filters.location")}
+            </label>
             <Select value={filterLocation} onValueChange={setFilterLocation}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem value="all">{t("filters.allLocations")}</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id.toString()}>
                     {location.name}
@@ -339,15 +417,19 @@ export default function JobsPage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">Status</label>
+            <label className="text-sm font-medium mb-2 block">
+              {t("filters.status")}
+            </label>
             <Select value={filterJobStatus} onValueChange={setFilterJobStatus}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Jobs</SelectItem>
-                <SelectItem value="active">Active Jobs</SelectItem>
-                <SelectItem value="past">Past Jobs</SelectItem>
+                <SelectItem value="all">{t("filters.allJobs")}</SelectItem>
+                <SelectItem value="active">
+                  {t("filters.activeJobs")}
+                </SelectItem>
+                <SelectItem value="past">{t("filters.pastJobs")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -356,7 +438,7 @@ export default function JobsPage() {
             <CardContent className="p-0 pt-3">
               <div className="text-center">
                 <p className="text-muted-foreground text-xs mb-0.5">
-                  Active Jobs
+                  {t("stats.activeJobs")}
                 </p>
                 <p className="text-lg font-bold text-primary">{stats.active}</p>
               </div>
@@ -367,7 +449,7 @@ export default function JobsPage() {
             <CardContent className="p-0 pt-3">
               <div className="text-center">
                 <p className="text-muted-foreground text-xs mb-0.5">
-                  Past Jobs
+                  {t("stats.pastJobs")}
                 </p>
                 <p className="text-lg font-bold text-primary">{stats.past}</p>
               </div>
@@ -434,10 +516,11 @@ export default function JobsPage() {
                     const isPast =
                       job.end_date < new Date().toISOString().split("T")[0];
 
-                    // ✅ Calculate total positions needed
                     const totalPositionsNeeded =
-                      (job.total_shifts || 0) * job.workers_needed;
+                      job.total_positions_needed || 0;
                     const totalAssignments = job.total_assignments || 0;
+                    const maxWorkersPerShift = job.max_workers_per_shift || 0;
+
                     const isFullyStaffed =
                       totalAssignments === totalPositionsNeeded &&
                       totalPositionsNeeded > 0;
@@ -463,7 +546,7 @@ export default function JobsPage() {
                               </CardTitle>
                             </div>
                             <span className="text-xs bg-muted px-2 py-1 rounded capitalize flex-shrink-0">
-                              {job.seniority}
+                              {t(`fields.${job.seniority}`)}
                             </span>
                           </div>
                         </CardHeader>
@@ -482,28 +565,41 @@ export default function JobsPage() {
                                 <span className="truncate">
                                   {locations.find(
                                     (loc) => loc.id === job.location_id
-                                  )?.name || "Unknown Location"}
+                                  )?.name || t("fields.noLocation")}
                                 </span>
                               </div>
                             )}
+
                             <div className="flex items-center gap-2 text-sm">
                               <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                               <span className="truncate">
                                 {job.start_date} - {job.end_date}
                               </span>
                             </div>
-                            {/* ✅ Workers with shift and assignment counts */}
-                            {/* ✅ Workers with shift count and staffing counter inline */}
+
+                            {/* ✅ Translated workers display */}
                             <div className="flex items-center gap-2 text-sm">
                               <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                               <div className="flex items-center gap-2 flex-1">
-                                <span>{job.workers_needed} per shift</span>
-                                {job.total_shifts !== undefined && (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs text-muted-foreground">
-                                      ({job.total_shifts} shifts)
-                                    </span>
-                                    {job.total_shifts > 0 && (
+                                <span>
+                                  {maxWorkersPerShift > 0
+                                    ? `${t(
+                                        "card.upTo"
+                                      )} ${maxWorkersPerShift} ${t(
+                                        "card.perShift"
+                                      )}`
+                                    : t("emptyState.title")}
+                                </span>
+                                {job.total_shifts !== undefined &&
+                                  job.total_shifts > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs text-muted-foreground">
+                                        ({job.total_shifts}{" "}
+                                        {job.total_shifts === 1
+                                          ? t("card.shifts")
+                                          : t("card.shifts_plural")}
+                                        )
+                                      </span>
                                       <div
                                         className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                                           isFullyStaffed
@@ -518,9 +614,8 @@ export default function JobsPage() {
                                         {totalAssignments}/
                                         {totalPositionsNeeded}
                                       </div>
-                                    )}
-                                  </div>
-                                )}
+                                    </div>
+                                  )}
                               </div>
                             </div>
                           </div>
@@ -537,6 +632,7 @@ export default function JobsPage() {
                               <Pencil className="w-3 h-3 mr-1" />
                               {t("card.editButton")}
                             </Button>
+
                             {!isPast &&
                               (() => {
                                 const today = new Date()
@@ -556,8 +652,8 @@ export default function JobsPage() {
                                     onClick={() => handleCancelJob(job)}
                                     title={
                                       jobHasStarted
-                                        ? "Cancel all remaining shifts"
-                                        : "Delete job and all shifts"
+                                        ? t("card.cancelShifts")
+                                        : t("card.deleteButton")
                                     }
                                   >
                                     <X className="w-3 h-3" />
@@ -571,15 +667,18 @@ export default function JobsPage() {
                   })}
                 </div>
 
+                {/* ✅ Translated pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-6 pt-6 border-t">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
-                      {Math.min(
-                        currentPage * ITEMS_PER_PAGE,
-                        filteredJobs.length
-                      )}{" "}
-                      of {filteredJobs.length} jobs
+                      {t("pagination.showing", {
+                        from: (currentPage - 1) * ITEMS_PER_PAGE + 1,
+                        to: Math.min(
+                          currentPage * ITEMS_PER_PAGE,
+                          filteredJobs.length
+                        ),
+                        total: filteredJobs.length,
+                      })}
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -591,8 +690,9 @@ export default function JobsPage() {
                         disabled={currentPage === 1}
                       >
                         <ChevronLeft className="w-4 h-4" />
-                        Previous
+                        {t("pagination.previous")}
                       </Button>
+
                       <div className="flex items-center gap-1">
                         {Array.from(
                           { length: totalPages },
@@ -611,6 +711,7 @@ export default function JobsPage() {
                           </Button>
                         ))}
                       </div>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -619,7 +720,7 @@ export default function JobsPage() {
                         }
                         disabled={currentPage === totalPages}
                       >
-                        Next
+                        {t("pagination.next")}
                         <ChevronRight className="w-4 h-4" />
                       </Button>
                     </div>

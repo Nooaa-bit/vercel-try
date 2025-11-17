@@ -146,7 +146,7 @@ export function useAuth() {
 
     if (isDashboardRoute && !user) {
       console.log("🔒 Unauthorized dashboard access, redirecting to homepage");
-      router.replace(`/${lang}`);
+      router.replace(`/${lang}/login`);
     }
   }, [loading, user, pathname, router, lang]);
 

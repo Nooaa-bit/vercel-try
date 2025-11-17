@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/JobDialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,19 +25,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Users, Search } from "lucide-react";
-import { getCompanyUsers } from "@/lib/company-users";
+import { Users } from "lucide-react";
 import { TimePickerSelect } from "@/components/TimePickerSelect";
-import {
-  fetchRemainingShifts,
-  calculateAllEmployeesAvailability,
-  assignStaffToShifts,
-  calculateShiftCapacity,
-  fetchShiftAssignments,
-  type EmployeeAvailability,
-  type Shift,
-  type Employee,
-} from "./staffing-utils";
+import { StaffingModal } from "./StaffingModal";
 
 interface Job {
   id: number;
@@ -44,7 +35,6 @@ interface Job {
   position: string;
   seniority: "junior" | "senior";
   description: string | null;
-  workers_needed: number;
   start_date: string;
   end_date: string;
   location_id: number | null;
@@ -106,24 +96,6 @@ export default function JobDialog({
   const [loadingShiftTimes, setLoadingShiftTimes] = useState(false);
 
   const [staffingOpen, setStaffingOpen] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployees, setSelectedEmployees] = useState<Set<number>>(
-    new Set()
-  );
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sendingInvites, setSendingInvites] = useState(false);
-
-  const [remainingShifts, setRemainingShifts] = useState<Shift[]>([]);
-  const [employeeAvailabilities, setEmployeeAvailabilities] = useState<
-    EmployeeAvailability[]
-  >([]);
-  const [loadingAvailability, setLoadingAvailability] = useState(false);
-  const [shiftCapacity, setShiftCapacity] = useState({
-    total: 0,
-    filled: 0,
-    remaining: 0,
-  });
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -132,7 +104,6 @@ export default function JobDialog({
       setPosition(editingJob.position);
       setSeniority(editingJob.seniority);
       setDescription(editingJob.description || "");
-      setWorkersNeeded(editingJob.workers_needed);
       setLocationId(editingJob.location_id);
       setStartDate(editingJob.start_date);
       setEndDate(editingJob.end_date);
@@ -142,14 +113,14 @@ export default function JobDialog({
 
   useEffect(() => {
     if (editingJob) {
-      const loadShiftTimes = async () => {
+      const loadShiftData = async () => {
         setLoadingShiftTimes(true);
         try {
           const todayStr = new Date().toISOString().split("T")[0];
 
           const { data: shiftData, error } = await supabase
             .from("shift")
-            .select("start_time, end_time")
+            .select("start_time, end_time, workers_needed")
             .eq("job_id", editingJob.id)
             .gte("shift_date", todayStr)
             .is("deleted_at", null)
@@ -160,15 +131,16 @@ export default function JobDialog({
           if (!error && shiftData) {
             setShiftStartTime(shiftData.start_time.slice(0, 5));
             setShiftEndTime(shiftData.end_time.slice(0, 5));
+            setWorkersNeeded(shiftData.workers_needed);
           }
         } catch (error) {
-          console.error("Error loading shift times:", error);
+          console.error("Error loading shift data:", error);
         } finally {
           setLoadingShiftTimes(false);
         }
       };
 
-      loadShiftTimes();
+      loadShiftData();
     }
   }, [editingJob, supabase]);
 
@@ -178,252 +150,138 @@ export default function JobDialog({
     }
   }, [startDate, isMultipleDays]);
 
-  const handleStaffingClick = async () => {
-    if (!editingJob) return;
-
-    setStaffingOpen(true);
-    setLoadingEmployees(true);
-    setLoadingAvailability(true);
-
-    try {
-      const users = await getCompanyUsers(companyId);
-      setEmployees(users);
-      setSelectedEmployees(new Set());
-      setSearchTerm("");
-
-      const shifts = await fetchRemainingShifts(supabase, editingJob.id);
-      setRemainingShifts(shifts);
-
-      if (shifts.length === 0) {
-        setLoadingAvailability(false);
-        setLoadingEmployees(false);
-        toast.error("No remaining shifts for this job");
-        return;
-      }
-
-      const shiftIds = shifts.map((s) => s.id);
-      const assignmentsMap = await fetchShiftAssignments(supabase, shiftIds);
-      const capacity = calculateShiftCapacity(shifts, assignmentsMap);
-      setShiftCapacity(capacity);
-
-      const availabilities = await calculateAllEmployeesAvailability(
-        supabase,
-        users,
-        shifts
-      );
-      setEmployeeAvailabilities(availabilities);
-    } catch (error) {
-      console.error("Failed to load staffing data:", error);
-      toast.error("Failed to load staffing data");
-    } finally {
-      setLoadingEmployees(false);
-      setLoadingAvailability(false);
-    }
-  };
-
-  const toggleEmployee = (userId: number) => {
-    const newSelected = new Set(selectedEmployees);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
-    }
-    setSelectedEmployees(newSelected);
-  };
-
-  const handleSendInvites = async () => {
-    if (selectedEmployees.size === 0) {
-      toast.error("Please select at least one employee");
-      return;
-    }
-
-    if (!editingJob) {
-      toast.error("Job must be created first");
-      return;
-    }
-
-    setSendingInvites(true);
-
-    try {
-      const response = await fetch(`/api/job-invitation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId: editingJob.id,
-          userIds: Array.from(selectedEmployees),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send invitations");
-      }
-
-      toast.success(
-        `Invitations sent to ${selectedEmployees.size} employee(s)`
-      );
-      setStaffingOpen(false);
-      setSelectedEmployees(new Set());
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      console.error("❌ Error sending invitations:", errorMessage);
-      toast.error(`Failed to send invitations: ${errorMessage}`);
-    } finally {
-      setSendingInvites(false);
-    }
-  };
-
-  const handleAssignStaff = async () => {
-    if (selectedEmployees.size === 0) {
-      toast.error("Please select at least one employee");
-      return;
-    }
-
-    if (!editingJob || !activeRole?.id) {
-      toast.error("Invalid job or user");
-      return;
-    }
-
-    if (remainingShifts.length === 0) {
-      toast.error("No shifts to assign");
-      return;
-    }
-
-    setSendingInvites(true);
-
-    try {
-      const result = await assignStaffToShifts(
-        supabase,
-        Array.from(selectedEmployees),
-        remainingShifts,
-        activeRole.id,
-        employeeAvailabilities
-      );
-
-      if (result.success > 0) {
-        toast.success(
-          `Assigned ${result.success} shift(s) to ${selectedEmployees.size} employee(s)`,
-          {
-            description: result.details.join(", "),
-          }
-        );
-      }
-
-      if (result.skipped > 0) {
-        toast.warning(
-          `${result.skipped} shift(s) skipped due to conflicts or capacity`
-        );
-      }
-
-      setStaffingOpen(false);
-      setSelectedEmployees(new Set());
-      onSave();
-    } catch (error) {
-      console.error("Error assigning staff:", error);
-      toast.error("Failed to assign staff");
-    } finally {
-      setSendingInvites(false);
-    }
-  };
-
   const handleCancelAllShifts = async () => {
     if (!editingJob) return;
 
-    const todayStr = new Date().toISOString().split("T")[0];
-    const jobHasStarted = editingJob.start_date <= todayStr;
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const jobHasStartedOrStartsToday = editingJob.start_date <= todayStr;
 
-    const confirmMessage = jobHasStarted
-      ? `Cancel all remaining shifts for "${position}"? The job end date will be updated to yesterday. This cannot be undone.`
-      : `Delete the job "${position}"? This will delete the job and all its shifts. This cannot be undone.`;
+    let canCancelToday = true;
+    let todayShiftStartTime: string | null = null;
+    let todayHasAssignments = false;
+
+    if (jobHasStartedOrStartsToday) {
+      const { data: todayShift } = await supabase
+        .from("shift")
+        .select("id, start_time")
+        .eq("job_id", editingJob.id)
+        .eq("shift_date", todayStr)
+        .is("deleted_at", null)
+        .single();
+
+      if (todayShift) {
+        const { count } = await supabase
+          .from("shift_assignment")
+          .select("id", { count: "exact", head: true })
+          .eq("shift_id", todayShift.id)
+          .is("cancelled_at", null)
+          .is("deleted_at", null);
+
+        todayHasAssignments = (count || 0) > 0;
+
+        if (todayHasAssignments) {
+          const [hours, minutes, seconds] = todayShift.start_time.split(":");
+          const shiftStartDateTime = new Date();
+          shiftStartDateTime.setHours(
+            parseInt(hours),
+            parseInt(minutes),
+            parseInt(seconds || "0"),
+            0
+          );
+
+          const timeDiffInHours =
+            (shiftStartDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+          canCancelToday = timeDiffInHours >= 1;
+          todayShiftStartTime = todayShift.start_time;
+        }
+      }
+    }
+
+    // ✅ Translated confirmations
+    let confirmMessage = "";
+    let toastSuccessKey = "";
+
+    if (!jobHasStartedOrStartsToday) {
+      confirmMessage = t("confirmations.deleteJob", { position });
+      toastSuccessKey = "toast.deleteSuccess";
+    } else if (canCancelToday) {
+      const noAssignmentsNote = !todayHasAssignments
+        ? t("confirmations.noAssignmentsNote")
+        : "";
+      confirmMessage = t("confirmations.cancelAllShifts", {
+        position,
+        noAssignments: noAssignmentsNote,
+      });
+      toastSuccessKey = "toast.cancelSuccess";
+    } else {
+      confirmMessage = t("confirmations.cancelFutureShifts", {
+        position,
+        time: todayShiftStartTime,
+      });
+      toastSuccessKey = "toast.cancelFutureSuccess";
+    }
 
     if (!confirm(confirmMessage)) {
       return;
     }
 
+    let deleteFromDate = todayStr;
+    if (jobHasStartedOrStartsToday && !canCancelToday) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      deleteFromDate = tomorrow.toISOString().split("T")[0];
+    }
+
     setSaving(true);
 
     try {
-      const now = new Date().toISOString();
-
-      if (jobHasStarted) {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-        const { error: shiftError } = await supabase
-          .from("shift")
-          .update({
-            deleted_at: now,
-          })
-          .eq("job_id", editingJob.id)
-          .gte("shift_date", todayStr)
-          .is("deleted_at", null);
-
-        if (shiftError) throw shiftError;
-
-        const { error: jobError } = await supabase
-          .from("job")
-          .update({
-            end_date: yesterdayStr,
-          })
-          .eq("id", editingJob.id);
-
-        if (jobError) throw jobError;
-
-        toast.success(`All remaining shifts cancelled for ${position}`);
+      if (!jobHasStartedOrStartsToday) {
+        const { data, error } = await supabase.rpc("delete_job_and_shifts", {
+          p_job_id: editingJob.id,
+          p_deleted_by: activeRole?.id || null,
+        });
+        if (error) throw error;
       } else {
-        const { error: jobError } = await supabase
-          .from("job")
-          .update({
-            deleted_at: now,
-            deleted_by: activeRole?.id || null,
-          })
-          .eq("id", editingJob.id);
+        const endDate = new Date(deleteFromDate);
+        endDate.setDate(endDate.getDate() - 1);
+        const endDateStr = endDate.toISOString().split("T")[0];
 
-        if (jobError) throw jobError;
-
-        const { error: shiftError } = await supabase
-          .from("shift")
-          .update({
-            deleted_at: now,
-          })
-          .eq("job_id", editingJob.id)
-          .is("deleted_at", null);
-
-        if (shiftError) {
-          console.error("Error deleting shifts:", shiftError);
-        }
-
-        toast.success(`Job "${position}" and all shifts deleted successfully`);
+        const { data, error } = await supabase.rpc("cancel_shifts_from_date", {
+          p_job_id: editingJob.id,
+          p_from_date: deleteFromDate,
+          p_new_end_date: endDateStr,
+        });
+        if (error) throw error;
       }
 
+      toast.success(t(toastSuccessKey, { position }));
       onSave();
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       console.error("Error:", errorMessage);
-      toast.error(
-        `Failed to ${jobHasStarted ? "cancel shifts" : "delete job"}`
-      );
+      toast.error(t("toast.saveFailed", { error: errorMessage }));
     } finally {
       setSaving(false);
     }
   };
 
   const handleSave = async () => {
+    // ✅ Translated validation messages
     if (!position || !startDate) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("validation.fillRequired"));
       return;
     }
 
     if (!editingJob) {
       if (!startTime || !endTime) {
-        toast.error("Please fill in start and end times");
+        toast.error(t("validation.fillTimes"));
         return;
       }
 
       if (endTime <= startTime) {
-        toast.error("End time must be after start time");
+        toast.error(t("validation.endAfterStart"));
         return;
       }
 
@@ -431,20 +289,18 @@ export default function JobDialog({
       const selectedDateTime = new Date(startDate + "T" + startTime + ":00");
 
       if (selectedDateTime < now) {
-        toast.error(
-          "Cannot create jobs in the past. Please select a future date/time."
-        );
+        toast.error(t("validation.noPastJobs"));
         return;
       }
 
       if (isMultipleDays) {
         if (!endDate) {
-          toast.error("Please set an end date");
+          toast.error(t("validation.setEndDate"));
           return;
         }
 
         if (endDate < startDate) {
-          toast.error("End date cannot be before start date");
+          toast.error(t("validation.endDateAfterStart"));
           return;
         }
       }
@@ -452,8 +308,205 @@ export default function JobDialog({
 
     if (editingJob) {
       if (shiftEndTime <= shiftStartTime) {
-        toast.error("Shift end time must be after start time");
+        toast.error(t("validation.shiftEndAfterStart"));
         return;
+      }
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const todayStr = `${year}-${month}-${day}`;
+
+      if (startDate === todayStr) {
+        const newShiftStartDateTime = new Date(
+          startDate + "T" + shiftStartTime + ":00"
+        );
+
+        if (newShiftStartDateTime < now) {
+          toast.error(t("validation.noPastTime", { time: shiftStartTime }));
+          return;
+        }
+      } else if (startDate < todayStr) {
+        toast.error(t("validation.noPastDate"));
+        return;
+      }
+
+      const finalEndDate = isMultipleDays ? endDate : startDate;
+
+      if (!finalEndDate) {
+        toast.error(t("validation.setEndDate"));
+        return;
+      }
+
+      // Check if reducing workers would over-assign shifts
+      const { data: shiftsWithAssignments, error: checkError } = await supabase
+        .from("shift")
+        .select("id, shift_date, workers_needed")
+        .eq("job_id", editingJob.id)
+        .gte("shift_date", todayStr)
+        .is("deleted_at", null);
+
+      if (checkError) {
+        console.error("Error checking shifts:", checkError);
+        toast.error(t("validation.validateWorkers"));
+        return;
+      }
+
+      if (shiftsWithAssignments && shiftsWithAssignments.length > 0) {
+        const shiftIds = shiftsWithAssignments.map((s) => s.id);
+        const { data: assignments } = await supabase
+          .from("shift_assignment")
+          .select("shift_id")
+          .in("shift_id", shiftIds)
+          .is("cancelled_at", null)
+          .is("deleted_at", null);
+
+        const assignmentsByShift: Record<number, number> = {};
+        (assignments || []).forEach((a) => {
+          assignmentsByShift[a.shift_id] =
+            (assignmentsByShift[a.shift_id] || 0) + 1;
+        });
+
+        const overassignedShifts = shiftsWithAssignments.filter(
+          (shift) => (assignmentsByShift[shift.id] || 0) > workersNeeded
+        );
+
+        if (overassignedShifts.length > 0) {
+          const exampleShift = overassignedShifts[0];
+          const assignedCount = assignmentsByShift[exampleShift.id];
+
+          toast.error(
+            t("validation.cannotReduceWorkers", {
+              needed: workersNeeded,
+              date: exampleShift.shift_date,
+              assigned: assignedCount,
+            }),
+            { duration: 6000 }
+          );
+          return;
+        }
+      }
+
+      // Check for shifts outside new date range
+      const datesChanged =
+        startDate !== editingJob.start_date ||
+        finalEndDate !== editingJob.end_date;
+
+      if (datesChanged) {
+        const { data: outsideShifts, error: checkError } = await supabase
+          .from("shift")
+          .select("id, shift_date, start_time")
+          .eq("job_id", editingJob.id)
+          .is("deleted_at", null)
+          .or(`shift_date.lt.${startDate},shift_date.gt.${finalEndDate}`);
+
+        if (checkError) {
+          console.error("Error checking shifts:", checkError);
+          toast.error(t("validation.validateDates"));
+          return;
+        }
+
+        if (outsideShifts && outsideShifts.length > 0) {
+          const shiftIds = outsideShifts.map((s) => s.id);
+
+          const { data: assignments, count: assignmentCount } = await supabase
+            .from("shift_assignment")
+            .select("shift_id", { count: "exact" })
+            .in("shift_id", shiftIds)
+            .is("cancelled_at", null)
+            .is("deleted_at", null);
+
+          const hasAssignments = (assignmentCount || 0) > 0;
+
+          const todayShift = outsideShifts.find(
+            (s) => s.shift_date === todayStr
+          );
+
+          if (todayShift && hasAssignments) {
+            const todayHasAssignments = assignments?.some(
+              (a) => a.shift_id === todayShift.id
+            );
+
+            if (todayHasAssignments) {
+              const [hours, minutes, seconds] =
+                todayShift.start_time.split(":");
+              const shiftStartDateTime = new Date();
+              shiftStartDateTime.setHours(
+                parseInt(hours),
+                parseInt(minutes),
+                parseInt(seconds || "0"),
+                0
+              );
+
+              const timeDiffInHours =
+                (shiftStartDateTime.getTime() - now.getTime()) /
+                (1000 * 60 * 60);
+
+              if (timeDiffInHours < 1 && timeDiffInHours > 0) {
+                toast.error(
+                  t("validation.cannotChangeDates", {
+                    time: todayShift.start_time.slice(0, 5),
+                  }),
+                  { duration: 6000 }
+                );
+                return;
+              }
+            }
+          }
+
+          const outsideDates = outsideShifts.map((s) => s.shift_date).sort();
+          const dateRangeMsg =
+            outsideDates.length === 1
+              ? outsideDates[0]
+              : `${outsideDates[0]} to ${
+                  outsideDates[outsideDates.length - 1]
+                }`;
+
+          let warningMessage = t("validation.dateChangeWarning", {
+            count: outsideShifts.length,
+            dates: dateRangeMsg,
+          });
+          warningMessage += "\n\n";
+
+          if (hasAssignments) {
+            warningMessage += t("validation.shiftsWithAssignments");
+          } else {
+            warningMessage += t("validation.shiftsNoAssignments");
+          }
+
+          warningMessage += "\n\n";
+          warningMessage += t("validation.continueQuestion");
+
+          if (!confirm(warningMessage)) {
+            return;
+          }
+
+          try {
+            const { error: deleteError } = await supabase.rpc(
+              "delete_shifts_outside_range",
+              {
+                p_shift_ids: shiftIds,
+              }
+            );
+
+            if (deleteError) {
+              console.error("Error deleting outside shifts:", deleteError);
+              throw new Error(t("validation.deleteShiftsFailed"));
+            }
+
+            toast.info(
+              t("validation.shiftsDeleted", { count: outsideShifts.length })
+            );
+          } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            console.error("Error handling outside shifts:", errorMessage);
+            toast.error(
+              t("validation.dateChangeFailed", { error: errorMessage })
+            );
+            return;
+          }
+        }
       }
     }
 
@@ -463,39 +516,55 @@ export default function JobDialog({
       const finalEndDate = isMultipleDays ? endDate : startDate;
 
       if (!finalEndDate) {
-        toast.error("Please set an end date");
+        toast.error(t("validation.setEndDate"));
         setSaving(false);
         return;
       }
 
-      if (!activeRole || !activeRole.id) {
-        toast.error("User not authenticated");
+      if (!activeRole || !activeRole.userId) {
+        toast.error(t("validation.userNotAuthenticated"));
         setSaving(false);
         return;
       }
-
-      const now = new Date().toISOString();
 
       if (editingJob) {
-        const { error } = await supabase
+        const { error: jobError } = await supabase
           .from("job")
           .update({
             position,
             seniority,
             description: description || null,
-            workers_needed: workersNeeded,
             location_id: locationId,
             start_date: startDate,
             end_date: finalEndDate,
           })
           .eq("id", editingJob.id);
 
-        if (error) {
-          console.error("Job update error:", error);
-          throw error;
+        if (jobError) {
+          console.error("Job update error:", jobError);
+          throw jobError;
         }
 
-        const todayStr = new Date().toISOString().split("T")[0];
+        const { data: shiftData, error: shiftError } = await supabase.rpc(
+          "generate_missing_shifts",
+          {
+            p_job_id: editingJob.id,
+            p_start_time: shiftStartTime + ":00",
+            p_end_time: shiftEndTime + ":00",
+            p_workers_needed: workersNeeded,
+          }
+        );
+
+        if (shiftError) {
+          console.error("Error generating shifts:", shiftError);
+          throw shiftError;
+        }
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const todayStr = `${year}-${month}-${day}`;
 
         const { error: shiftUpdateError } = await supabase
           .from("shift")
@@ -510,55 +579,35 @@ export default function JobDialog({
 
         if (shiftUpdateError) {
           console.error("Shift update error:", shiftUpdateError);
+          throw shiftUpdateError;
         }
 
-        toast.success("Job and remaining shifts updated successfully");
+        toast.success(t("toast.updateSuccess"));
       } else {
-        const { data: jobData, error: jobError } = await supabase
-          .from("job")
-          .insert({
-            company_id: companyId,
-            position,
-            seniority,
-            description: description || null,
-            workers_needed: workersNeeded,
-            location_id: locationId,
-            start_date: startDate,
-            end_date: finalEndDate,
-            created_by: activeRole.id,
-            created_at: now,
-          })
-          .select()
-          .single();
-
-        if (jobError) {
-          console.error("Job creation error:", jobError);
-          throw jobError;
-        }
-
-        const shifts = generateShifts(
-          jobData.id,
-          startDate,
-          finalEndDate,
-          startTime,
-          endTime,
-          workersNeeded,
-          now
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          "create_job_with_shifts",
+          {
+            p_company_id: companyId,
+            p_position: position,
+            p_seniority: seniority,
+            p_description: description || null,
+            p_workers_needed: workersNeeded,
+            p_location_id: locationId,
+            p_start_date: startDate,
+            p_end_date: finalEndDate,
+            p_start_time: startTime + ":00",
+            p_end_time: endTime + ":00",
+            p_created_by: activeRole.userId,
+          }
         );
 
-        if (shifts.length > 0) {
-          const { error: shiftsError } = await supabase
-            .from("shift")
-            .insert(shifts);
-
-          if (shiftsError) {
-            console.error("Shifts creation error:", shiftsError);
-            throw shiftsError;
-          }
+        if (rpcError) {
+          console.error("Job creation error:", rpcError);
+          throw rpcError;
         }
 
         toast.success(
-          `Job created with ${shifts.length} shift(s) successfully`
+          t("toast.createSuccess", { count: rpcData.created_shifts })
         );
       }
 
@@ -566,47 +615,10 @@ export default function JobDialog({
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       console.error("Error saving job:", errorMessage);
-      toast.error(`Failed to save job: ${errorMessage}`);
+      toast.error(t("toast.saveFailed", { error: errorMessage }));
     } finally {
       setSaving(false);
     }
-  };
-
-  const generateShifts = (
-    jobId: number,
-    startDateStr: string,
-    endDateStr: string,
-    startTimeStr: string,
-    endTimeStr: string,
-    workersNeeded: number,
-    now: string
-  ) => {
-    const shifts: Array<{
-      job_id: number;
-      shift_date: string;
-      start_time: string;
-      end_time: string;
-      workers_needed: number;
-      created_at: string;
-    }> = [];
-
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const shiftDate = d.toISOString().split("T")[0];
-
-      shifts.push({
-        job_id: jobId,
-        shift_date: shiftDate,
-        start_time: startTimeStr + ":00",
-        end_time: endTimeStr + ":00",
-        workers_needed: workersNeeded,
-        created_at: now,
-      });
-    }
-
-    return shifts;
   };
 
   if (!ready) {
@@ -618,47 +630,50 @@ export default function JobDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&_button[data-radix-dialog-close]]:z-50">
         <DialogHeader className="top-0 bg-background z-8 pt-6 border-b pb-4">
           <DialogTitle>
-            {editingJob ? "Edit Job" : "Create New Job"}
+            {editingJob ? t("dialog.editTitle") : t("dialog.createTitle")}
           </DialogTitle>
           <DialogDescription>
             {editingJob
-              ? "Update the job details and shift times for remaining shifts"
-              : "Create a new job and shifts will be generated for each day"}
+              ? t("dialog.editDescription")
+              : t("dialog.createDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 pr-4">
+          {/* Position */}
           <div>
             <Label htmlFor="position" className="text-sm font-medium">
-              Position *
+              {t("fields.position")} {t("fields.required")}
             </Label>
             <Input
               id="position"
               value={position}
               onChange={(e) => setPosition(e.target.value)}
-              placeholder="e.g., Delivery Driver"
+              placeholder={t("fields.positionPlaceholder")}
               className="mt-2"
             />
           </div>
 
+          {/* Description */}
           <div>
             <Label htmlFor="description" className="text-sm font-medium">
-              Description
+              {t("fields.description")}
             </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Job details..."
+              placeholder={t("fields.descriptionPlaceholder")}
               className="mt-2"
               rows={3}
             />
           </div>
 
+          {/* Seniority & Workers Needed */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="seniority" className="text-sm font-medium">
-                Seniority *
+                {t("fields.seniority")} {t("fields.required")}
               </Label>
               <Select
                 value={seniority}
@@ -670,15 +685,15 @@ export default function JobDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="junior">Junior</SelectItem>
-                  <SelectItem value="senior">Senior</SelectItem>
+                  <SelectItem value="junior">{t("fields.junior")}</SelectItem>
+                  <SelectItem value="senior">{t("fields.senior")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
               <Label htmlFor="workers" className="text-sm font-medium">
-                Workers Needed *
+                {t("fields.workersNeeded")} {t("fields.required")}
               </Label>
               <Input
                 id="workers"
@@ -690,12 +705,18 @@ export default function JobDialog({
                 }
                 className="mt-2"
               />
+              {editingJob && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("dialog.appliesToAllShifts")}
+                </p>
+              )}
             </div>
           </div>
 
+          {/* Location */}
           <div>
             <Label htmlFor="location" className="text-sm font-medium">
-              Location
+              {t("fields.location")}
             </Label>
             <Select
               value={locationId?.toString() || "none"}
@@ -704,10 +725,10 @@ export default function JobDialog({
               }
             >
               <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Select location..." />
+                <SelectValue placeholder={t("fields.selectLocation")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No location</SelectItem>
+                <SelectItem value="none">{t("fields.noLocation")}</SelectItem>
                 {locations.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
                     {loc.name}
@@ -717,25 +738,30 @@ export default function JobDialog({
             </Select>
           </div>
 
+          {/* Start Date */}
           <div>
             <Label htmlFor="startDate" className="text-sm font-medium">
-              Start Date *
+              {t("fields.startDate")} {t("fields.required")}
             </Label>
             <Input
               id="startDate"
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                e.target.blur();
+              }}
               min={editingJob ? undefined : today}
               className="mt-2"
             />
             {!editingJob && (
               <p className="text-xs text-muted-foreground mt-1">
-                Must be today or a future date
+                {t("dialog.mustBeFutureDate")}
               </p>
             )}
           </div>
 
+          {/* Multiple Days Checkbox */}
           <div className="flex items-center space-x-2 p-4 bg-muted rounded-lg">
             <Checkbox
               id="multipleDays"
@@ -743,47 +769,54 @@ export default function JobDialog({
               onCheckedChange={(checked) => setIsMultipleDays(checked === true)}
             />
             <Label htmlFor="multipleDays" className="cursor-pointer">
-              This job spans multiple days
+              {t("dialog.multipleDaysLabel")}
             </Label>
           </div>
 
+          {/* End Date (if multiple days) */}
           {isMultipleDays && (
             <div>
               <Label htmlFor="endDate" className="text-sm font-medium">
-                End Date *
+                {t("fields.endDate")} {t("fields.required")}
               </Label>
               <Input
                 id="endDate"
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  e.target.blur();
+                }}
                 min={startDate}
                 className="mt-2"
               />
             </div>
           )}
 
+          {/* Shift Times */}
           {!editingJob ? (
             <>
               <div className="border-t pt-4">
-                <h4 className="text-sm font-medium mb-3">Shift Times</h4>
+                <h4 className="text-sm font-medium mb-3">
+                  {t("dialog.shiftTimes")}
+                </h4>
               </div>
 
               <TimePickerSelect
                 value={startTime}
                 onChange={setStartTime}
-                label="Start Time"
+                label={t("fields.startTime")}
                 required
               />
 
               <TimePickerSelect
                 value={endTime}
                 onChange={setEndTime}
-                label="End Time"
+                label={t("fields.endTime")}
                 required
               />
               <p className="text-xs text-muted-foreground -mt-2">
-                These times will be applied to all shifts
+                {t("dialog.allShiftsNote")}
               </p>
             </>
           ) : (
@@ -792,24 +825,23 @@ export default function JobDialog({
                 <>
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-medium mb-1">
-                      Update Remaining Shift Times
+                      {t("dialog.updateShiftTimes")}
                     </h4>
                     <p className="text-xs text-muted-foreground mb-4">
-                      Change the times for all remaining shifts (today and
-                      future). Past shifts will not be affected.
+                      {t("dialog.updateShiftTimesDescription")}
                     </p>
                   </div>
 
                   <TimePickerSelect
                     value={shiftStartTime}
                     onChange={setShiftStartTime}
-                    label="Shift Start Time"
+                    label={t("fields.shiftStartTime")}
                   />
 
                   <TimePickerSelect
                     value={shiftEndTime}
                     onChange={setShiftEndTime}
-                    label="Shift End Time"
+                    label={t("fields.shiftEndTime")}
                   />
                 </>
               )}
@@ -817,6 +849,7 @@ export default function JobDialog({
           )}
         </div>
 
+        {/* Footer Buttons */}
         <div className="flex gap-3 justify-between pt-6 border-t bottom-0 bg-background">
           <div>
             {editingJob &&
@@ -831,24 +864,24 @@ export default function JobDialog({
                     disabled={saving}
                   >
                     {jobHasStarted
-                      ? "Cancel All Remaining Shifts"
-                      : "Delete Job"}
+                      ? t("dialog.cancelAllShifts")
+                      : t("dialog.deleteJob")}
                   </Button>
                 );
               })()}
           </div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={onCancel}>
-              Close
+              {t("dialog.close")}
             </Button>
             {editingJob && (
               <Button
                 variant="outline"
-                onClick={handleStaffingClick}
+                onClick={() => setStaffingOpen(true)}
                 className="gap-2"
               >
                 <Users className="h-4 w-4" />
-                Staff
+                {t("dialog.staff")}
               </Button>
             )}
             <Button
@@ -856,228 +889,26 @@ export default function JobDialog({
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? "Saving..." : editingJob ? "Update Job" : "Create Job"}
+              {saving
+                ? t("dialog.saving")
+                : editingJob
+                ? t("dialog.updateButton")
+                : t("dialog.createButton")}
             </Button>
           </div>
         </div>
       </DialogContent>
 
-      {/* ✅ COMPACT Staffing Modal */}
-      <Dialog open={staffingOpen} onOpenChange={setStaffingOpen} modal={true}>
-        <DialogContent
-          className="max-w-3xl h-[75vh] flex flex-col"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <DialogHeader className="flex-shrink-0 pb-3">
-            <DialogTitle>Staff Job: {position || "Untitled"}</DialogTitle>
-            <DialogDescription className="text-xs">
-              Assign employees to remaining shifts for this job
-            </DialogDescription>
-          </DialogHeader>
-
-          {loadingEmployees || loadingAvailability ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  Loading employees and availability...
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex-1 flex flex-col min-h-0 space-y-3">
-                {/* Compact Capacity Overview */}
-                <div className="flex-shrink-0 p-2 bg-muted rounded-lg flex items-center justify-between text-sm">
-                  <div>
-                    <span className="font-medium">Capacity: </span>
-                    <span className="text-primary font-bold">
-                      {shiftCapacity.filled}/{shiftCapacity.total}
-                    </span>
-                  </div>
-                  <div className="text-muted-foreground text-xs">
-                    {remainingShifts.length} shift(s) ·{" "}
-                    {shiftCapacity.remaining} position(s) available
-                  </div>
-                </div>
-
-                {/* Compact Search */}
-                <div className="flex-shrink-0">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search employees..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 h-9"
-                    />
-                  </div>
-                </div>
-
-                {/* Scrollable Employee List */}
-                <div className="flex-1 min-h-0 border rounded-lg">
-                  <div className="h-full overflow-y-auto p-3">
-                    <div className="space-y-1.5">
-                      {(() => {
-                        const filtered = employeeAvailabilities.filter(
-                          (avail) => {
-                            const fullName = `${
-                              avail.employee.firstName || ""
-                            } ${avail.employee.lastName || ""}`.toLowerCase();
-                            const email = avail.employee.email.toLowerCase();
-                            const search = searchTerm.toLowerCase();
-                            return (
-                              fullName.includes(search) ||
-                              email.includes(search)
-                            );
-                          }
-                        );
-
-                        if (filtered.length === 0) {
-                          return (
-                            <div className="text-center py-8 text-muted-foreground text-sm">
-                              No employees found
-                            </div>
-                          );
-                        }
-
-                        return filtered.map((avail) => {
-                          const isDisabled =
-                            avail.isFullyAssigned || avail.isUnavailable;
-                          const canSelect = !isDisabled;
-
-                          return (
-                            <div
-                              key={avail.employee.userId}
-                              className={`flex items-start space-x-2 p-2 rounded transition-colors ${
-                                isDisabled
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : "hover:bg-muted cursor-pointer"
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (canSelect) {
-                                  toggleEmployee(avail.employee.userId);
-                                }
-                              }}
-                            >
-                              <Checkbox
-                                checked={selectedEmployees.has(
-                                  avail.employee.userId
-                                )}
-                                onCheckedChange={() => {
-                                  if (canSelect) {
-                                    toggleEmployee(avail.employee.userId);
-                                  }
-                                }}
-                                disabled={isDisabled}
-                                className="mt-0.5"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium">
-                                  {avail.employee.firstName &&
-                                  avail.employee.lastName
-                                    ? `${avail.employee.firstName} ${avail.employee.lastName}`
-                                    : avail.employee.email}
-                                </div>
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {avail.employee.email}
-                                </div>
-
-                                {avail.isFullyAssigned ? (
-                                  <div className="text-xs text-green-600 mt-0.5">
-                                    ✓ Assigned to all {avail.total} shift(s)
-                                  </div>
-                                ) : avail.isUnavailable ? (
-                                  <div className="text-xs text-red-600 mt-0.5">
-                                    ✗ Unavailable (conflicts or full)
-                                  </div>
-                                ) : (
-                                  <div className="text-xs mt-0.5">
-                                    <span
-                                      className={`font-medium ${
-                                        avail.available === avail.total
-                                          ? "text-green-600"
-                                          : "text-orange-600"
-                                      }`}
-                                    >
-                                      {avail.available}/{avail.total} shift(s)
-                                    </span>
-                                    {avail.alreadyAssigned > 0 && (
-                                      <span className="text-muted-foreground ml-1">
-                                        ({avail.alreadyAssigned} assigned)
-                                      </span>
-                                    )}
-                                    {avail.conflicts > 0 && (
-                                      <span className="text-orange-600 ml-1">
-                                        ({avail.conflicts} conflicts)
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Compact Selection Count */}
-                <div className="flex-shrink-0 text-sm text-muted-foreground">
-                  {selectedEmployees.size} employee(s) selected
-                </div>
-              </div>
-
-              {/* Fixed Actions */}
-              <div className="flex-shrink-0 flex gap-2 justify-end pt-3 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setStaffingOpen(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSendInvites();
-                  }}
-                  disabled={selectedEmployees.size === 0 || sendingInvites}
-                >
-                  {sendingInvites ? "Sending..." : "Send Invitations"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAssignStaff();
-                  }}
-                  disabled={
-                    selectedEmployees.size === 0 ||
-                    sendingInvites ||
-                    loadingAvailability
-                  }
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  {sendingInvites ? "Assigning..." : "Assign to Shifts"}
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {editingJob && (
+        <StaffingModal
+          open={staffingOpen}
+          onOpenChange={setStaffingOpen}
+          job={editingJob}
+          position={position}
+          companyId={companyId}
+          onSave={onSave}
+        />
+      )}
     </>
   );
 }

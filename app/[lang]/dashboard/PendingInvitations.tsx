@@ -50,97 +50,133 @@ export function PendingInvitations({ userId }: { userId: number }) {
     fetchInvitations();
   }, [userId]);
 
-  const fetchInvitations = async () => {
-    setLoading(true);
+ const fetchInvitations = async () => {
+   setLoading(true);
 
-    try {
-      const { data: invitationsData, error: invitationsError } = await supabase
-        .from("job_invitation")
-        .select(
-          `
-          id,
-          job_id,
-          shift_ids,
-          status,
-          token,
-          created_at,
-          job:job_id (
-            position,
-            start_date,
-            end_date,
-            location:location_id (
-              name
-            )
+   try {
+     console.log("Fetching invitations for userId:", userId);
+
+     const { data: invitationsData, error: invitationsError } = await supabase
+       .from("job_invitation")
+       .select(
+         `
+        id,
+        job_id,
+        shift_ids,
+        status,
+        token,
+        created_at,
+        job:job_id (
+          position,
+          start_date,
+          end_date,
+          location:location_id (
+            name
           )
-        `
         )
-        .eq("user_id", userId)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
+      `
+       )
+       .eq("user_id", userId)
+       .eq("status", "pending")
+       .order("created_at", { ascending: false });
 
-      if (invitationsError) throw invitationsError;
+     // ✅ Log the actual error values
+     if (invitationsError) {
+       console.error("Supabase error code:", invitationsError.code);
+       console.error("Supabase error message:", invitationsError.message);
+       console.error("Supabase error details:", invitationsError.details);
+       console.error("Supabase error hint:", invitationsError.hint);
+       throw invitationsError;
+     }
 
-      if (invitationsData && invitationsData.length > 0) {
-        const invitationsWithShifts = await Promise.all(
-          invitationsData.map(async (invitation) => {
-            const shiftIds = (invitation.shift_ids || []) as number[];
+     console.log("Raw invitations data:", invitationsData);
 
-            const { data: shiftsData } = await supabase
-              .from("shift")
-              .select("id, shift_date, start_time, end_time")
-              .in("id", shiftIds)
-              .is("deleted_at", null)
-              .order("shift_date", { ascending: true });
+     if (invitationsData && invitationsData.length > 0) {
+       const invitationsWithShifts = await Promise.all(
+         invitationsData.map(async (invitation) => {
+           const shiftIds = (invitation.shift_ids || []) as number[];
 
-            // ✅ Use unknown as intermediate step
-            const jobData = invitation.job as unknown as Record<
-              string,
-              unknown
-            > | null;
-            const locationData = jobData?.location as Record<
-              string,
-              unknown
-            > | null;
+           console.log(
+             `Fetching shifts for invitation ${invitation.id}:`,
+             shiftIds
+           );
 
-            return {
-              id: invitation.id,
-              job_id: invitation.job_id,
-              shift_ids: invitation.shift_ids,
-              status: invitation.status,
-              token: invitation.token,
-              created_at: invitation.created_at,
-              job: {
-                position: (jobData?.position as string) || "Unknown Position",
-                start_date: (jobData?.start_date as string) || "",
-                end_date: (jobData?.end_date as string) || "",
-                location: locationData
-                  ? {
-                      name: (locationData.name as string) || "Unknown Location",
-                    }
-                  : null,
-              },
-              shifts: shiftsData || [],
-            } as JobInvitation;
-          })
-        );
+           const { data: shiftsData, error: shiftsError } = await supabase
+             .from("shift")
+             .select("id, shift_date, start_time, end_time")
+             .in("id", shiftIds)
+             .is("deleted_at", null)
+             .order("shift_date", { ascending: true });
 
-        setInvitations(invitationsWithShifts);
-      } else {
-        setInvitations([]);
-      }
-    } catch (error) {
-      console.error("Error fetching invitations:", error);
-      toast.error("Failed to load invitations");
-    } finally {
-      setLoading(false);
-    }
-  };
+           if (shiftsError) {
+             console.error("Error fetching shifts:", shiftsError);
+           }
+
+           const jobData = invitation.job as unknown as Record<
+             string,
+             unknown
+           > | null;
+           const locationData = jobData?.location as Record<
+             string,
+             unknown
+           > | null;
+
+           return {
+             id: invitation.id,
+             job_id: invitation.job_id,
+             shift_ids: invitation.shift_ids,
+             status: invitation.status,
+             token: invitation.token,
+             created_at: invitation.created_at,
+             job: {
+               position: (jobData?.position as string) || "Unknown Position",
+               start_date: (jobData?.start_date as string) || "",
+               end_date: (jobData?.end_date as string) || "",
+               location: locationData
+                 ? {
+                     name: (locationData.name as string) || "Unknown Location",
+                   }
+                 : null,
+             },
+             shifts: shiftsData || [],
+           } as JobInvitation;
+         })
+       );
+
+       console.log("Final invitations with shifts:", invitationsWithShifts);
+       setInvitations(invitationsWithShifts);
+     } else {
+       console.log("No pending invitations found");
+       setInvitations([]);
+     }
+   } catch (error) {
+     // ✅ Cast error to access properties
+     const err = error as {
+       code?: string;
+       message?: string;
+       details?: string;
+       hint?: string;
+     };
+     console.error("Error code:", err?.code);
+     console.error("Error message:", err?.message);
+     console.error("Error details:", err?.details);
+     console.error("Error hint:", err?.hint);
+
+     // Only show toast if it's a real error
+     if (err?.message) {
+       toast.error(`Failed to load invitations: ${err.message}`);
+     }
+   } finally {
+     setLoading(false);
+   }
+ };
+
 
   const handleAccept = async (invitationId: number, token: string) => {
     setProcessingId(invitationId);
 
     try {
-      const response = await fetch("/api/job-accept", {
+      const response = await fetch("/api/invite/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),

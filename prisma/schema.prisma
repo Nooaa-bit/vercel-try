@@ -207,7 +207,6 @@ model Job {
   position      String    @db.VarChar(255)
   seniority     Seniority
   description   String?   @db.Text
-  workersNeeded Int       @map("workers_needed")
   
   // Schedule
   startDate     DateTime  @map("start_date") @db.Date
@@ -307,7 +306,7 @@ model JobInvitation {
   userId        Int       @map("user_id")
   
   invitedBy     Int       @map("invited_by")
-  token         String    @unique @default(cuid())
+  token         String?    @unique @default(cuid())
   
   shiftIds      Int[]     @map("shift_ids")
   

@@ -1,4 +1,3 @@
-//hype-hire/vercel/app/hooks/useActiveRole.tsx
 "use client";
 
 import {
@@ -24,7 +23,8 @@ const ROLE_WEIGHT: Record<Role, number> = {
 };
 
 interface UserCompanyRole {
-  id: number;
+  id: number; // user_company_role.id
+  userId: number; // ✅ NEW: Actual user.id
   role: Role;
   companyId: number;
   companyName: string;
@@ -43,7 +43,6 @@ interface ActiveRoleContext {
   hasPermission: (requiredRole: Role) => boolean;
   hasAnyRole: (requiredRoles: Role[]) => boolean;
   loading: boolean;
-  // ✅ NEW: Company selection for superadmins
   availableCompanies: Company[];
   selectedCompanyForAdmin: number | null;
   setSelectedCompanyForAdmin: (companyId: number) => void;
@@ -54,6 +53,7 @@ interface RoleRow {
   id: number;
   role: Role;
   company_id: number;
+  user_id: number; // ✅ NEW: Added user_id
 }
 
 interface CompanyRow {
@@ -81,9 +81,10 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
+    // ✅ FIXED: Now selecting user_id as well
     const { data: roles, error: rolesError } = await supabase
       .from("user_company_role")
-      .select("id, role, company_id")
+      .select("id, role, company_id, user_id")
       .eq("user_id", profile.id)
       .is("revoked_at", null);
 
@@ -106,8 +107,10 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       (companies as CompanyRow[]).map((c) => [c.id, c.name])
     );
 
+    // ✅ FIXED: Now returning userId (user.id)
     return (roles as RoleRow[]).map((r) => ({
-      id: r.id,
+      id: r.id, // user_company_role.id
+      userId: r.user_id, // ✅ NEW: user.id (the actual user ID)
       role: r.role,
       companyId: r.company_id,
       companyName: companyMap.get(r.company_id) || "Unknown Company",
@@ -118,7 +121,6 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
   }
 }
 
-// ✅ NEW: Fetch all companies for superadmin selection
 async function fetchAllCompanies(): Promise<Company[]> {
   const supabase = createClient();
 
@@ -145,7 +147,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
   const { t, ready } = useTranslation("role-access");
   const { user, loading: authLoading } = useAuth();
   const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
-  // ✅ NEW: Track selected company for admin purposes
   const [selectedCompanyForAdmin, setSelectedCompanyForAdmin] = useState<
     number | null
   >(null);
@@ -161,7 +162,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     }
   );
 
-  // ✅ NEW: Fetch all companies for superadmin dropdown
   const { data: availableCompanies = [] } = useSWR(
     "all-companies",
     fetchAllCompanies,
@@ -197,19 +197,16 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }, [availableRoles, activeRoleId]);
 
-  // ✅ NEW: Check if superadmin
   const isSuperAdmin = activeRole?.role === "superadmin";
 
   const setActiveRole = useCallback((roleId: number) => {
     setActiveRoleId(roleId);
-    // ✅ NEW: Reset company selection when switching roles
     setSelectedCompanyForAdmin(null);
     if (typeof window !== "undefined") {
       localStorage.setItem("activeRoleId", roleId.toString());
     }
   }, []);
 
-  // ✅ NEW: Setter for company selection
   const handleSetSelectedCompanyForAdmin = useCallback((companyId: number) => {
     setSelectedCompanyForAdmin(companyId);
     if (typeof window !== "undefined") {
@@ -217,7 +214,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ✅ NEW: Initialize company selection from localStorage
   useMemo(() => {
     if (isSuperAdmin && selectedCompanyForAdmin === null) {
       const stored =
@@ -226,7 +222,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
           : null;
       const storedId = stored ? parseInt(stored, 10) : null;
 
-      // Set to first available company if not stored
       if (storedId && availableCompanies.some((c) => c.id === storedId)) {
         setSelectedCompanyForAdmin(storedId);
       } else if (availableCompanies.length > 0) {
@@ -262,7 +257,6 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
       hasPermission,
       hasAnyRole,
       loading,
-      // ✅ NEW: Expose company selection
       availableCompanies,
       selectedCompanyForAdmin,
       setSelectedCompanyForAdmin: handleSetSelectedCompanyForAdmin,

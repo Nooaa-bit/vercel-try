@@ -24,7 +24,8 @@ export default function JobsLayout({ children }: LayoutProps) {
   // ✅ Check if user has admin access
   const isAdmin =
     activeRole?.role === "company_admin" || activeRole?.role === "superadmin";
-
+  
+    //Show a spinning loader, until Role is loaded
   if (!ready || roleLoading) {
     return (
       <div className="space-y-6 py-20">
