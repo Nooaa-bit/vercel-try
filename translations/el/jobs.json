@@ -216,7 +216,7 @@
     "applyToRemainingDescription": "Ενημερώνει ώρες, απαιτούμενο προσωπικό και στελέχωση για {{count}} βάρδιες",
     "cancelShiftButton": "Ακύρωση Βάρδιας",
     "cancelling": "Ακύρωση...",
-    "saveChangesButton": "Αποθήκευση Αλλαγών",
+    "saveChangesButton": "Αποθήκευση ",
     "saving": "Αποθήκευση...",
     "currentlyAssigned": "Τρέχουσα ανάθεση {{count}} εργαζομένων",
     "overstaffed": "Υπερστελέχωση:",

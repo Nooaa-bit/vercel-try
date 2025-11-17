@@ -1,6 +1,8 @@
+//hype-hire/vercel/app/[lang]/dashboard/calendar/ShiftEditDialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { createClient } from "@/lib/supabase/client";
 import {
   DialogContent,
@@ -55,6 +57,8 @@ export function ShiftEditDialog({
   onSave,
   onCancel,
 }: ShiftEditDialogProps) {
+  const { t, i18n } = useTranslation("jobs");
+
   const isShiftInPast = () => {
     const now = new Date();
     const shiftDateTime = new Date(shift.shift_date + "T" + shift.start_time);
@@ -135,18 +139,18 @@ export function ShiftEditDialog({
         }
       } catch (error) {
         console.error("Error loading initial data:", error);
-        toast.error("Failed to load shift data");
+        toast.error(t("shiftEditToast.loadShiftFailed"));
       } finally {
         setLoadingInitialData(false);
       }
     };
 
     loadInitialData();
-  }, [shift.id, shift.job_id, supabase]);
+  }, [shift.id, shift.job_id, supabase, t]);
 
   const timeValidation = {
     isValid: endTime > startTime,
-    message: "End time must be after start time",
+    message: t("shiftEditToast.endAfterStart"),
   };
 
   const workersValidation = {
@@ -161,7 +165,7 @@ export function ShiftEditDialog({
     e.stopPropagation();
 
     if (companyId === 0) {
-      toast.error("Loading company data...");
+      toast.error(t("shiftEditToast.loadingCompany"));
       return;
     }
 
@@ -195,7 +199,7 @@ export function ShiftEditDialog({
       setEmployeeAvailabilities(availabilities);
     } catch (error) {
       console.error("Error loading staff data:", error);
-      toast.error("Failed to load employee data");
+      toast.error(t("shiftEditToast.loadEmployeesFailed"));
       setStaffModalOpen(false);
     } finally {
       setLoadingStaff(false);
@@ -214,7 +218,7 @@ export function ShiftEditDialog({
 
   const handleAddSelectedStaff = () => {
     if (selectedStaffIds.size === 0) {
-      toast.error("Please select at least one employee");
+      toast.error(t("shiftEditToast.selectEmployee"));
       return;
     }
 
@@ -236,14 +240,16 @@ export function ShiftEditDialog({
     });
     setCurrentStaff(updatedStaff);
 
-    toast.info(`${selectedStaffIds.size} employee(s) added (pending save)`);
+    toast.info(
+      t("shiftEditToast.employeesAdded", { count: selectedStaffIds.size })
+    );
     setStaffModalOpen(false);
     setSelectedStaffIds(new Set());
   };
 
   const handleSendInvites = async () => {
     if (selectedStaffIds.size === 0) {
-      toast.error("Please select at least one employee");
+      toast.error(t("shiftEditToast.selectEmployee"));
       return;
     }
 
@@ -265,12 +271,14 @@ export function ShiftEditDialog({
         throw new Error(data.error || "Failed to send invitations");
       }
 
-      toast.success(`Invitations sent to ${selectedStaffIds.size} employee(s)`);
+      toast.success(
+        t("shiftEditToast.invitationsSent", { count: selectedStaffIds.size })
+      );
       setStaffModalOpen(false);
       setSelectedStaffIds(new Set());
     } catch (error) {
       console.error("Error sending invitations:", error);
-      toast.error("Failed to send invitations");
+      toast.error(t("shiftEditToast.invitationsFailed"));
     } finally {
       setSendingInvites(false);
     }
@@ -298,7 +306,7 @@ export function ShiftEditDialog({
     const updatedStaff = currentStaff.filter((s) => s.userId !== userId);
     setCurrentStaff(updatedStaff);
 
-    toast.info(`${userName} removed (pending save)`);
+    toast.info(t("shiftEditToast.staffRemoved", { name: userName }));
   };
 
   const assignStaffDirectly = async (
@@ -306,11 +314,6 @@ export function ShiftEditDialog({
     shiftIds: number[],
     adminId: number
   ) => {
-    console.log("=== Starting assignStaffDirectly ===");
-    console.log("User IDs to assign:", userIds);
-    console.log("Shift IDs:", shiftIds);
-    console.log("Admin ID:", adminId);
-
     const now = new Date().toISOString();
     let successCount = 0;
 
@@ -319,8 +322,6 @@ export function ShiftEditDialog({
       .select("id, shift_id, user_id, deleted_at, cancelled_at")
       .in("shift_id", shiftIds)
       .in("user_id", userIds);
-
-    console.log("All assignments (including deleted):", allAssignments);
 
     const activeAssignments = new Set(
       (allAssignments || [])
@@ -334,26 +335,16 @@ export function ShiftEditDialog({
         .map((a) => [`${a.shift_id}-${a.user_id}`, a])
     );
 
-    console.log("Active assignments:", Array.from(activeAssignments));
-    console.log("Deleted assignments:", Array.from(deletedAssignments.keys()));
-
     for (const userId of userIds) {
       for (const shiftId of shiftIds) {
         const key = `${shiftId}-${userId}`;
 
         if (activeAssignments.has(key)) {
-          console.log(
-            `⏭️ Skipping - active assignment exists for user ${userId}, shift ${shiftId}`
-          );
           continue;
         }
 
         const deletedAssignment = deletedAssignments.get(key);
         if (deletedAssignment) {
-          console.log(
-            `🔄 Undeleting assignment for user ${userId}, shift ${shiftId}`
-          );
-
           const { error } = await supabase
             .from("shift_assignment")
             .update({
@@ -364,21 +355,11 @@ export function ShiftEditDialog({
             })
             .eq("id", deletedAssignment.id);
 
-          if (error) {
-            console.error(`❌ Error undeleting assignment:`, error);
-            continue;
+          if (!error) {
+            successCount++;
           }
-
-          console.log(
-            `✅ Undeleted assignment for user ${userId}, shift ${shiftId}`
-          );
-          successCount++;
           continue;
         }
-
-        console.log(
-          `➕ Creating new assignment for user ${userId}, shift ${shiftId}`
-        );
 
         const { data, error } = await supabase
           .from("shift_assignment")
@@ -391,32 +372,20 @@ export function ShiftEditDialog({
           .select()
           .maybeSingle();
 
-        if (error) {
-          if (error.code === "23505") {
-            console.log(
-              `⚠️ Duplicate detected for user ${userId}, shift ${shiftId} - skipping`
-            );
-            continue;
-          } else {
-            console.error(`❌ Error creating assignment:`, error);
-            continue;
-          }
-        }
-
-        if (data) {
-          console.log(`✅ Created new assignment:`, data);
+        if (!error && data) {
           successCount++;
+        } else if (error && error.code !== "23505") {
+          console.error("Error creating assignment:", error);
         }
       }
     }
 
-    console.log(`✅ Total assignments processed: ${successCount}`);
     return successCount;
   };
 
   const handleSave = async () => {
     if (!startTime || !endTime) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("shiftEditToast.fillRequired"));
       return;
     }
 
@@ -426,7 +395,7 @@ export function ShiftEditDialog({
     }
 
     if (workersNeeded < 1) {
-      toast.error("Workers needed must be at least 1");
+      toast.error(t("shiftEditToast.workersMin"));
       return;
     }
 
@@ -441,7 +410,7 @@ export function ShiftEditDialog({
       shiftStartDateTime.setHours(hours, minutes, 0, 0);
 
       if (shiftStartDateTime < now) {
-        toast.error("Cannot set shift time in the past for today's date");
+        toast.error(t("shiftEditToast.pastTime"));
         return;
       }
     }
@@ -449,7 +418,10 @@ export function ShiftEditDialog({
     if (workersNeeded < currentStaff.length && !applyToRestOfJob) {
       if (
         !confirm(
-          `You have ${currentStaff.length} workers assigned but only need ${workersNeeded}. This shift will be overstaffed. Continue?`
+          t("shiftEditToast.overstaffedConfirm", {
+            assigned: currentStaff.length,
+            needed: workersNeeded,
+          })
         )
       ) {
         return;
@@ -499,9 +471,6 @@ export function ShiftEditDialog({
         for (const userId of staffToRemove) {
           await removeStaffFromShifts(supabase, userId, shiftsToModify);
         }
-        console.log(
-          `Removed ${staffToRemove.size} staff from ${shiftsToModify.length} shift(s)`
-        );
       }
 
       if (staffToAdd.size > 0) {
@@ -510,12 +479,10 @@ export function ShiftEditDialog({
         } = await supabase.auth.getUser();
 
         if (!authUser) {
-          toast.error("User not authenticated");
+          toast.error(t("shiftEditToast.userNotAuthenticated"));
           setSaving(false);
           return;
         }
-
-        console.log("Auth user ID:", authUser.id);
 
         let adminUserId: number | null = null;
 
@@ -527,7 +494,6 @@ export function ShiftEditDialog({
 
         if (userData1) {
           adminUserId = userData1.id;
-          console.log("Found user via auth_user_id:", adminUserId);
         }
 
         if (!adminUserId) {
@@ -539,7 +505,6 @@ export function ShiftEditDialog({
 
           if (userData2) {
             adminUserId = userData2.id;
-            console.log("Found user via supabase_user_id:", adminUserId);
           }
         }
 
@@ -553,13 +518,11 @@ export function ShiftEditDialog({
 
           if (roleData) {
             adminUserId = roleData.user_id;
-            console.log("Using user_id from user_role:", adminUserId);
           }
         }
 
         if (!adminUserId) {
-          console.error("Could not find user ID in database");
-          toast.error("Could not find user data. Staff changes not applied.");
+          toast.error(t("shiftEditToast.userDataNotFound"));
         } else {
           const assignedCount = await assignStaffDirectly(
             Array.from(staffToAdd),
@@ -567,13 +530,12 @@ export function ShiftEditDialog({
             adminUserId
           );
 
-          console.log(
-            `Successfully assigned ${assignedCount} shift assignments`
-          );
-
           if (assignedCount > 0) {
             toast.success(
-              `Assigned ${staffToAdd.size} worker(s) to ${shiftsToModify.length} shift(s)`
+              t("shiftEditToast.staffAssigned", {
+                staffCount: staffToAdd.size,
+                shiftCount: shiftsToModify.length,
+              })
             );
           }
         }
@@ -586,30 +548,27 @@ export function ShiftEditDialog({
       setStaffToRemove(new Set());
 
       const message = applyToRestOfJob
-        ? `Updated ${remainingShiftCount} remaining shift(s)`
-        : "Shift updated successfully";
+        ? t("shiftEditToast.updateSuccess", { count: remainingShiftCount })
+        : t("shiftEditToast.shiftUpdated");
 
       toast.success(message);
 
       onSave();
     } catch (error) {
       console.error("Error updating shift:", error);
-      toast.error("Failed to update shift");
+      toast.error(t("shiftEditToast.updateFailed"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = async () => {
-    if (
-      !confirm(
-        `Are you sure you want to cancel this shift? ${
-          currentStaff.length > 0
-            ? `${currentStaff.length} worker(s) are assigned and will be notified.`
-            : ""
-        }`
-      )
-    ) {
+    const staffInfo =
+      currentStaff.length > 0
+        ? t("shiftEditToast.staffNotified", { count: currentStaff.length })
+        : "";
+
+    if (!confirm(t("shiftEditToast.cancelConfirm", { staffInfo }))) {
       return;
     }
 
@@ -617,7 +576,6 @@ export function ShiftEditDialog({
 
     try {
       const now = new Date();
-
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
@@ -631,13 +589,8 @@ export function ShiftEditDialog({
         .gte("shift_date", todayStr)
         .is("deleted_at", null);
 
-      console.log("Remaining shifts for job:", remainingCount);
-      console.log("Current shift ID:", shift.id);
-
       const isLastShift =
         remainingCount === 1 && remainingShifts?.[0]?.id === shift.id;
-
-      console.log("Is this the last shift?", isLastShift);
 
       const { error: shiftError } = await supabase
         .from("shift")
@@ -649,8 +602,6 @@ export function ShiftEditDialog({
       if (shiftError) throw shiftError;
 
       if (isLastShift) {
-        console.log("Deleting job because this was the last shift");
-
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
@@ -676,22 +627,17 @@ export function ShiftEditDialog({
           })
           .eq("id", shift.job_id);
 
-        if (jobError) {
-          console.error("Error deleting job:", jobError);
-          throw jobError;
-        }
+        if (jobError) throw jobError;
 
-        toast.success(
-          "Shift cancelled successfully. Job also deleted as it was the last shift."
-        );
+        toast.success(t("shiftEditToast.jobDeleted"));
       } else {
-        toast.success("Shift cancelled successfully");
+        toast.success(t("shiftEditToast.shiftCancelled"));
       }
 
       onSave();
     } catch (error) {
       console.error("Error cancelling shift:", error);
-      toast.error("Failed to cancel shift");
+      toast.error(t("shiftEditToast.cancelFailed"));
     } finally {
       setSaving(false);
     }
@@ -702,12 +648,12 @@ export function ShiftEditDialog({
       <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Loading Shift</DialogTitle>
+            <DialogTitle>{t("shiftEdit.loadingTitle")}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
             <p className="text-sm text-muted-foreground">
-              Loading shift details...
+              {t("shiftEdit.loadingMessage")}
             </p>
           </div>
         </DialogContent>
@@ -716,22 +662,22 @@ export function ShiftEditDialog({
   }
 
   if (shiftIsPast) {
+    const shiftDate = new Date(
+      shift.shift_date + "T00:00:00"
+    ).toLocaleDateString(i18n.language, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
     return (
       <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>View Shift (Past)</DialogTitle>
+            <DialogTitle>{t("shiftEdit.viewTitle")}</DialogTitle>
             <DialogDescription>
-              {shift.position} -{" "}
-              {new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
-                "en-US",
-                {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                }
-              )}
+              {shift.position} - {shiftDate}
             </DialogDescription>
           </DialogHeader>
 
@@ -739,24 +685,28 @@ export function ShiftEditDialog({
             <Alert className="border-gray-500 bg-gray-50">
               <Info className="h-4 w-4 text-gray-600" />
               <AlertDescription className="text-gray-800">
-                This shift has already started and cannot be edited.
+                {t("shiftEdit.pastShiftAlert")}
               </AlertDescription>
             </Alert>
 
             <div className="space-y-3 text-sm">
               <div>
-                <Label className="text-muted-foreground">Time</Label>
+                <Label className="text-muted-foreground">
+                  {t("shiftEdit.time")}
+                </Label>
                 <p className="font-medium">
                   {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
                 </p>
               </div>
               <div>
-                <Label className="text-muted-foreground">Workers Needed</Label>
+                <Label className="text-muted-foreground">
+                  {t("shiftEdit.workersNeeded")}
+                </Label>
                 <p className="font-medium">{shift.workers_needed}</p>
               </div>
               <div>
                 <Label className="text-muted-foreground">
-                  Workers Assigned
+                  {t("shiftEdit.workersAssigned")}
                 </Label>
                 <p className="font-medium">{originalStaff.length}</p>
               </div>
@@ -764,7 +714,7 @@ export function ShiftEditDialog({
               {originalStaff.length > 0 && (
                 <div>
                   <Label className="text-muted-foreground">
-                    Assigned Staff
+                    {t("shiftEdit.assignedStaff")}
                   </Label>
                   <div className="space-y-1 mt-2">
                     {originalStaff.map((staff) => (
@@ -785,7 +735,7 @@ export function ShiftEditDialog({
 
           <div className="flex justify-end pt-4 border-t">
             <Button variant="outline" onClick={onCancel}>
-              Close
+              {t("shiftEdit.closeButton")}
             </Button>
           </div>
         </DialogContent>
@@ -793,23 +743,24 @@ export function ShiftEditDialog({
     );
   }
 
+  const shiftDate = new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
+    i18n.language,
+    {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }
+  );
+
   return (
     <>
       <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Shift</DialogTitle>
+            <DialogTitle>{t("shiftEdit.title")}</DialogTitle>
             <DialogDescription>
-              {shift.position} -{" "}
-              {new Date(shift.shift_date + "T00:00:00").toLocaleDateString(
-                "en-US",
-                {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                }
-              )}
+              {shift.position} - {shiftDate}
             </DialogDescription>
           </DialogHeader>
 
@@ -818,8 +769,11 @@ export function ShiftEditDialog({
               <Alert className="border-orange-500 bg-orange-50">
                 <AlertTriangle className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-orange-800">
-                  <strong>Overstaffed:</strong> {currentStaff.length} workers
-                  assigned, {workersNeeded} needed
+                  <strong>{t("shiftEdit.overstaffed")}</strong>{" "}
+                  {t("shiftEdit.overstaffedDescription", {
+                    assigned: currentStaff.length,
+                    needed: workersNeeded,
+                  })}
                 </AlertDescription>
               </Alert>
             )}
@@ -828,8 +782,11 @@ export function ShiftEditDialog({
               <Alert className="border-blue-500 bg-blue-50">
                 <Info className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-800">
-                  <strong>Understaffed:</strong> {currentStaff.length} workers
-                  assigned, {workersNeeded} needed
+                  <strong>{t("shiftEdit.understaffed")}</strong>{" "}
+                  {t("shiftEdit.understaffedDescription", {
+                    assigned: currentStaff.length,
+                    needed: workersNeeded,
+                  })}
                 </AlertDescription>
               </Alert>
             )}
@@ -838,8 +795,11 @@ export function ShiftEditDialog({
               <Alert className="border-green-500 bg-green-50">
                 <Info className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
-                  <strong>Fully Staffed:</strong> {currentStaff.length}/
-                  {workersNeeded} workers assigned
+                  <strong>{t("shiftEdit.fullyStaffed")}</strong>{" "}
+                  {t("shiftEdit.fullyStaffedDescription", {
+                    assigned: currentStaff.length,
+                    needed: workersNeeded,
+                  })}
                 </AlertDescription>
               </Alert>
             )}
@@ -847,7 +807,7 @@ export function ShiftEditDialog({
             <TimePickerSelect
               value={startTime}
               onChange={setStartTime}
-              label="Start Time"
+              label={t("shiftEdit.startTime")}
               required
             />
 
@@ -855,7 +815,7 @@ export function ShiftEditDialog({
               <TimePickerSelect
                 value={endTime}
                 onChange={setEndTime}
-                label="End Time"
+                label={t("shiftEdit.endTime")}
                 required
               />
               {!timeValidation.isValid && (
@@ -866,7 +826,9 @@ export function ShiftEditDialog({
             </div>
 
             <div>
-              <Label htmlFor="workersNeeded">Workers Needed *</Label>
+              <Label htmlFor="workersNeeded">
+                {t("shiftEdit.workersNeeded")} {t("shiftEdit.required")}
+              </Label>
               <Input
                 id="workersNeeded"
                 type="number"
@@ -878,17 +840,20 @@ export function ShiftEditDialog({
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Currently {currentStaff.length} worker(s) assigned
+                {t("shiftEdit.currentlyAssigned", {
+                  count: currentStaff.length,
+                })}
               </p>
             </div>
 
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-3">
                 <Label className="text-sm font-medium">
-                  Current Staff ({currentStaff.length}/{workersNeeded})
+                  {t("shiftEdit.currentStaff")} ({currentStaff.length}/
+                  {workersNeeded})
                   {(staffToAdd.size > 0 || staffToRemove.size > 0) && (
                     <span className="text-xs text-orange-600 ml-2">
-                      (Pending changes)
+                      {t("shiftEdit.pendingChanges")}
                     </span>
                   )}
                 </Label>
@@ -900,13 +865,13 @@ export function ShiftEditDialog({
                   className="gap-2"
                 >
                   <Users className="w-3 h-3" />
-                  Add Staff
+                  {t("shiftEdit.addStaffButton")}
                 </Button>
               </div>
 
               {currentStaff.length === 0 ? (
                 <div className="text-sm text-muted-foreground italic py-2">
-                  No staff assigned yet
+                  {t("shiftEdit.noStaffAssigned")}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -935,12 +900,12 @@ export function ShiftEditDialog({
                             {staffName}
                             {isNewlyAdded && (
                               <span className="text-xs text-green-600">
-                                (New)
+                                {t("shiftEdit.newStaff")}
                               </span>
                             )}
                             {isMarkedForRemoval && (
                               <span className="text-xs text-red-600">
-                                (To remove)
+                                {t("shiftEdit.toRemove")}
                               </span>
                             )}
                           </div>
@@ -991,14 +956,15 @@ export function ShiftEditDialog({
                     className="cursor-pointer text-sm font-medium"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Apply changes to all remaining shifts
+                    {t("shiftEdit.applyToRemaining")}
                   </Label>
                   <p
                     className="text-xs text-muted-foreground mt-1"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Updates times, workers needed, and staffing for{" "}
-                    {remainingShiftCount} shift(s)
+                    {t("shiftEdit.applyToRemainingDescription", {
+                      count: remainingShiftCount,
+                    })}
                   </p>
                 </div>
               </div>
@@ -1015,10 +981,10 @@ export function ShiftEditDialog({
               {saving ? (
                 <>
                   <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                  Cancelling...
+                  {t("shiftEdit.cancelling")}
                 </>
               ) : (
-                "Cancel Shift"
+                t("shiftEdit.cancelShiftButton")
               )}
             </Button>
             <div className="flex gap-2">
@@ -1028,7 +994,7 @@ export function ShiftEditDialog({
                 onClick={onCancel}
                 disabled={saving}
               >
-                Close
+                {t("shiftEdit.closeButton")}
               </Button>
               <Button
                 type="button"
@@ -1038,10 +1004,10 @@ export function ShiftEditDialog({
                 {saving ? (
                   <>
                     <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                    Saving...
+                    {t("shiftEdit.saving")}
                   </>
                 ) : (
-                  "Save Changes"
+                  t("shiftEdit.saveChangesButton")
                 )}
               </Button>
             </div>
@@ -1060,11 +1026,13 @@ export function ShiftEditDialog({
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="flex-shrink-0">
-            <DialogTitle>Add Staff to Shift</DialogTitle>
+            <DialogTitle>{t("shiftEdit.addStaffToShift")}</DialogTitle>
             <DialogDescription>
               {applyToRestOfJob
-                ? `Select employees for ${remainingShiftCount} remaining shift(s)`
-                : "Select employees for this shift"}
+                ? t("shiftEdit.selectForRemaining", {
+                    count: remainingShiftCount,
+                  })
+                : t("shiftEdit.selectForShift")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1073,7 +1041,7 @@ export function ShiftEditDialog({
               <div className="text-center">
                 <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">
-                  Loading employees and calculating availability...
+                  {t("shiftEdit.loadingAvailability")}
                 </p>
               </div>
             </div>
@@ -1084,7 +1052,7 @@ export function ShiftEditDialog({
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by name or email..."
+                      placeholder={t("shiftEdit.searchPlaceholder")}
                       value={staffSearchTerm}
                       onChange={(e) => setStaffSearchTerm(e.target.value)}
                       className="pl-10"
@@ -1097,7 +1065,7 @@ export function ShiftEditDialog({
                     <div className="space-y-2">
                       {employeeAvailabilities.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
-                          No employees found
+                          {t("shiftEdit.noEmployees")}
                         </div>
                       ) : (
                         employeeAvailabilities
@@ -1160,18 +1128,22 @@ export function ShiftEditDialog({
 
                                   {avail.isFullyAssigned ? (
                                     <div className="text-xs text-green-600">
-                                      ✓ Already assigned
+                                      {t("shiftEdit.alreadyAssigned")}
                                     </div>
                                   ) : avail.isUnavailable ? (
                                     <div className="text-xs text-red-600">
-                                      ✗ Unavailable
+                                      {t("shiftEdit.unavailable")}
                                     </div>
                                   ) : (
                                     <div className="text-xs text-primary">
-                                      Available for {avail.available}/
-                                      {avail.total} shift(s)
+                                      {t("shiftEdit.availableFor", {
+                                        available: avail.available,
+                                        total: avail.total,
+                                      })}
                                       {avail.conflicts > 0 &&
-                                        ` (${avail.conflicts} conflicts)`}
+                                        ` ${t("shiftEdit.conflicts", {
+                                          count: avail.conflicts,
+                                        })}`}
                                     </div>
                                   )}
                                 </div>
@@ -1184,7 +1156,7 @@ export function ShiftEditDialog({
                 </div>
 
                 <div className="flex-shrink-0 text-sm text-muted-foreground">
-                  {selectedStaffIds.size} selected
+                  {t("shiftEdit.selected", { count: selectedStaffIds.size })}
                 </div>
               </div>
 
@@ -1197,7 +1169,7 @@ export function ShiftEditDialog({
                     setStaffModalOpen(false);
                   }}
                 >
-                  Cancel
+                  {t("shiftEdit.cancelButton")}
                 </Button>
                 <Button
                   type="button"
@@ -1211,10 +1183,10 @@ export function ShiftEditDialog({
                   {sendingInvites ? (
                     <>
                       <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                      Sending...
+                      {t("shiftEdit.sending")}
                     </>
                   ) : (
-                    "Send Invitations"
+                    t("shiftEdit.sendInvitationsButton")
                   )}
                 </Button>
                 <Button
@@ -1226,7 +1198,7 @@ export function ShiftEditDialog({
                   disabled={selectedStaffIds.size === 0}
                   className="bg-primary hover:bg-primary/90"
                 >
-                  Assign Selected
+                  {t("shiftEdit.assignSelectedButton")}
                 </Button>
               </div>
             </>
