@@ -1,5 +1,4 @@
 //hype-hire/vercel/app/[lang]/dashboard/page.tsx
-// app/[lang]/dashboard/page.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

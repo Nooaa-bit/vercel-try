@@ -305,9 +305,7 @@ model JobInvitation {
   jobId         Int       @map("job_id")
   userId        Int       @map("user_id")
   
-  invitedBy     Int       @map("invited_by")
-  token         String?    @unique @default(cuid())
-  
+  invitedBy     Int       @map("invited_by")  
   shiftIds      Int[]     @map("shift_ids")
   
   status        job_invitation_status @default(pending)
