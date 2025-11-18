@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/PendingInvitations.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -264,32 +265,34 @@ const handleAccept = async (invitation: JobInvitation) => {
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (existingAssignment) {
-        // Reactivate
-        const { error: reactivateError } = await supabase
-          .from("shift_assignment")
-          .update({
-            cancelled_at: null,
-            deleted_at: null,
-            assigned_by: invitation.invited_by,
-            assigned_at: now,
-          })
-          .eq("id", existingAssignment.id);
+   if (existingAssignment) {
+     // Reactivate and clear cancellation data
+     const { error: reactivateError } = await supabase
+       .from("shift_assignment")
+       .update({
+         cancelled_at: null,
+         cancelled_by: null, // ✅ Clear who cancelled
+         cancellation_reason: null, // ✅ Clear cancellation reason
+         deleted_at: null,
+         assigned_by: invitation.invited_by,
+         assigned_at: now,
+       })
+       .eq("id", existingAssignment.id);
 
-        if (reactivateError) throw reactivateError;
-      } else {
-        // Create new
-        const { error: insertError } = await supabase
-          .from("shift_assignment")
-          .insert({
-            shift_id: shiftId,
-            user_id: userId,
-            assigned_by: invitation.invited_by,
-            assigned_at: now,
-          });
+     if (reactivateError) throw reactivateError;
+   } else {
+     // Create new
+     const { error: insertError } = await supabase
+       .from("shift_assignment")
+       .insert({
+         shift_id: shiftId,
+         user_id: userId,
+         assigned_by: invitation.invited_by,
+         assigned_at: now,
+       });
 
-        if (insertError) throw insertError;
-      }
+     if (insertError) throw insertError;
+   }
 
       // Check if this shift is now full
       if (shift && (currentCount || 0) + 1 >= shift.workers_needed) {

@@ -593,6 +593,18 @@ enum job_invitation_status {
   @@map("job_invitation_status")
 }
 
+enum cancellation_reason {
+  // Worker reasons
+  other_job
+  personal
+  sick
+  accident
+  // Admin reasons
+  bad_performance
+  day_off
+  admin_decision
+}
+
 
 //enum ExportStatus { pending processing completed failed @@map("export_status") }
 

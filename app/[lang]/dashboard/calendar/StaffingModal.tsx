@@ -50,7 +50,12 @@ interface StaffingModalProps {
   position: string;
   companyId: number;
   onSave: () => void;
+  // ✅ NEW: Optional single shift mode
+  singleShiftMode?: boolean;
+  specificShiftId?: number;
+  applyToRemaining?: boolean;
 }
+
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;

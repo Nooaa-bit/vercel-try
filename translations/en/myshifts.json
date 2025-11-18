@@ -1,0 +1,31 @@
+{
+  "title": "My Upcoming Shifts",
+  "noShifts": "No upcoming shifts",
+  "today": "Today",
+  "cancel": {
+    "button": "Cancel",
+    "title": "Cancel Shift",
+    "reasonLabel": "Cancellation Reason",
+    "reasons": {
+      "otherJob": "Other Job",
+      "personal": "Personal Reasons",
+      "sick": "Sick",
+      "accident": "Accident",
+      "badPerformance": "Bad Performance",
+      "dayOff": "Day Off",
+      "adminDecision": "Admin Decision"
+    },
+    "proofWarning": "⚠️ You must send medical proof to connect@hypehire.me within 5 working days.",
+    "cancelAllLabel": "Cancel all remaining shifts for this job",
+    "cancelAllDescription": "This will cancel {{count}} shift(s) for this position",
+    "confirmSingle": "This action cannot be undone. The shift will be cancelled immediately.",
+    "confirmMultiple": "This will cancel {{count}} shift(s). This action cannot be undone.",
+    "back": "Go Back",
+    "cancelling": "Cancelling...",
+    "confirm": "Confirm Cancellation",
+    "success": "{{count}} shift(s) cancelled successfully",
+    "successWithProof": "{{count}} shift(s) cancelled successfully",
+    "proofRequired": "Remember to send medical proof to connect@hypehire.me within 5 working days",
+    "error": "Failed to cancel shift. Please try again."
+  }
+}

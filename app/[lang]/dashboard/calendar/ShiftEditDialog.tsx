@@ -16,6 +16,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -23,6 +30,7 @@ import {
   Users,
   Search,
   X as XIcon,
+  XCircle,
   Loader2,
 } from "lucide-react";
 import { TimePickerSelect } from "@/components/TimePickerSelect";
@@ -50,6 +58,15 @@ interface ShiftEditDialogProps {
   onSave: () => void;
   onCancel: () => void;
 }
+
+type AdminCancellationReason =
+  | "other_job"
+  | "personal"
+  | "sick"
+  | "accident"
+  | "bad_performance"
+  | "day_off"
+  | "admin_decision";
 
 export function ShiftEditDialog({
   shift,
@@ -103,6 +120,16 @@ export function ShiftEditDialog({
   const [staffSearchTerm, setStaffSearchTerm] = useState("");
   const [companyId, setCompanyId] = useState<number>(0);
   const [sendingInvites, setSendingInvites] = useState(false);
+
+  // Cancellation state
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [staffToCancel, setStaffToCancel] = useState<{
+    userId: number;
+    name: string;
+  } | null>(null);
+  const [cancellationReason, setCancellationReason] =
+    useState<AdminCancellationReason>("admin_decision");
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -247,77 +274,77 @@ export function ShiftEditDialog({
     setSelectedStaffIds(new Set());
   };
 
-const handleSendInvites = async () => {
-  if (selectedStaffIds.size === 0) {
-    toast.error(t("shiftEditToast.selectEmployee"));
-    return;
-  }
-
-  setSendingInvites(true);
-
-  try {
-    // Get the admin's user_id
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Not authenticated");
+  const handleSendInvites = async () => {
+    if (selectedStaffIds.size === 0) {
+      toast.error(t("shiftEditToast.selectEmployee"));
       return;
     }
 
-    const { data: userData } = await supabase
-      .from("user")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single();
+    setSendingInvites(true);
 
-    if (!userData) {
-      toast.error("User not found");
-      return;
-    }
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
 
-    // Determine which shifts to include in the invitation
-    let shiftIds: number[];
+      const { data: userData } = await supabase
+        .from("user")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single();
 
-    if (applyToRestOfJob) {
-      // Get all remaining shifts for the job
-      const remainingShifts = await fetchRemainingShifts(
-        supabase,
-        shift.job_id
+      if (!userData) {
+        toast.error("User not found");
+        return;
+      }
+
+      let shiftIds: number[];
+
+      if (applyToRestOfJob) {
+        const remainingShifts = await fetchRemainingShifts(
+          supabase,
+          shift.job_id
+        );
+        shiftIds = remainingShifts.map((s) => s.id);
+      } else {
+        shiftIds = [shift.id];
+      }
+
+      const now = new Date().toISOString();
+
+      const invitations = Array.from(selectedStaffIds).map((userId) => ({
+        job_id: shift.job_id,
+        user_id: userId,
+        invited_by: userData.id,
+        shift_ids: shiftIds,
+        status: "pending",
+        created_at: now,
+        updated_at: now,
+      }));
+
+      const { error } = await supabase
+        .from("job_invitation")
+        .insert(invitations);
+
+      if (error) throw error;
+
+      toast.success(
+        t("shiftEditToast.invitationsSent", { count: selectedStaffIds.size })
       );
-      shiftIds = remainingShifts.map((s) => s.id);
-    } else {
-      // Just this shift
-      shiftIds = [shift.id];
+
+      setStaffModalOpen(false);
+      setSelectedStaffIds(new Set());
+    } catch (error) {
+      console.error("Error sending invitations:", error);
+      toast.error(t("shiftEditToast.invitationsFailed"));
+    } finally {
+      setSendingInvites(false);
     }
-
-    // Create invitations
-    const invitations = Array.from(selectedStaffIds).map((userId) => ({
-      job_id: shift.job_id,
-      user_id: userId,
-      invited_by: userData.id,
-      shift_ids: shiftIds,
-      status: "pending",
-    }));
-
-    const { error } = await supabase.from("job_invitation").insert(invitations);
-
-    if (error) throw error;
-
-    toast.success(
-      t("shiftEditToast.invitationsSent", { count: selectedStaffIds.size })
-    );
-
-    setStaffModalOpen(false);
-    setSelectedStaffIds(new Set());
-  } catch (error) {
-    console.error("Error sending invitations:", error);
-    toast.error(t("shiftEditToast.invitationsFailed"));
-  } finally {
-    setSendingInvites(false);
-  }
-};
-
+  };
 
   const handleRemoveStaff = (
     e: React.MouseEvent,
@@ -342,6 +369,90 @@ const handleSendInvites = async () => {
     setCurrentStaff(updatedStaff);
 
     toast.info(t("shiftEditToast.staffRemoved", { name: userName }));
+  };
+
+  const handleCancelStaff = (
+    e: React.MouseEvent,
+    userId: number,
+    userName: string
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setStaffToCancel({ userId, name: userName });
+    setCancellationReason("admin_decision");
+    setCancelDialogOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!staffToCancel) return;
+
+    setCancelling(true);
+
+    try {
+      const now = new Date().toISOString();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const { data: userData } = await supabase
+        .from("user")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single();
+
+      if (!userData) {
+        toast.error("User not found");
+        return;
+      }
+
+      const { data: assignment } = await supabase
+        .from("shift_assignment")
+        .select("id")
+        .eq("shift_id", shift.id)
+        .eq("user_id", staffToCancel.userId)
+        .is("cancelled_at", null)
+        .is("deleted_at", null)
+        .single();
+
+      if (!assignment) {
+        toast.error("Assignment not found");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("shift_assignment")
+        .update({
+          cancelled_at: now,
+          cancelled_by: userData.id,
+          cancellation_reason: cancellationReason,
+        })
+        .eq("id", assignment.id);
+
+      if (error) throw error;
+
+      toast.success(
+        t("shiftEdit.staffCancelled", { name: staffToCancel.name })
+      );
+
+      const updatedStaff = await fetchAssignedStaffForShift(supabase, shift.id);
+      setOriginalStaff(updatedStaff);
+      setCurrentStaff(updatedStaff);
+
+      setCancelDialogOpen(false);
+      setStaffToCancel(null);
+    } catch (error) {
+      console.error("Error cancelling staff:", error);
+      toast.error(t("shiftEdit.cancelStaffFailed"));
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const assignStaffDirectly = async (
@@ -924,9 +1035,9 @@ const handleSendInvites = async () => {
                         key={staff.userId}
                         className={`flex items-center justify-between p-2 rounded ${
                           isNewlyAdded
-                            ? "bg-green-50 border border-green-200"
+                            ? "bg-green-50 border border-green-200 dark:bg-green-950/20 dark:border-green-800"
                             : isMarkedForRemoval
-                            ? "bg-red-50 border border-red-200 opacity-50"
+                            ? "bg-red-50 border border-red-200 opacity-50 dark:bg-red-950/20 dark:border-red-800"
                             : "bg-muted"
                         }`}
                       >
@@ -934,12 +1045,12 @@ const handleSendInvites = async () => {
                           <div className="text-sm font-medium truncate flex items-center gap-2">
                             {staffName}
                             {isNewlyAdded && (
-                              <span className="text-xs text-green-600">
+                              <span className="text-xs text-green-600 dark:text-green-400">
                                 {t("shiftEdit.newStaff")}
                               </span>
                             )}
                             {isMarkedForRemoval && (
-                              <span className="text-xs text-red-600">
+                              <span className="text-xs text-red-600 dark:text-red-400">
                                 {t("shiftEdit.toRemove")}
                               </span>
                             )}
@@ -948,17 +1059,34 @@ const handleSendInvites = async () => {
                             {staff.email}
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) =>
-                            handleRemoveStaff(e, staff.userId, staffName)
-                          }
-                          className="text-destructive hover:text-destructive flex-shrink-0 ml-2"
-                        >
-                          <XIcon className="w-3 h-3" />
-                        </Button>
+                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                          {!isMarkedForRemoval && !isNewlyAdded && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) =>
+                                handleCancelStaff(e, staff.userId, staffName)
+                              }
+                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+                              title="Cancel assignment"
+                            >
+                              <XCircle className="w-3 h-3" />
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) =>
+                              handleRemoveStaff(e, staff.userId, staffName)
+                            }
+                            className="text-destructive hover:text-destructive"
+                            title="Remove from list"
+                          >
+                            <XIcon className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1050,6 +1178,7 @@ const handleSendInvites = async () => {
         </DialogContent>
       </Dialog>
 
+      {/* Staff Modal (existing functionality) */}
       <Dialog
         open={staffModalOpen}
         onOpenChange={setStaffModalOpen}
@@ -1238,6 +1367,111 @@ const handleSendInvites = async () => {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancellation Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("shiftEdit.cancelStaffTitle")}</DialogTitle>
+            <DialogDescription>
+              {staffToCancel && `${staffToCancel.name} - ${shift.position}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Cancellation Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason">
+                {t("shiftEdit.cancelReasonLabel")}{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={cancellationReason}
+                onValueChange={(value) =>
+                  setCancellationReason(value as AdminCancellationReason)
+                }
+              >
+                <SelectTrigger id="cancel-reason">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Admin-specific reasons first */}
+                  <SelectItem value="admin_decision">
+                    {t("shiftEdit.cancelReasons.adminDecision")}
+                  </SelectItem>
+                  <SelectItem value="day_off">
+                    {t("shiftEdit.cancelReasons.dayOff")}
+                  </SelectItem>
+                  <SelectItem value="bad_performance">
+                    {t("shiftEdit.cancelReasons.badPerformance")}
+                  </SelectItem>
+
+                  {/* Worker reasons */}
+                  <SelectItem value="sick">
+                    {t("shiftEdit.cancelReasons.sick")}
+                  </SelectItem>
+                  <SelectItem value="accident">
+                    {t("shiftEdit.cancelReasons.accident")}
+                  </SelectItem>
+                  <SelectItem value="personal">
+                    {t("shiftEdit.cancelReasons.personal")}
+                  </SelectItem>
+                  <SelectItem value="other_job">
+                    {t("shiftEdit.cancelReasons.otherJob")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Warning for bad performance */}
+            {cancellationReason === "bad_performance" && (
+              <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-sm text-orange-800 dark:text-orange-200">
+                  {t("shiftEdit.performanceWarning")}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Alert>
+              <AlertDescription className="text-sm">
+                {staffToCancel &&
+                  t("shiftEdit.cancelStaffConfirm", {
+                    worker: staffToCancel.name,
+                  })}
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 justify-end pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={cancelling}
+            >
+              {t("shiftEdit.back")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancel}
+              disabled={cancelling}
+            >
+              {cancelling ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t("shiftEdit.cancelling")}
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  {t("shiftEdit.confirmCancel")}
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
