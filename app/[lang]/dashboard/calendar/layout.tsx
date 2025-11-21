@@ -10,6 +10,7 @@ import { useActiveRole } from "@/app/hooks/useActiveRole";
 interface LayoutProps {
   children: ReactNode;
 }
+const TABS_TOP_OFFSET = 134; // e.g. 56px for the navbar + 16px space
 
 export default function JobsLayout({ children }: LayoutProps) {
   const { t, ready } = useTranslation("jobs");
@@ -39,7 +40,10 @@ export default function JobsLayout({ children }: LayoutProps) {
   return (
     <div className="space-y-6 py-16">
       {/* ✅ Tabs - Only show Job Management for admins */}
-      <div className="flex gap-2 border-b">
+      <div
+        className="flex gap-2 border-b bg-background sticky py-1 "
+        style={{ top: TABS_TOP_OFFSET, zIndex: 20 }}
+      >
         <Link
           href={calendarPath}
           className={`px-4 py-2 font-medium transition-colors ${

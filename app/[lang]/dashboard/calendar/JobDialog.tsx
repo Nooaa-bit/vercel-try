@@ -903,7 +903,7 @@ export default function JobDialog({
         <StaffingModal
           open={staffingOpen}
           onOpenChange={setStaffingOpen}
-          job={editingJob}
+          jobId={editingJob.id} 
           position={position}
           companyId={companyId}
           onSave={onSave}

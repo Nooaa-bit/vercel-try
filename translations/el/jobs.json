@@ -25,7 +25,7 @@
     "editDescription": "Ενημερώστε τα στοιχεία της θέσης και τους χρόνους βαρδιών για τις υπόλοιπες βάρδιες",
     "cancelButton": "Ακύρωση",
     "saveButton": "Αποθήκευση Θέσης",
-    "updateButton": "Ενημέρωση ",
+    "updateButton": "Ενημέρωση",
     "createButton": "Δημιουργία Θέσης",
     "saving": "Αποθήκευση...",
     "close": "Κλείσιμο",
@@ -146,6 +146,8 @@
     "noLocation": "Χωρίς Τοποθεσία"
   },
   "staffing": {
+    "confirmRemove": "Η αφαίρεση του εργαζομένου από αυτή τη θέση θα ακυρώσει όλες τις αναθέσεις σε βάρδιες για αυτή τη θέση. Θέλετε να συνεχίσετε;",
+    "removeButton": "Αφαίρεση Εργαζομένου",
     "title": "Στελέχωση Θέσης: {{position}}",
     "description": "Στείλτε προσκλήσεις (απεριόριστες) ή αναθέστε απευθείας (πρώτος-έρχεται-πρώτος-εξυπηρετείται μέχρι τη χωρητικότητα)",
     "loadingEmployees": "Φόρτωση εργαζομένων και διαθεσιμότητας...",
@@ -165,7 +167,35 @@
     "sending": "Αποστολή...",
     "assigning": "Ανάθεση...",
     "allShiftsFull": "Όλες οι βάρδιες είναι πλήρως στελεχωμένες",
-    "assignTooltip": "Αναθέστε επιλεγμένους εργαζομένους σε διαθέσιμες βάρδιες"
+    "assignTooltip": "Αναθέστε επιλεγμένους εργαζομένους σε διαθέσιμες βάρδιες",
+    "titleSingleShift": "Στελέχωση Βάρδιας - {{position}}",
+    "descriptionSingleShift": "Επιλέξτε υπαλλήλους για ανάθεση ή πρόσκληση σε αυτή τη βάρδια",
+    "reactivatedInfo": "{{count}} προηγουμένως ακυρωμένες αναθέσεις επανενεργοποιήθηκαν",
+    "removeFromShifts": "Αφαίρεση από Βάρδιες",
+    "confirmRemoveTitle": "Αφαίρεση Προσωπικού",
+    "confirmRemoveDescription": "Είστε σίγουροι ότι θέλετε να αφαιρέσετε τον/την {{name}} από {{count}} βάρδια/βάρδιες; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
+    "confirmRemoveButton": "Αφαίρεση Προσωπικού",
+    "pendingInvitation": "Εκκρεμής Πρόσκληση",
+    "closeButton": "Κλείσιμο",
+    "selectedForRemoval": "{{count}} επιλεγμένοι για αφαίρεση",
+    "removeSelectedButton": "Αφαίρεση Επιλεγμένων ({{count}})",
+    "cancelledBefore": "Ακυρώθηκε Προηγουμένως",
+    "confirmBulkRemoveTitle": "Αφαίρεση Πολλαπλού Προσωπικού",
+    "confirmBulkRemoveDescription": "Είστε σίγουροι ότι θέλετε να αφαιρέσετε {{count}} εργαζομένους από τις βάρδιες τους;",
+    "shifts": "βάρδιες",
+    "shift": "βάρδια",
+    "removing": "Αφαίρεση...",
+    "cancelledCount": "Ακυρώθηκε {{count}}x",
+    "cancelReasons": {
+      "admin_decision": "Απόφαση Διαχειριστή",
+      "day_off": "Ρεπό",
+      "bad_performance": "Κακή Απόδοση",
+      "sick": "Ασθένεια",
+      "accident": "Ατύχημα",
+      "personal": "Προσωπικοί Λόγοι",
+      "other_job": "Άλλη Δουλειά",
+      "unknown": "Άγνωστο"
+    }
   },
   "staffingToast": {
     "selectEmployee": "Παρακαλώ επιλέξτε τουλάχιστον έναν εργαζόμενο",
@@ -180,13 +210,19 @@
     "invitationsFailed": "Αποτυχία αποστολής προσκλήσεων: {{error}}",
     "assignSuccess": "Επιτυχής ανάθεση {{assigned}} βάρδιας/βαρδιών σε {{employees}} εργαζομένους",
     "assignmentSkipped": "{{count}} ανάθεση/αναθέσεις παραλείφθηκαν",
-    "skipDetailsFull": "{{count}} πλήρεις",
-    "skipDetailsConflicts": "{{count}} συγκρούσεις",
-    "skipDetailsAlreadyAssigned": "{{count}} ήδη ανατεθειμένες",
     "noAssignments": "Δεν ανατέθηκαν εργαζόμενοι",
     "noAssignmentsDescription": "Όλοι οι επιλεγμένοι εργαζόμενοι είχαν συγκρούσεις ή οι βάρδιες ήταν πλήρεις",
     "assignFailed": "Αποτυχία ανάθεσης προσωπικού",
-    "loadStaffingFailed": "Αποτυχία φόρτωσης δεδομένων στελέχωσης"
+    "loadStaffingFailed": "Αποτυχία φόρτωσης δεδομένων στελέχωσης",
+    "staffRemoved": "Ο/Η {{name}} αφαιρέθηκε από {{count}} βάρδια/βάρδιες",
+    "removeFailed": "Αποτυχία αφαίρεσης προσωπικού: {{error}}",
+    "reactivatedInfo": "{{count}} προηγουμένως ακυρωμένες αναθέσεις επανενεργοποιήθηκαν",
+    "skipDetailsFull": "{{count}} πλήρεις",
+    "skipDetailsConflicts": "{{count}} συγκρούσεις",
+    "skipDetailsAlreadyAssigned": "{{count}} ήδη ανατεθειμένες",
+    "noAvailableShifts": "Δεν υπάρχουν διαθέσιμες βάρδιες για τους επιλεγμένους εργαζομένους (όλοι έχουν συγκρούσεις ή είναι ήδη ανατεθειμένοι)",
+    "bulkRemoveSuccess": "Αφαιρέθηκαν {{count}} αναθέσεις από {{employees}} εργαζομένους",
+    "bulkRemoveErrors": "Ορισμένες αφαιρέσεις απέτυχαν"
   },
   "dayView": {
     "addButton": "Προσθήκη Θέσης",
@@ -214,9 +250,12 @@
     "toRemove": "(Προς αφαίρεση)",
     "applyToRemaining": "Εφαρμογή αλλαγών σε όλες τις υπόλοιπες βάρδιες",
     "applyToRemainingDescription": "Ενημερώνει ώρες, απαιτούμενο προσωπικό και στελέχωση για {{count}} βάρδιες",
+    "applyToRemainingNote": "Ώρες, απαιτούμενο προσωπικό και ακυρώσεις προσωπικού θα εφαρμοστούν σε όλες τις υπόλοιπες βάρδιες",
+    "cancelAllRemainingNote": "Αυτό θα ακυρώσει την ανάθεση για {{count}} υπόλοιπες βάρδιες",
+    "bulkRemoveAllShiftsDescription": "Είστε σίγουροι ότι θέλετε να αφαιρέσετε {{count}} εργαζομένους από όλες τις {{shifts}} υπόλοιπες βάρδιες;",
     "cancelShiftButton": "Ακύρωση Βάρδιας",
     "cancelling": "Ακύρωση...",
-    "saveChangesButton": "Αποθήκευση ",
+    "saveChangesButton": "Αποθήκευση",
     "saving": "Αποθήκευση...",
     "currentlyAssigned": "Τρέχουσα ανάθεση {{count}} εργαζομένων",
     "overstaffed": "Υπερστελέχωση:",
@@ -240,7 +279,24 @@
     "sendInvitationsButton": "Αποστολή Προσκλήσεων",
     "sending": "Αποστολή...",
     "assignSelectedButton": "Ανάθεση Επιλεγμένων",
-    "required": "*"
+    "required": "*",
+    "cancelStaffTitle": "Ακύρωση Ανάθεσης Εργαζομένου",
+    "cancelReasonLabel": "Λόγος Ακύρωσης",
+    "performanceWarning": "⚠️ Αυτό θα καταγραφεί ως θέμα απόδοσης.",
+    "cancelStaffConfirm": "Ακύρωση ανάθεσης του/της {{worker}}; Θα ειδοποιηθεί.",
+    "staffCancelled": "Η ανάθεση του/της {{name}} ακυρώθηκε επιτυχώς",
+    "cancelStaffFailed": "Αποτυχία ακύρωσης ανάθεσης",
+    "back": "Επιστροφή",
+    "confirmCancel": "Επιβεβαίωση Ακύρωσης",
+    "cancelReasons": {
+      "adminDecision": "Απόφαση Διαχειριστή",
+      "dayOff": "Ρεπό",
+      "badPerformance": "Κακή Απόδοση",
+      "sick": "Ασθένεια",
+      "accident": "Ατύχημα",
+      "personal": "Προσωπικοί Λόγοι",
+      "otherJob": "Άλλη Δουλειά"
+    }
   },
   "shiftEditToast": {
     "fillRequired": "Παρακαλώ συμπληρώστε όλα τα απαιτούμενα πεδία",
@@ -266,6 +322,8 @@
     "loadShiftFailed": "Αποτυχία φόρτωσης δεδομένων βάρδιας",
     "userNotAuthenticated": "Ο χρήστης δεν είναι πιστοποιημένος",
     "userDataNotFound": "Δεν βρέθηκαν δεδομένα χρήστη. Οι αλλαγές προσωπικού δεν εφαρμόστηκαν.",
-    "staffAssigned": "Ανατέθηκαν {{staffCount}} εργαζόμενοι σε {{shiftCount}} βάρδιες"
+    "staffAssigned": "Ανατέθηκαν {{staffCount}} εργαζόμενοι σε {{shiftCount}} βάρδιες",
+    "reactivatedInfo": "{{count}} προηγουμένως ακυρωμένες αναθέσεις επανενεργοποιήθηκαν",
+    "staffReactivated": "{{count}} προηγουμένως ακυρωμένες αναθέσεις επανενεργοποιήθηκαν"
   }
 }
