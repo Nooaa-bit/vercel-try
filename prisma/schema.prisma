@@ -10,38 +10,37 @@ datasource db {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
-  email     String   @map("email")
-  userId    Int   @map("user_id")
-  token     String   @unique @map("token")
-  expiresAt DateTime @map("expires_at")
+  id        String    @id @default(cuid())
+  email     String    @map("email")
+  userId    Int       @map("user_id")
+  token     String    @unique @map("token")
+  expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-    user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("password_reset_token")
 }
 
 model user {
-  id             Int       @id @default(autoincrement()) @map("id")
-  authUserId     String    @unique @map("auth_user_id")
-  email          String    @unique
-  firstName      String?   @map("first_name")
-  lastName       String?   @map("last_name")
-  hasPassword    Boolean   @default(false) @map("has_password")
-  profilePicture String?   @map("profile_picture")
+  id             Int     @id @default(autoincrement()) @map("id")
+  authUserId     String  @unique @map("auth_user_id")
+  email          String  @unique
+  firstName      String? @map("first_name")
+  lastName       String? @map("last_name")
+  hasPassword    Boolean @default(false) @map("has_password")
+  profilePicture String? @map("profile_picture")
 
-  
   // GDPR: Anonymization support
-  isAnonymized   Boolean   @default(false) @map("is_anonymized")
-  anonymizedAt   DateTime? @map("anonymized_at")
-  
+  isAnonymized Boolean   @default(false) @map("is_anonymized")
+  anonymizedAt DateTime? @map("anonymized_at")
+
   // Audit
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime?  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
-  deletedBy      Int?      @map("deleted_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
 
   // Relations
   userCompanyRoles user_company_role[]
@@ -49,33 +48,33 @@ model user {
   revokedRoles     user_company_role[] @relation("UserCompanyRoleRevokedBy")
 
   // Back-references for invitation
-  invitationsSent    invitation[] @relation("InvitationInvitedBy")
-  invitationsDeleted invitation[] @relation("InvitationDeletedBy")
+  invitationsSent      invitation[]      @relation("InvitationInvitedBy")
+  invitationsDeleted   invitation[]      @relation("InvitationDeletedBy")
   // for Jobs
-  jobsCreated              Job[]               @relation("JobCreatedBy")
-  jobsDeleted              Job[]               @relation("JobDeletedBy")
-   // for Assignments
-  shiftAssignments         ShiftAssignment[]   @relation("ShiftAssignmentTalent")
-  assignmentsMade          ShiftAssignment[]   @relation("ShiftAssignmentAssignedBy")
-  assignmentsCancelled     ShiftAssignment[]   @relation("ShiftAssignmentCancelledBy")
-  noShowsMarked            ShiftAssignment[]   @relation("ShiftAssignmentNoShowBy")
-  
-  checkInsPerformed        CheckInOut[]        @relation("CheckInBy")
-  checkOutsPerformed       CheckInOut[]        @relation("CheckOutBy")
-  
-  ratingsReceived          JobRating[]         @relation("RatingForTalent")
-  ratingsGiven             JobRating[]         @relation("RatingByUser")
+  jobsCreated          Job[]             @relation("JobCreatedBy")
+  jobsDeleted          Job[]             @relation("JobDeletedBy")
+  // for Assignments
+  shiftAssignments     ShiftAssignment[] @relation("ShiftAssignmentTalent")
+  assignmentsMade      ShiftAssignment[] @relation("ShiftAssignmentAssignedBy")
+  assignmentsCancelled ShiftAssignment[] @relation("ShiftAssignmentCancelledBy")
+  noShowsMarked        ShiftAssignment[] @relation("ShiftAssignmentNoShowBy")
 
-  jobInvitationsReceived    JobInvitation[]   @relation("JobInvitationInvitee")
-  jobInvitationsSent        JobInvitation[]   @relation("JobInvitationInvitedBy")
-  
-// GDPR relations
-  dataExportRequests       DataExportRequest[] @relation("DataExportRequests")
-  userConsents             UserConsent[]       @relation("UserConsents")
-  dataAccessLogs           DataAccessLog[]     @relation("DataAccessSubject")
-  dataAccessesMade         DataAccessLog[]     @relation("DataAccessActor")
+  checkInsPerformed  CheckInOut[] @relation("CheckInBy")
+  checkOutsPerformed CheckInOut[] @relation("CheckOutBy")
 
-   passwordResetTokens   PasswordResetToken[]
+  ratingsReceived JobRating[] @relation("RatingForTalent")
+  ratingsGiven    JobRating[] @relation("RatingByUser")
+
+  jobInvitationsReceived JobInvitation[] @relation("JobInvitationInvitee")
+  jobInvitationsSent     JobInvitation[] @relation("JobInvitationInvitedBy")
+
+  // GDPR relations
+  dataExportRequests DataExportRequest[] @relation("DataExportRequests")
+  userConsents       UserConsent[]       @relation("UserConsents")
+  dataAccessLogs     DataAccessLog[]     @relation("DataAccessSubject")
+  dataAccessesMade   DataAccessLog[]     @relation("DataAccessActor")
+
+  passwordResetTokens PasswordResetToken[]
 
   @@index([deletedAt, firstName], map: "idx_user_active_sorted")
   @@map("user")
@@ -90,8 +89,7 @@ model company {
   userCompanyRoles user_company_role[]
   invitation       invitation[]
   locations        Location[]
-  jobs        Job[]
-
+  jobs             Job[]
 
   @@map("company")
 }
@@ -133,13 +131,10 @@ model invitation {
   inviter user    @relation("InvitationInvitedBy", fields: [invitedBy], references: [id], map: "invitation_inviter_fkey")
   deleter user?   @relation("InvitationDeletedBy", fields: [deletedBy], references: [id], map: "invitation_deleter_fkey")
 
-
- @@index([companyId, status, deletedAt], map: "idx_invitation_active")
+  @@index([companyId, status, deletedAt], map: "idx_invitation_active")
   @@index([email, status], map: "idx_invitation_lookup")
   @@map("invitation")
 }
-
-
 
 model contact_message {
   id        Int      @id @default(autoincrement())
@@ -186,11 +181,10 @@ model Location {
   company company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // Jobs at this location (if you have a jobs table)
-   jobs        Job[]
-
+  jobs Job[]
 
   @@index([companyId, deletedAt])
-//  @@index([latitude, longitude])
+  //  @@index([latitude, longitude])
   @@map("location")
 }
 
@@ -199,37 +193,37 @@ model Location {
 // ============================================
 
 model Job {
-  id            Int       @id @default(autoincrement())
-  companyId     Int       @map("company_id")
-  locationId    Int?      @map("location_id") // Which location is this job at?
-  
+  id         Int  @id @default(autoincrement())
+  companyId  Int  @map("company_id")
+  locationId Int? @map("location_id") // Which location is this job at?
+
   // Job Details
-  position      String    @db.VarChar(255)
-  seniority     Seniority
-  description   String?   @db.Text
-  
+  position    String    @db.VarChar(255)
+  seniority   Seniority
+  description String?   @db.Text
+
   // Schedule
-  startDate     DateTime  @map("start_date") @db.Date
-  endDate       DateTime  @map("end_date") @db.Date
-  
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
   // Status & Audit
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  createdBy     Int       @map("created_by")
-  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
-  deletedBy     Int?      @map("deleted_by")
-  
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy Int       @map("created_by")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy Int?      @map("deleted_by")
+
   // Relations
-  company       company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  location      Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  creator       user      @relation("JobCreatedBy", fields: [createdBy], references: [id])
-  deleter       user?     @relation("JobDeletedBy", fields: [deletedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
-  invitations   JobInvitation[]
-  shifts        Shift[]
-  ratings       JobRating[]
+  company  company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  creator  user      @relation("JobCreatedBy", fields: [createdBy], references: [id])
+  deleter  user?     @relation("JobDeletedBy", fields: [deletedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  invitations JobInvitation[]
+  shifts      Shift[]
+  ratings     JobRating[]
 
   @@index([companyId, deletedAt, startDate], map: "idx_job_active")
-//  @@index([startDate, endDate])
+  @@index([startDate, endDate], map: "idx_job_date_range")
   @@map("job")
 }
 
@@ -238,25 +232,25 @@ model Job {
 // ============================================
 
 model Shift {
-  id              Int       @id @default(autoincrement())
-  jobId           Int       @map("job_id")
-  
-  // Shift Details
-  shiftDate       DateTime  @map("shift_date") @db.Date
-  startTime       DateTime  @map("start_time")   @db.Time(6)
-  endTime         DateTime  @map("end_time") @db.Time(6)
-  workersNeeded   Int       @map("workers_needed")
+  id    Int @id @default(autoincrement())
+  jobId Int @map("job_id")
 
-  
+  // Shift Details
+  shiftDate     DateTime @map("shift_date") @db.Date
+  startTime     DateTime @map("start_time") @db.Time(6)
+  endTime       DateTime @map("end_time") @db.Time(6)
+  workersNeeded Int      @map("workers_needed")
+
   // Audit
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
-  deletedBy       Int?      @map("deleted_by")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  deletedBy   Int?              @map("deleted_by")
   // Relations
-  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  assignments     ShiftAssignment[]
-  
-@@index([jobId, shiftDate, deletedAt], map: "idx_shift_schedule")
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  assignments ShiftAssignment[]
+
+  @@index([jobId, shiftDate, deletedAt], map: "idx_shift_schedule")
+  @@index([shiftDate, deletedAt], map: "idx_shift_date_active")
   @@map("shift")
 }
 
@@ -265,64 +259,63 @@ model Shift {
 // ============================================
 
 model ShiftAssignment {
-  id              Int       @id @default(autoincrement())
-  shiftId         Int       @map("shift_id")
-  userId          Int       @map("user_id") // The talent assigned
-  
+  id      Int @id @default(autoincrement())
+  shiftId Int @map("shift_id")
+  userId  Int @map("user_id") // The talent assigned
+
   // Assignment Lifecycle
-  assignedAt      DateTime  @default(now()) @map("assigned_at") @db.Timestamptz(6)
-  assignedBy      Int       @map("assigned_by") // Who assigned them
-  
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  assignedBy Int      @map("assigned_by") // Who assigned them
+
   // Cancellation tracking
-  cancelledAt     DateTime? @map("cancelled_at") @db.Timestamptz(6)
-  cancelledBy     Int?      @map("cancelled_by") // User or admin who cancelled
-  cancellationReason String? @map("cancellation_reason") @db.Text
-  
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy        Int?      @map("cancelled_by") // User or admin who cancelled
+  cancellationReason String?   @map("cancellation_reason") @db.Text
+
   // No-show tracking
-  markedNoShowAt  DateTime? @map("marked_no_show_at") @db.Timestamptz(6)
-  markedNoShowBy  Int?      @map("marked_no_show_by")
-  
+  markedNoShowAt DateTime? @map("marked_no_show_at") @db.Timestamptz(6)
+  markedNoShowBy Int?      @map("marked_no_show_by")
+
   // Metadata
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)  // Admin cancells shift or job
-  
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6) // Admin cancells shift or job
+
   // Relations
-  shift           Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  talent          user      @relation("ShiftAssignmentTalent", fields: [userId], references: [id])
-  assigner        user      @relation("ShiftAssignmentAssignedBy", fields: [assignedBy], references: [id])
-  canceller       user?     @relation("ShiftAssignmentCancelledBy", fields: [cancelledBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  noShowMarker    user?     @relation("ShiftAssignmentNoShowBy", fields: [markedNoShowBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
-  checkIns        CheckInOut[]
-  
+  shift        Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  talent       user  @relation("ShiftAssignmentTalent", fields: [userId], references: [id])
+  assigner     user  @relation("ShiftAssignmentAssignedBy", fields: [assignedBy], references: [id])
+  canceller    user? @relation("ShiftAssignmentCancelledBy", fields: [cancelledBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  noShowMarker user? @relation("ShiftAssignmentNoShowBy", fields: [markedNoShowBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  checkIns CheckInOut[]
+
   @@unique([shiftId, userId, deletedAt], name: "shift_user_unique")
-@@index([userId, cancelledAt, markedNoShowAt], map: "idx_assignment_user_status")
+  @@index([userId, cancelledAt, markedNoShowAt], map: "idx_assignment_user_status")
   @@index([shiftId, cancelledAt, deletedAt], map: "idx_assignment_shift_active")
   @@map("shift_assignment")
 }
 
 model JobInvitation {
-  id            Int       @id @default(autoincrement())
-  jobId         Int       @map("job_id")
-  userId        Int       @map("user_id")
-  
-  invitedBy     Int       @map("invited_by")  
-  shiftIds      Int[]     @map("shift_ids")
-  
+  id     Int @id @default(autoincrement())
+  jobId  Int @map("job_id")
+  userId Int @map("user_id")
+
+  invitedBy Int   @map("invited_by")
+  shiftIds  Int[] @map("shift_ids")
+
   status        job_invitation_status @default(pending)
-  respondedAt   DateTime? @map("responded_at")
-  spotsFilledAt DateTime? @map("spots_filled_at") @db.Timestamptz(6)
-  
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime?  @updatedAt @map("updated_at")
-  
-  job           Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  invitee       user      @relation("JobInvitationInvitee", fields: [userId], references: [id], onDelete: Cascade)
-  inviter       user      @relation("JobInvitationInvitedBy", fields: [invitedBy], references: [id])
-  
-  //@@index([jobId, status])
- // @@index([userId, status])
-  //@@index([token])
-  @@index([shiftIds])
+  respondedAt   DateTime?             @map("responded_at")
+  spotsFilledAt DateTime?             @map("spots_filled_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  job     Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  invitee user @relation("JobInvitationInvitee", fields: [userId], references: [id], onDelete: Cascade)
+  inviter user @relation("JobInvitationInvitedBy", fields: [invitedBy], references: [id])
+
+  @@index([jobId, status], map: "idx_invitation_job_status")
+  @@index([userId, status], map: "idx_invitation_user_status")
+  @@index([shiftIds], map: "idx_invitation_shifts")
   @@map("job_invitation")
 }
 
@@ -331,30 +324,30 @@ model JobInvitation {
 // ============================================
 
 model CheckInOut {
-  id                Int       @id @default(autoincrement())
-  assignmentId      Int       @map("assignment_id")
-  
+  id           Int @id @default(autoincrement())
+  assignmentId Int @map("assignment_id")
+
   // Check-in
-  checkInTime       DateTime? @map("check_in_time") @db.Timestamptz(6)
-  checkInMethod     CheckMethod? @map("check_in_method")
-  checkedInBy       Int?      @map("checked_in_by") // If manual, who did it
-  checkInLocation   String?   @map("check_in_location") @db.Text // GPS coords if from app
-  
+  checkInTime     DateTime?    @map("check_in_time") @db.Timestamptz(6)
+  checkInMethod   CheckMethod? @map("check_in_method")
+  checkedInBy     Int?         @map("checked_in_by") // If manual, who did it
+  checkInLocation String?      @map("check_in_location") @db.Text // GPS coords if from app
+
   // Check-out
-  checkOutTime      DateTime? @map("check_out_time") @db.Timestamptz(6)
-  checkOutMethod    CheckMethod? @map("check_out_method")
-  checkedOutBy      Int?      @map("checked_out_by") // If manual, who did it
-  checkOutLocation  String?   @map("check_out_location") @db.Text // GPS coords if from app
-  
+  checkOutTime     DateTime?    @map("check_out_time") @db.Timestamptz(6)
+  checkOutMethod   CheckMethod? @map("check_out_method")
+  checkedOutBy     Int?         @map("checked_out_by") // If manual, who did it
+  checkOutLocation String?      @map("check_out_location") @db.Text // GPS coords if from app
+
   // Audit
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
   // Relations
-  assignment        ShiftAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  checkInUser       user?     @relation("CheckInBy", fields: [checkedInBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  checkOutUser      user?     @relation("CheckOutBy", fields: [checkedOutBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
-//  @@index([assignmentId])
+  assignment   ShiftAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  checkInUser  user?           @relation("CheckInBy", fields: [checkedInBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  checkOutUser user?           @relation("CheckOutBy", fields: [checkedOutBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  //  @@index([assignmentId])
   @@map("check_in_out")
 }
 
@@ -363,28 +356,28 @@ model CheckInOut {
 // ============================================
 
 model JobRating {
-  id              Int       @id @default(autoincrement())
-  jobId           Int       @map("job_id")
-  userId          Int       @map("user_id") // The talent being rated
-  
+  id     Int @id @default(autoincrement())
+  jobId  Int @map("job_id")
+  userId Int @map("user_id") // The talent being rated
+
   // Rating
-  rating          Int       // 1-5 stars
-  feedback        String?   @db.Text
-  
+  rating   Int // 1-5 stars
+  feedback String? @db.Text
+
   // Audit
-  ratedBy         Int       @map("rated_by") // Who gave the rating
-  ratedAt         DateTime  @default(now()) @map("rated_at") @db.Timestamptz(6)
-  
+  ratedBy Int      @map("rated_by") // Who gave the rating
+  ratedAt DateTime @default(now()) @map("rated_at") @db.Timestamptz(6)
+
   // GDPR compliance
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
-  
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   // Relations
-  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  talent          user      @relation("RatingForTalent", fields: [userId], references: [id])
-  rater           user      @relation("RatingByUser", fields: [ratedBy], references: [id])
-  
+  job    Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  talent user @relation("RatingForTalent", fields: [userId], references: [id])
+  rater  user @relation("RatingByUser", fields: [ratedBy], references: [id])
+
   @@unique([jobId, userId], map: "job_user_rating_unique") // One rating per user per job
-//  @@index([userId, deletedAt])
+  //  @@index([userId, deletedAt])
   @@map("job_rating")
 }
 
@@ -395,81 +388,79 @@ model JobRating {
 
 // USER CONSENT TRACKING, GDPR
 model UserConsent {
-  id              Int       @id @default(autoincrement())
-  userId          Int       @map("user_id")
-  
+  id     Int @id @default(autoincrement())
+  userId Int @map("user_id")
+
   // What they consented to
-  consentType     ConsentType @map("consent_type")
-  purpose         String    @db.Text // e.g., "Performance ratings", "Marketing emails"
-  
+  consentType ConsentType @map("consent_type")
+  purpose     String      @db.Text // e.g., "Performance ratings", "Marketing emails"
+
   // Consent lifecycle
-  givenAt         DateTime  @default(now()) @map("given_at") @db.Timestamptz(6)
-  withdrawnAt     DateTime? @map("withdrawn_at") @db.Timestamptz(6)
-  expiresAt       DateTime? @map("expires_at") @db.Timestamptz(6) // Some consents expire
-  
+  givenAt     DateTime  @default(now()) @map("given_at") @db.Timestamptz(6)
+  withdrawnAt DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(6) // Some consents expire
+
   // Audit trail
-  ipAddress       String?   @map("ip_address") @db.VarChar(45)
-  userAgent       String?   @map("user_agent") @db.Text
-  
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
   // Relations
-  user            user      @relation("UserConsents", fields: [userId], references: [id])
-  
+  user user @relation("UserConsents", fields: [userId], references: [id])
+
   //@@index([userId, consentType, withdrawnAt])
   @@map("user_consent")
 }
 
-
 //DATA EXPORT LOG, GDPR
 model DataExportRequest {
-  id              Int       @id @default(autoincrement())
-  userId          Int       @map("user_id")
-  
+  id     Int @id @default(autoincrement())
+  userId Int @map("user_id")
+
   // Request details
-  requestType     ExportRequestType @map("request_type")
-  
+  requestType ExportRequestType @map("request_type")
+
   // File generation
-  fileUrl         String?   @map("file_url") @db.Text
-//fileSha256    String?           @db.Char(64)
-  expiresAt       DateTime? @map("expires_at") @db.Timestamptz(6)
-  
+  fileUrl   String?   @map("file_url") @db.Text
+  //fileSha256    String?           @db.Char(64)
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+
   // Audit (calculate status from these!)
-  requestedAt     DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
-  failedAt        DateTime? @map("failed_at") @db.Timestamptz(6)
-  errorMessage    String?   @map("error_message") @db.Text
-  
+  requestedAt  DateTime  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  failedAt     DateTime? @map("failed_at") @db.Timestamptz(6)
+  errorMessage String?   @map("error_message") @db.Text
+
   // Relations
-  user            user      @relation("DataExportRequests", fields: [userId], references: [id])
-  
- // @@index([userId, completedAt])
+  user user @relation("DataExportRequests", fields: [userId], references: [id])
+
+  // @@index([userId, completedAt])
   @@map("data_export_request")
 }
 
-
 //  DATA ACCESS LOG, GDPR
 model DataAccessLog {
-  id              Int       @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // Who accessed
-  accessedBy      Int       @map("accessed_by")
-  
+  accessedBy Int @map("accessed_by")
+
   // Whose data
-  subjectUserId   Int       @map("subject_user_id")
-  
+  subjectUserId Int @map("subject_user_id")
+
   // What they accessed
-  accessType      AccessType @map("access_type")
-  resourceType    String    @db.VarChar(100) // e.g., "user_profile", "job_rating"
-  resourceId      Int?      @map("resource_id")
-  
+  accessType   AccessType @map("access_type")
+  resourceType String     @db.VarChar(100) // e.g., "user_profile", "job_rating"
+  resourceId   Int?       @map("resource_id")
+
   // When and how
-  accessedAt      DateTime  @default(now()) @map("accessed_at") @db.Timestamptz(6)
-  ipAddress       String?   @map("ip_address") @db.VarChar(45)
-  userAgent       String?   @map("user_agent") @db.Text
-  
+  accessedAt DateTime @default(now()) @map("accessed_at") @db.Timestamptz(6)
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  userAgent  String?  @map("user_agent") @db.Text
+
   // Relations
-  accessor        user      @relation("DataAccessActor", fields: [accessedBy], references: [id])
-  subject         user      @relation("DataAccessSubject", fields: [subjectUserId], references: [id])
-  
+  accessor user @relation("DataAccessActor", fields: [accessedBy], references: [id])
+  subject  user @relation("DataAccessSubject", fields: [subjectUserId], references: [id])
+
   //@@index([subjectUserId, accessedAt])
   //@@index([accessedBy, accessedAt])
   @@map("data_access_log")
@@ -477,25 +468,24 @@ model DataAccessLog {
 
 // DATA RETENTION POLICY
 model DataRetentionPolicy {
-  id              Int       @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // What data
-  dataType        String    @unique @db.VarChar(100) // e.g., "inactive_user", "old_job"
-  description     String    @db.Text
-  
+  dataType    String @unique @db.VarChar(100) // e.g., "inactive_user", "old_job"
+  description String @db.Text
+
   // Retention period
-  retentionDays   Int       @map("retention_days") // How long to keep
-  
+  retentionDays Int @map("retention_days") // How long to keep
+
   // When to check
-  lastCheckedAt   DateTime? @map("last_checked_at") @db.Timestamptz(6)
-  
+  lastCheckedAt DateTime? @map("last_checked_at") @db.Timestamptz(6)
+
   // Audit
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
   @@map("data_retention_policy")
 }
-
 
 // ============================================
 // ENUMS
@@ -536,40 +526,37 @@ enum LocationType {
 
   @@map("location_type")
 }
+
 enum Seniority {
-  
   junior
   senior
-  
+
   @@map("seniority")
 }
 
-
-
-
 enum CheckMethod {
-  app_self      // Talent checked themselves via app
-  manual  // Admin or Supervisor 
+  app_self // Talent checked themselves via app
+  manual // Admin or Supervisor 
   ai_agent // Texted live location to AI agent
-  
+
   @@map("check_method")
 }
 
 enum ExportRequestType {
-  full_data     // All user data
-  job_history   // Just job history
-  ratings       // Just ratings received
-  
+  full_data // All user data
+  job_history // Just job history
+  ratings // Just ratings received
+
   @@map("export_request_type")
 }
 
 enum ConsentType {
-  data_processing        // General data processing
-  performance_ratings    // Allow performance reviews
-  marketing             // Marketing communications
-  third_party_sharing   // Share data with clients
-  location_tracking     // GPS location for check-in
-  
+  data_processing // General data processing
+  performance_ratings // Allow performance reviews
+  marketing // Marketing communications
+  third_party_sharing // Share data with clients
+  location_tracking // GPS location for check-in
+
   @@map("consent_type")
 }
 
@@ -579,9 +566,9 @@ enum AccessType {
   delete
   export
   automated_decision
+
   @@map("access_type")
 }
-
 
 enum job_invitation_status {
   pending
@@ -590,6 +577,7 @@ enum job_invitation_status {
   expired
   cancelled
   spots_filled
+
   @@map("job_invitation_status")
 }
 
@@ -605,9 +593,7 @@ enum cancellation_reason {
   admin_decision
 }
 
-
 //enum ExportStatus { pending processing completed failed @@map("export_status") }
-
 
 // If you think venue types might change often, consider a reference table instead:
 //model LocationType {

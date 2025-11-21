@@ -50,6 +50,8 @@ import {
   type Employee as StaffEmployee,
 } from "./staffing-utils";
 import { StaffingModal } from "./StaffingModal";
+import { ProfileAvatar } from "./ProfileAvatar";
+
 
 interface ShiftEditDialogProps {
   shift: {
@@ -853,6 +855,14 @@ export function ShiftEditDialog({
                           }
                           className="border-red-500 data-[state=checked]:bg-red-500"
                           onClick={(e) => e.stopPropagation()}
+                        />
+                        {/* ✅ NEW: Profile Picture */}
+                        <ProfileAvatar
+                          firstName={staff.firstName}
+                          lastName={staff.lastName}
+                          email={staff.email}
+                          profilePicture={staff.profilePicture}
+                          size="md"
                         />
 
                         <div className="flex-1 min-w-0">

@@ -1,6 +1,36 @@
 // app/[lang]/dashboard/calendar/staffing-utils.ts
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+export function getProfilePictureUrl(
+  profilePicture: string | null
+): string | null {
+  if (!profilePicture) return null;
+  if (profilePicture.startsWith("http")) {
+    return profilePicture;
+  }
+  const supabase = createClient();
+  const { data } = supabase.storage
+    .from("profile-pictures")
+    .getPublicUrl(profilePicture);
+  return data.publicUrl;
+}
+
+export function getUserInitials(
+  firstName: string | null,
+  lastName: string | null,
+  email: string
+): string {
+  if (firstName) {
+    return firstName[0].toUpperCase();
+  }
+  return email[0].toUpperCase();
+}
 
 // ============================================
 // TYPES
@@ -37,7 +67,6 @@ export interface ShiftAssignment {
   deleted_at: string | null;
 }
 
-// ✅ UPDATED: Group cancellations by reason
 export interface CancellationHistory {
   cancellationReason: string | null;
   cancelCount: number;
@@ -72,6 +101,7 @@ interface ConflictingShift {
   shift_date: string;
   start_time: string;
   end_time: string;
+  user_id: number;
   job: {
     position: string;
   };
@@ -121,7 +151,6 @@ export async function fetchShiftAssignments(
     return new Map();
   }
 
-  // Group by shift_id
   const map = new Map<number, ShiftAssignment[]>();
   (data || []).forEach((assignment) => {
     const existing = map.get(assignment.shift_id) || [];
@@ -132,16 +161,19 @@ export async function fetchShiftAssignments(
   return map;
 }
 
-export async function fetchEmployeeConflicts(
+// ✅ OPTIMIZED: Batch fetch conflicts for all employees at once
+export async function fetchBatchEmployeeConflicts(
   supabase: SupabaseClient,
-  userId: number,
+  userIds: number[],
   dateRange: { startDate: string; endDate: string }
-): Promise<ConflictingShift[]> {
+): Promise<Map<number, ConflictingShift[]>> {
+  if (userIds.length === 0) return new Map();
+
   const { data, error } = await supabase
     .from("shift_assignment")
     .select(
       `
-      shift_id,
+      user_id,
       shift:shift_id (
         shift_date,
         start_time,
@@ -152,17 +184,17 @@ export async function fetchEmployeeConflicts(
       )
     `
     )
-    .eq("user_id", userId)
+    .in("user_id", userIds)
     .is("cancelled_at", null)
     .is("deleted_at", null);
 
   if (error) {
     console.error("Error fetching employee conflicts:", error);
-    return [];
+    return new Map();
   }
 
-  // Filter by date range and flatten structure
-  const conflicts: ConflictingShift[] = [];
+  const conflictsMap = new Map<number, ConflictingShift[]>();
+
   (data || []).forEach((assignment) => {
     const shift = assignment.shift as unknown as {
       shift_date: string;
@@ -176,55 +208,69 @@ export async function fetchEmployeeConflicts(
       shift.shift_date >= dateRange.startDate &&
       shift.shift_date <= dateRange.endDate
     ) {
-      conflicts.push(shift);
+      const conflicts = conflictsMap.get(assignment.user_id) || [];
+      conflicts.push({
+        ...shift,
+        user_id: assignment.user_id,
+      });
+      conflictsMap.set(assignment.user_id, conflicts);
     }
   });
 
-  return conflicts;
+  return conflictsMap;
 }
 
-// ✅ UPDATED: Group cancellations by reason, not by shift
-export async function fetchCancellationHistory(
+// ✅ OPTIMIZED: Batch fetch cancellation history for all employees
+export async function fetchBatchCancellationHistory(
   supabase: SupabaseClient,
-  userId: number,
+  userIds: number[],
   shiftIds: number[]
-): Promise<CancellationHistory[]> {
-  if (shiftIds.length === 0) return [];
+): Promise<Map<number, CancellationHistory[]>> {
+  if (userIds.length === 0 || shiftIds.length === 0) return new Map();
 
   const { data, error } = await supabase
     .from("shift_assignment")
-    .select("shift_id, cancelled_at, cancellation_reason")
-    .eq("user_id", userId)
+    .select("user_id, shift_id, cancelled_at, cancellation_reason")
+    .in("user_id", userIds)
     .in("shift_id", shiftIds)
     .not("cancelled_at", "is", null);
 
   if (error) {
     console.error("Error fetching cancellation history:", error);
-    return [];
+    return new Map();
   }
 
-  // ✅ Group by cancellation_reason instead of shift_id
-  const historyMap = new Map<string, CancellationHistory>();
+  const historyMap = new Map<number, CancellationHistory[]>();
 
   (data || []).forEach((item) => {
-    const reason = item.cancellation_reason || "unknown";
-    const existing = historyMap.get(reason);
+    const userHistoryMap = new Map<string, CancellationHistory>();
+    const existing = historyMap.get(item.user_id) || [];
 
-    if (existing) {
-      existing.cancelCount++;
-      existing.shiftIds.push(item.shift_id);
+    existing.forEach((hist) => {
+      userHistoryMap.set(hist.cancellationReason || "unknown", hist);
+    });
+
+    const reason = item.cancellation_reason || "unknown";
+    const existingReason = userHistoryMap.get(reason);
+
+    if (existingReason) {
+      existingReason.cancelCount++;
+      existingReason.shiftIds.push(item.shift_id);
     } else {
-      historyMap.set(reason, {
+      userHistoryMap.set(reason, {
         cancellationReason: item.cancellation_reason,
         cancelCount: 1,
         shiftIds: [item.shift_id],
       });
     }
+
+    historyMap.set(item.user_id, Array.from(userHistoryMap.values()));
   });
 
-  return Array.from(historyMap.values());
+  return historyMap;
 }
 
+// ✅ OPTIMIZED: Batch fetch pending invitations (unchanged but included for completeness)
 export async function fetchPendingInvitations(
   supabase: SupabaseClient,
   userIds: number[],
@@ -244,7 +290,6 @@ export async function fetchPendingInvitations(
     return new Map();
   }
 
-  // Group by user_id
   const map = new Map<number, PendingInvitation[]>();
   (data || []).forEach((invitation) => {
     const existing = map.get(invitation.user_id) || [];
@@ -316,15 +361,11 @@ export function hasTimeConflict(
   shift1: { shift_date: string; start_time: string; end_time: string },
   shift2: { shift_date: string; start_time: string; end_time: string }
 ): boolean {
-  // Same date?
   if (shift1.shift_date !== shift2.shift_date) return false;
-
-  // Check time overlap
   const start1 = shift1.start_time;
   const end1 = shift1.end_time;
   const start2 = shift2.start_time;
   const end2 = shift2.end_time;
-
   return start1 < end2 && end1 > start2;
 }
 
@@ -332,15 +373,14 @@ export function hasTimeConflict(
 // AVAILABILITY CALCULATION
 // ============================================
 
-export async function calculateEmployeeAvailability(
-  supabase: SupabaseClient,
+export function calculateEmployeeAvailability(
   employee: Employee,
   shifts: Shift[],
   assignmentsMap: Map<number, ShiftAssignment[]>,
   conflicts: ConflictingShift[],
   cancellationHistory: CancellationHistory[],
   pendingInvitations: PendingInvitation[]
-): Promise<EmployeeAvailability> {
+): EmployeeAvailability {
   let available = 0;
   let alreadyAssigned = 0;
   let conflictCount = 0;
@@ -351,7 +391,6 @@ export async function calculateEmployeeAvailability(
   for (const shift of shifts) {
     const shiftAssignments = assignmentsMap.get(shift.id) || [];
 
-    // Already assigned to this shift?
     const isAssigned = shiftAssignments.some(
       (a) => a.user_id === employee.userId
     );
@@ -361,13 +400,11 @@ export async function calculateEmployeeAvailability(
       continue;
     }
 
-    // Shift is full?
     if (shiftAssignments.length >= shift.workers_needed) {
       full++;
       continue;
     }
 
-    // Check for conflicts with other jobs
     const hasConflict = conflicts.some((conflict) =>
       hasTimeConflict(shift, conflict)
     );
@@ -408,47 +445,44 @@ export async function calculateEmployeeAvailability(
   };
 }
 
+// ✅ OPTIMIZED: Use batched queries and parallel processing
 export async function calculateAllEmployeesAvailability(
   supabase: SupabaseClient,
   employees: Employee[],
   shifts: Shift[]
 ): Promise<EmployeeAvailability[]> {
-  if (shifts.length === 0) return [];
+  if (shifts.length === 0 || employees.length === 0) return [];
 
   const shiftIds = shifts.map((s) => s.id);
-  const assignmentsMap = await fetchShiftAssignments(supabase, shiftIds);
   const jobId = shifts[0].job_id;
   const userIds = employees.map((e) => e.userId);
-  const pendingInvitationsMap = await fetchPendingInvitations(
-    supabase,
-    userIds,
-    jobId
-  );
 
   const dateRange = {
     startDate: shifts[0].shift_date,
     endDate: shifts[shifts.length - 1].shift_date,
   };
 
-  const availabilities: EmployeeAvailability[] = [];
+  // ✅ Fetch all data in parallel
+  const [
+    assignmentsMap,
+    conflictsMap,
+    cancellationHistoryMap,
+    pendingInvitationsMap,
+  ] = await Promise.all([
+    fetchShiftAssignments(supabase, shiftIds),
+    fetchBatchEmployeeConflicts(supabase, userIds, dateRange),
+    fetchBatchCancellationHistory(supabase, userIds, shiftIds),
+    fetchPendingInvitations(supabase, userIds, jobId),
+  ]);
 
-  for (const employee of employees) {
-    const conflicts = await fetchEmployeeConflicts(
-      supabase,
-      employee.userId,
-      dateRange
-    );
-
-    const cancellationHistory = await fetchCancellationHistory(
-      supabase,
-      employee.userId,
-      shiftIds
-    );
-
+  // ✅ Calculate availability for all employees (no async needed now)
+  const availabilities: EmployeeAvailability[] = employees.map((employee) => {
+    const conflicts = conflictsMap.get(employee.userId) || [];
+    const cancellationHistory =
+      cancellationHistoryMap.get(employee.userId) || [];
     const pendingInvitations = pendingInvitationsMap.get(employee.userId) || [];
 
-    const availability = await calculateEmployeeAvailability(
-      supabase,
+    return calculateEmployeeAvailability(
       employee,
       shifts,
       assignmentsMap,
@@ -456,11 +490,88 @@ export async function calculateAllEmployeesAvailability(
       cancellationHistory,
       pendingInvitations
     );
-
-    availabilities.push(availability);
-  }
+  });
 
   return availabilities;
+}
+
+// ============================================
+// INVITATION MANAGEMENT
+// ============================================
+
+export async function cancelInvitationsForFullShifts(
+  supabase: SupabaseClient,
+  shifts: Shift[],
+  assignmentsMap: Map<number, ShiftAssignment[]>
+): Promise<{ cancelledCount: number }> {
+  const now = new Date().toISOString();
+  let cancelledCount = 0;
+
+  const fullShiftIds: number[] = [];
+
+  for (const shift of shifts) {
+    const assignments = assignmentsMap.get(shift.id) || [];
+    if (assignments.length >= shift.workers_needed) {
+      fullShiftIds.push(shift.id);
+    }
+  }
+
+  if (fullShiftIds.length === 0) {
+    return { cancelledCount: 0 };
+  }
+
+  try {
+    const { data: invitations, error: fetchError } = await supabase
+      .from("job_invitation")
+      .select("id, shift_ids")
+      .eq("status", "pending")
+      .overlaps("shift_ids", fullShiftIds);
+
+    if (fetchError) {
+      console.error("Error fetching invitations:", fetchError);
+      return { cancelledCount: 0 };
+    }
+
+    if (!invitations || invitations.length === 0) {
+      return { cancelledCount: 0 };
+    }
+
+    for (const invitation of invitations) {
+      const remainingShiftIds = invitation.shift_ids.filter(
+        (id: number) => !fullShiftIds.includes(id)
+      );
+
+      if (remainingShiftIds.length === 0) {
+        const { error: updateError } = await supabase
+          .from("job_invitation")
+          .update({
+            status: "cancelled",
+            updated_at: now,
+          })
+          .eq("id", invitation.id);
+
+        if (!updateError) {
+          cancelledCount++;
+        }
+      } else {
+        const { error: updateError } = await supabase
+          .from("job_invitation")
+          .update({
+            shift_ids: remainingShiftIds,
+            updated_at: now,
+          })
+          .eq("id", invitation.id);
+
+        if (!updateError) {
+          cancelledCount++;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error cancelling invitations for full shifts:", error);
+  }
+
+  return { cancelledCount };
 }
 
 // ============================================
@@ -478,6 +589,7 @@ export async function assignStaffToShifts(
   reactivated: number;
   skipped: number;
   details: string[];
+  invitationsCancelled: number;
 }> {
   const now = new Date().toISOString();
   const shiftIds = shifts.map((s) => s.id);
@@ -599,11 +711,19 @@ export async function assignStaffToShifts(
     }
   }
 
+  const updatedAssignmentsMap = await fetchShiftAssignments(supabase, shiftIds);
+  const { cancelledCount } = await cancelInvitationsForFullShifts(
+    supabase,
+    shifts,
+    updatedAssignmentsMap
+  );
+
   return {
     success: successCount,
     reactivated: reactivatedCount,
     skipped: userIds.length * shifts.length - successCount,
     details,
+    invitationsCancelled: cancelledCount,
   };
 }
 

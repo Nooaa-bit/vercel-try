@@ -1,4 +1,4 @@
-//hype-hire/vercel/app/[lang]/dashboard/calendar/DayView.tsx
+// app/[lang]/dashboard/calendar/DayView.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -10,6 +10,8 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, X, Plus } from "lucide-react";
 import JobDialog from "./JobDialog";
 import { ShiftEditDialog } from "./ShiftEditDialog";
+import { ProfileAvatar } from "./ProfileAvatar";
+import { fetchAssignedStaffForShift, type Employee } from "./staffing-utils";
 
 interface Shift {
   id: number;
@@ -78,6 +80,11 @@ export function DayView({
   const hoursScrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
+  // ✅ NEW: Store assigned staff for each shift
+  const [assignedStaffMap, setAssignedStaffMap] = useState<
+    Map<number, Employee[]>
+  >(new Map());
+
   const canEdit =
     activeRole.role === "company_admin" || activeRole.role === "superadmin";
 
@@ -94,6 +101,24 @@ export function DayView({
     shiftsDiv.addEventListener("scroll", handleScroll);
     return () => shiftsDiv.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // ✅ NEW: Fetch assigned staff for all visible shifts
+  useEffect(() => {
+    const loadAssignedStaff = async () => {
+      if (!canEdit || dayShifts.length === 0) return;
+
+      const staffMap = new Map<number, Employee[]>();
+
+      for (const shift of dayShifts) {
+        const staff = await fetchAssignedStaffForShift(supabase, shift.id);
+        staffMap.set(shift.id, staff);
+      }
+
+      setAssignedStaffMap(staffMap);
+    };
+
+    loadAssignedStaff();
+  }, [shifts, date, canEdit]);
 
   const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
     2,
@@ -176,7 +201,6 @@ export function DayView({
 
   const swimlanes = getSwimlanesLayout();
 
-  // ✅ Use locale-aware date formatting
   const dayName = date.toLocaleDateString(i18n.language, {
     weekday: "long",
     month: "short",
@@ -221,216 +245,278 @@ export function DayView({
   };
 
   return (
-  <>
-    <div
-      className="fixed inset-0 bg-black/50 z-40 flex items-start justify-center p-4 pt-16 overflow-y-auto"
-      onClick={onClose}
-    >
-      <Card
-        className="w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col my-4"
-        onClick={(e) => e.stopPropagation()}
+    <>
+      <div
+        className="fixed inset-0 bg-black/50 z-40 flex items-start justify-center p-4 pt-16 overflow-y-auto"
+        onClick={onClose}
       >
-        <CardHeader className="border-b pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onPreviousDay}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <CardTitle className="text-xl min-w-fit">{dayName}</CardTitle>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onNextDay}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+        <Card
+          className="w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col my-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CardHeader className="border-b pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onPreviousDay}
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <CardTitle className="text-xl min-w-fit">{dayName}</CardTitle>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onNextDay}
+                  className="h-8 w-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="flex gap-2">
+                {canEdit && (
+                  <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-primary hover:bg-primary/90">
+                        <Plus className="w-4 h-4 mr-2" />
+                        {t("dayView.addButton")}
+                      </Button>
+                    </DialogTrigger>
+                    {dialogOpen && (
+                      <JobDialog
+                        editingJob={null}
+                        locations={locations}
+                        defaultStartDate={dateStr}
+                        onSave={async () => {
+                          setDialogOpen(false);
+                          onSave();
+                        }}
+                        onCancel={() => {
+                          setDialogOpen(false);
+                        }}
+                        companyId={targetCompanyId}
+                      />
+                    )}
+                  </Dialog>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="h-8 w-8"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="flex-1 overflow-hidden p-0 flex">
+            {/* Hours Column */}
+            <div
+              ref={hoursScrollRef}
+              className="w-20 border-r bg-muted/30 flex flex-col overflow-y-scroll scrollbar-hide"
+            >
+              {hours.map((hour) => (
+                <div
+                  key={hour}
+                  className="h-16 border-b px-2 py-1 text-xs font-medium text-muted-foreground flex items-start justify-center flex-shrink-0"
+                >
+                  {String(hour).padStart(2, "0")}:00
+                </div>
+              ))}
             </div>
 
-            <div className="flex gap-2">
-              {canEdit && (
-                <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-primary hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-2" />
-                      {t("dayView.addButton")}
-                    </Button>
-                  </DialogTrigger>
-                  {dialogOpen && (
-                    <JobDialog
-                      editingJob={null}
-                      locations={locations}
-                      defaultStartDate={dateStr}
-                      onSave={async () => {
-                        setDialogOpen(false);
-                        onSave();
+            {/* Shifts Swimlanes */}
+            <div
+              ref={shiftsScrollRef}
+              className="flex-1 overflow-y-scroll overflow-x-auto relative bg-background"
+            >
+              {/* Hour dividers background */}
+              {hours.map((hour) => (
+                <div
+                  key={`divider-${hour}`}
+                  className="h-16 border-b border-border relative flex-shrink-0"
+                >
+                  <div className="absolute top-1/2 w-full border-t border-border/50" />
+                </div>
+              ))}
+
+              {/* Shifts */}
+              {dayShifts.length > 0 ? (
+                <div className="absolute inset-0 flex">
+                  {swimlanes.map((swimlane) => (
+                    <div
+                      key={`swimlane-${swimlane.id}`}
+                      className="relative flex-shrink-0 border-r border-border/30"
+                      style={{
+                        width: `${SWIMLANE_WIDTH_PX}px`,
+                        marginRight: `${SWIMLANE_GAP_PX}px`,
                       }}
-                      onCancel={() => {
-                        setDialogOpen(false);
-                      }}
-                      companyId={targetCompanyId}
-                    />
-                  )}
-                </Dialog>
-              )}
+                    >
+                      {swimlane.shifts.map((shift) => {
+                        const startPosition = getShiftPosition(shift.startTime);
+                        const height = getShiftHeight(
+                          shift.startTime,
+                          shift.endTime
+                        );
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+                        const assignmentCount = shift.assignmentCount ?? 0;
+                        const workersNeeded = shift.workers_needed;
+                        const isFullyStaffed =
+                          assignmentCount === workersNeeded;
+                        const isOverstaffed = assignmentCount > workersNeeded;
 
-        <CardContent className="flex-1 overflow-hidden p-0 flex">
-          {/* Hours Column */}
-          <div
-            ref={hoursScrollRef}
-            className="w-20 border-r bg-muted/30 flex flex-col overflow-y-scroll scrollbar-hide"
-          >
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="h-16 border-b px-2 py-1 text-xs font-medium text-muted-foreground flex items-start justify-center flex-shrink-0"
-              >
-                {String(hour).padStart(2, "0")}:00
-              </div>
-            ))}
-          </div>
+                        // ✅ Get assigned staff for this shift
+                        const assignedStaff =
+                          assignedStaffMap.get(shift.id) || [];
+                        const maxAvatarsToShow = 6;
+                        const remainingCount = Math.max(
+                          0,
+                          assignedStaff.length - maxAvatarsToShow
+                        );
 
-          {/* Shifts Swimlanes */}
-          <div
-            ref={shiftsScrollRef}
-            className="flex-1 overflow-y-scroll overflow-x-auto relative bg-background"
-          >
-            {/* Hour dividers background */}
-            {hours.map((hour) => (
-              <div
-                key={`divider-${hour}`}
-                className="h-16 border-b border-border relative flex-shrink-0"
-              >
-                <div className="absolute top-1/2 w-full border-t border-border/50" />
-              </div>
-            ))}
-
-            {/* Shifts */}
-            {dayShifts.length > 0 ? (
-              <div className="absolute inset-0 flex">
-                {swimlanes.map((swimlane) => (
-                  <div
-                    key={`swimlane-${swimlane.id}`}
-                    className="relative flex-shrink-0 border-r border-border/30"
-                    style={{
-                      width: `${SWIMLANE_WIDTH_PX}px`,
-                      marginRight: `${SWIMLANE_GAP_PX}px`,
-                    }}
-                  >
-                    {swimlane.shifts.map((shift) => {
-                      const startPosition = getShiftPosition(shift.startTime);
-                      const height = getShiftHeight(
-                        shift.startTime,
-                        shift.endTime
-                      );
-
-                      const assignmentCount = shift.assignmentCount ?? 0;
-                      const workersNeeded = shift.workers_needed;
-                      const isFullyStaffed =
-                        assignmentCount === workersNeeded;
-                      const isOverstaffed = assignmentCount > workersNeeded;
-
-                      return (
-                        <div
-                          key={shift.id}
-                          className={`absolute rounded-lg p-2 border transition-shadow overflow-hidden left-1 right-1 ${
-                            canEdit
-                              ? "hover:shadow-lg hover:shadow-primary/20 cursor-pointer"
-                              : "cursor-default"
-                          } bg-primary text-primary-foreground border-primary/30`}
-                          style={{
-                            top: `${startPosition * 64}px`,
-                            height: `${height * 64}px`,
-                          }}
-                          title={
-                            canEdit
-                              ? `${shift.position} - ${shift.location} (${t(
-                                  "dayView.clickToEdit"
-                                )})`
-                              : `${shift.position} - ${shift.location}`
-                          }
-                          onClick={() => handleShiftClick(shift)}
-                        >
-                          <div className="text-xs font-semibold truncate">
-                            {shift.position}
-                          </div>
-                          <div className="text-xs opacity-90">
-                            {shift.startTime.slice(0, 5)} -{" "}
-                            {shift.endTime.slice(0, 5)}
-                          </div>
-                          <div className="text-xs opacity-80 mt-1 truncate">
-                            {shift.location}
-                          </div>
-                          {canEdit && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <div
-                                className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                  isFullyStaffed
-                                    ? "bg-green-600 text-white dark:bg-green-500"
-                                    : isOverstaffed
-                                    ? "bg-red-600 text-white dark:bg-red-500"
-                                    : "bg-orange-600 text-white dark:bg-orange-500"
-                                }`}
-                              >
-                                {assignmentCount}/{workersNeeded}
-                              </div>
+                        return (
+                          <div
+                            key={shift.id}
+                            className={`absolute rounded-lg p-2 border transition-shadow overflow-hidden left-1 right-1 ${
+                              canEdit
+                                ? "hover:shadow-lg hover:shadow-primary/20 cursor-pointer"
+                                : "cursor-default"
+                            } bg-primary text-primary-foreground border-primary/30`}
+                            style={{
+                              top: `${startPosition * 64}px`,
+                              height: `${height * 64}px`,
+                            }}
+                            title={
+                              canEdit
+                                ? `${shift.position} - ${shift.location} (${t(
+                                    "dayView.clickToEdit"
+                                  )})`
+                                : `${shift.position} - ${shift.location}`
+                            }
+                            onClick={() => handleShiftClick(shift)}
+                          >
+                            <div className="text-xs font-semibold truncate">
+                              {shift.position}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                <p>{t("dayView.noShifts")}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                            <div className="text-xs opacity-90">
+                              {shift.startTime.slice(0, 5)} -{" "}
+                              {shift.endTime.slice(0, 5)}
+                            </div>
+                            <div className="text-xs opacity-80 mt-1 truncate">
+                              {shift.location}
+                            </div>
 
-    {/* ShiftEditDialog */}
-    {canEdit && shiftEditDialogOpen && editingShiftData && (
-      <Dialog open={shiftEditDialogOpen} onOpenChange={setShiftEditDialogOpen}>
-        <ShiftEditDialog
-          shift={{
-            ...editingShiftData,
-            position: shiftPosition,
-          }}
-          assignmentCount={shiftAssignmentCount}
-          onSave={() => {
-            setShiftEditDialogOpen(false);
-            setEditingShiftData(null);
-            onSave();
-          }}
-          onCancel={() => {
-            setShiftEditDialogOpen(false);
-            setEditingShiftData(null);
-          }}
-        />
-      </Dialog>
-    )}
-  </>
-);
+                            {canEdit && (
+                              <div className="mt-1 space-y-1">
+                                {/* Staffing Badge */}
+                                <div className="flex items-center gap-1">
+                                  <div
+                                    className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                      isFullyStaffed
+                                        ? "bg-green-600 text-white dark:bg-green-500"
+                                        : isOverstaffed
+                                        ? "bg-red-600 text-white dark:bg-red-500"
+                                        : "bg-orange-600 text-white dark:bg-orange-500"
+                                    }`}
+                                  >
+                                    {assignmentCount}/{workersNeeded}
+                                  </div>
+                                </div>
 
+                                {/* ✅ UPDATED: Stacked Profile Avatars with Wrapping */}
+                                {assignedStaff.length > 0 && (
+                                  <div className="flex items-start gap-0.5 flex-wrap max-w-full">
+                                    {assignedStaff
+                                      .slice(0, maxAvatarsToShow)
+                                      .map((staff, index) => (
+                                        <div
+                                          key={staff.userId}
+                                          className="relative flex-shrink-0"
+                                          style={{
+                                            marginLeft:
+                                              index > 0 && index % 4 !== 0
+                                                ? "-6px"
+                                                : "0",
+                                            zIndex:
+                                              maxAvatarsToShow - (index % 4),
+                                          }}
+                                        >
+                                          <ProfileAvatar
+                                            firstName={staff.firstName}
+                                            lastName={staff.lastName}
+                                            email={staff.email}
+                                            profilePicture={
+                                              staff.profilePicture
+                                            }
+                                            size="sm"
+                                            className="ring-2 ring-primary"
+                                          />
+                                        </div>
+                                      ))}
+                                    {remainingCount > 0 && (
+                                      <div
+                                        className="w-6 h-6 bg-primary-foreground/20 text-primary-foreground rounded-full flex items-center justify-center text-[10px] font-semibold ring-2 ring-primary flex-shrink-0"
+                                        style={{
+                                          marginLeft:
+                                            assignedStaff.length > 0
+                                              ? "-6px"
+                                              : "0",
+                                          zIndex: 0,
+                                        }}
+                                      >
+                                        +{remainingCount}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                  <p>{t("dayView.noShifts")}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ShiftEditDialog */}
+      {canEdit && shiftEditDialogOpen && editingShiftData && (
+        <Dialog
+          open={shiftEditDialogOpen}
+          onOpenChange={setShiftEditDialogOpen}
+        >
+          <ShiftEditDialog
+            shift={{
+              ...editingShiftData,
+              position: shiftPosition,
+            }}
+            assignmentCount={shiftAssignmentCount}
+            onSave={() => {
+              setShiftEditDialogOpen(false);
+              setEditingShiftData(null);
+              onSave();
+            }}
+            onCancel={() => {
+              setShiftEditDialogOpen(false);
+              setEditingShiftData(null);
+            }}
+          />
+        </Dialog>
+      )}
+    </>
+  );
 }

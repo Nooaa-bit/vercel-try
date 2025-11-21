@@ -40,7 +40,7 @@ import {
   type Shift,
   type Employee,
 } from "./staffing-utils";
-
+import { ProfileAvatar } from "./ProfileAvatar";
 interface StaffingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -616,7 +616,15 @@ export function StaffingModal({
                                   onClick={(e) => e.stopPropagation()}
                                 />
                               )}
-
+                              {/* ✅ NEW: Profile Picture */}
+                              <ProfileAvatar
+                                firstName={avail.employee.firstName}
+                                lastName={avail.employee.lastName}
+                                email={avail.employee.email}
+                                profilePicture={avail.employee.profilePicture}
+                                size="md"
+                                className="mt-0.5"
+                              />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <div className="text-sm font-medium">
