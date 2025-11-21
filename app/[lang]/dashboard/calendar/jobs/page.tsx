@@ -1,8 +1,7 @@
-//hype-hire/vercel/app/[lang]/dashboard/calendar/jobs/page.tsx
+// app/[lang]/dashboard/calendar/jobs/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -34,6 +33,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import JobDialog from "../JobDialog";
@@ -62,6 +62,15 @@ interface Location {
   name: string;
 }
 
+// ✅ Helper to get today's date (memoized)
+const getTodayString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function JobsPage() {
   const { t, ready } = useTranslation("jobs");
   const {
@@ -85,16 +94,19 @@ export default function JobsPage() {
     ? selectedCompanyForAdmin
     : activeRole?.companyId;
 
+  // ✅ Memoize today string
+  const today = useMemo(() => getTodayString(), []);
+
+  // ✅ Memoize stats
   const stats = useMemo(() => {
     const total = jobs.length;
-    const today = new Date().toISOString().split("T")[0];
     const active = jobs.filter((job) => job.end_date >= today).length;
     const past = jobs.filter((job) => job.end_date < today).length;
     return { total, active, past };
-  }, [jobs]);
+  }, [jobs, today]);
 
+  // ✅ Memoize filtered jobs
   const filteredJobs = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
     return jobs.filter((job) => {
       const locationMatch =
         filterLocation === "all"
@@ -108,8 +120,9 @@ export default function JobsPage() {
           : job.end_date < today;
       return locationMatch && statusMatch;
     });
-  }, [jobs, filterLocation, filterJobStatus]);
+  }, [jobs, filterLocation, filterJobStatus, today]);
 
+  // ✅ Memoize paginated jobs
   const paginatedJobs = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
@@ -118,108 +131,131 @@ export default function JobsPage() {
 
   const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [filterLocation, filterJobStatus]);
 
+  // ✅ OPTIMIZED: Fetch everything in parallel with batched queries
   const fetchData = useCallback(async () => {
     if (!targetCompanyId || targetCompanyId <= 0) return;
     setLoading(true);
 
     try {
-      const { data: jobsData, error: jobsError } = await supabase
-        .from("job")
-        .select("*")
-        .eq("company_id", targetCompanyId)
-        .is("deleted_at", null)
-        .order("start_date", { ascending: false });
+      // ✅ Step 1: Fetch jobs and locations in parallel
+      const [jobsResponse, locationsResponse] = await Promise.all([
+        supabase
+          .from("job")
+          .select("*")
+          .eq("company_id", targetCompanyId)
+          .is("deleted_at", null)
+          .order("start_date", { ascending: false }),
+        supabase
+          .from("location")
+          .select("id, name")
+          .eq("company_id", targetCompanyId)
+          .is("deleted_at", null),
+      ]);
 
-      if (jobsError) throw jobsError;
+      if (jobsResponse.error) throw jobsResponse.error;
+      if (locationsResponse.error) throw locationsResponse.error;
 
-      if (jobsData && jobsData.length > 0) {
-        const jobIds = jobsData.map((job) => job.id);
+      const jobsData = jobsResponse.data;
+      const locationsData = locationsResponse.data;
 
-        const { data: shiftsData } = await supabase
+      if (locationsData) {
+        setLocations(locationsData);
+      }
+
+      if (!jobsData || jobsData.length === 0) {
+        setJobs([]);
+        setLoading(false);
+        return;
+      }
+
+      const jobIds = jobsData.map((job) => job.id);
+
+      // ✅ Step 2: Fetch shifts and assignments in parallel (single query each)
+      const [shiftsResponse, assignmentsResponse] = await Promise.all([
+        supabase
           .from("shift")
           .select("id, job_id, workers_needed")
           .in("job_id", jobIds)
-          .is("deleted_at", null);
-
-        const shiftIds = (shiftsData || []).map((s) => s.id);
-        const { data: assignmentsData } = await supabase
+          .is("deleted_at", null),
+        supabase
           .from("shift_assignment")
           .select("shift_id")
-          .in("shift_id", shiftIds)
           .is("cancelled_at", null)
-          .is("deleted_at", null);
+          .is("deleted_at", null),
+      ]);
 
-        const jobAggregates: Record<
-          number,
-          {
-            shiftCount: number;
-            maxWorkersPerShift: number;
-            totalPositionsNeeded: number;
-            assignmentCount: number;
-          }
-        > = {};
+      const shiftsData = shiftsResponse.data || [];
+      const allAssignmentsData = assignmentsResponse.data || [];
 
-        jobIds.forEach((jobId) => {
-          jobAggregates[jobId] = {
-            shiftCount: 0,
-            maxWorkersPerShift: 0,
-            totalPositionsNeeded: 0,
-            assignmentCount: 0,
-          };
-        });
+      // ✅ Step 3: Build shift ID set for filtering assignments
+      const shiftIdSet = new Set(shiftsData.map((s) => s.id));
 
-        (shiftsData || []).forEach((shift) => {
-          const agg = jobAggregates[shift.job_id];
-          agg.shiftCount++;
-          agg.totalPositionsNeeded += shift.workers_needed;
-          agg.maxWorkersPerShift = Math.max(
-            agg.maxWorkersPerShift,
-            shift.workers_needed
-          );
-        });
+      // Filter assignments to only those that belong to our shifts
+      const assignmentsData = allAssignmentsData.filter((a) =>
+        shiftIdSet.has(a.shift_id)
+      );
 
-        (assignmentsData || []).forEach((assignment) => {
-          const shift = shiftsData?.find((s) => s.id === assignment.shift_id);
-          if (shift) {
-            jobAggregates[shift.job_id].assignmentCount++;
-          }
-        });
+      // ✅ Step 4: Calculate aggregates in memory (fast)
+      const jobAggregates: Record<
+        number,
+        {
+          shiftCount: number;
+          maxWorkersPerShift: number;
+          totalPositionsNeeded: number;
+          assignmentCount: number;
+        }
+      > = {};
 
-        const jobsWithCounts = jobsData.map((job) => {
-          const agg = jobAggregates[job.id];
-          return {
-            ...job,
-            total_shifts: agg.shiftCount,
-            max_workers_per_shift: agg.maxWorkersPerShift,
-            total_positions_needed: agg.totalPositionsNeeded,
-            total_assignments: agg.assignmentCount,
-          };
-        });
+      jobIds.forEach((jobId) => {
+        jobAggregates[jobId] = {
+          shiftCount: 0,
+          maxWorkersPerShift: 0,
+          totalPositionsNeeded: 0,
+          assignmentCount: 0,
+        };
+      });
 
-        setJobs(jobsWithCounts);
-      } else {
-        setJobs([]);
-      }
+      shiftsData.forEach((shift) => {
+        const agg = jobAggregates[shift.job_id];
+        agg.shiftCount++;
+        agg.totalPositionsNeeded += shift.workers_needed;
+        agg.maxWorkersPerShift = Math.max(
+          agg.maxWorkersPerShift,
+          shift.workers_needed
+        );
+      });
 
-      const { data: locationsData, error: locationsError } = await supabase
-        .from("location")
-        .select("id, name")
-        .eq("company_id", targetCompanyId)
-        .is("deleted_at", null);
+      assignmentsData.forEach((assignment) => {
+        const shift = shiftsData.find((s) => s.id === assignment.shift_id);
+        if (shift) {
+          jobAggregates[shift.job_id].assignmentCount++;
+        }
+      });
 
-      if (!locationsError && locationsData) {
-        setLocations(locationsData);
-      }
+      const jobsWithCounts = jobsData.map((job) => {
+        const agg = jobAggregates[job.id];
+        return {
+          ...job,
+          total_shifts: agg.shiftCount,
+          max_workers_per_shift: agg.maxWorkersPerShift,
+          total_positions_needed: agg.totalPositionsNeeded,
+          total_assignments: agg.assignmentCount,
+        };
+      });
+
+      setJobs(jobsWithCounts);
     } catch (error) {
       console.error("Error fetching data:", error);
+      toast.error(t("toast.loadFailed"));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
-  }, [targetCompanyId, supabase]);
+  }, [targetCompanyId, supabase, t]);
 
   useEffect(() => {
     if (roleLoading || !ready || !targetCompanyId) return;
@@ -234,10 +270,7 @@ export default function JobsPage() {
   const handleCancelJob = useCallback(
     async (job: Job) => {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      const today = `${year}-${month}-${day}`;
+      const today = getTodayString();
 
       const jobHasStartedOrStartsToday = job.start_date <= today;
 
@@ -283,10 +316,8 @@ export default function JobsPage() {
         }
       }
 
-      // ✅ Updated with translations
       let confirmMessage = "";
       let actionDescription = "";
-      let toastLoadingKey = "";
       let toastSuccessKey = "";
 
       if (!jobHasStartedOrStartsToday) {
@@ -294,7 +325,6 @@ export default function JobsPage() {
           position: job.position,
         });
         actionDescription = t("toast.deleting", { position: job.position });
-        toastLoadingKey = "toast.deleting";
         toastSuccessKey = "toast.deleteSuccess";
       } else if (canCancelToday) {
         const noAssignmentsNote = !todayHasAssignments
@@ -305,7 +335,6 @@ export default function JobsPage() {
           noAssignments: noAssignmentsNote,
         });
         actionDescription = t("toast.cancelling", { position: job.position });
-        toastLoadingKey = "toast.cancelling";
         toastSuccessKey = "toast.cancelSuccess";
       } else {
         confirmMessage = t("confirmations.cancelFutureShifts", {
@@ -315,7 +344,6 @@ export default function JobsPage() {
         actionDescription = t("toast.cancellingFutureShifts", {
           position: job.position,
         });
-        toastLoadingKey = "toast.cancellingFutureShifts";
         toastSuccessKey = "toast.cancelFutureSuccess";
       }
 
@@ -336,13 +364,10 @@ export default function JobsPage() {
       toast.promise(
         async () => {
           if (!jobHasStartedOrStartsToday) {
-            const { data, error } = await supabase.rpc(
-              "delete_job_and_shifts",
-              {
-                p_job_id: job.id,
-                p_deleted_by: activeRole?.userId || null,
-              }
-            );
+            const { error } = await supabase.rpc("delete_job_and_shifts", {
+              p_job_id: job.id,
+              p_deleted_by: activeRole?.userId || null,
+            });
             if (error) throw error;
           } else {
             const endDate = new Date(deleteFromDate);
@@ -352,14 +377,11 @@ export default function JobsPage() {
             const endDay = String(endDate.getDate()).padStart(2, "0");
             const endDateStr = `${endYear}-${endMonth}-${endDay}`;
 
-            const { data, error } = await supabase.rpc(
-              "cancel_shifts_from_date",
-              {
-                p_job_id: job.id,
-                p_from_date: deleteFromDate,
-                p_new_end_date: endDateStr,
-              }
-            );
+            const { error } = await supabase.rpc("cancel_shifts_from_date", {
+              p_job_id: job.id,
+              p_from_date: deleteFromDate,
+              p_new_end_date: endDateStr,
+            });
             if (error) throw error;
           }
           await fetchData();
@@ -374,17 +396,17 @@ export default function JobsPage() {
     [supabase, fetchData, activeRole, t]
   );
 
-  const handleDialogClose = (open: boolean) => {
+  const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
       setEditingJob(null);
     }
     setDialogOpen(open);
-  };
+  }, []);
 
   if (!ready || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -395,7 +417,7 @@ export default function JobsPage() {
       redirectTo="/dashboard/calendar"
     >
       <div className="w-full space-y-8 py-2">
-        {/* ✅ Filters with translations */}
+        {/* Filters */}
         <div className="grid grid-cols-4 gap-4">
           <div>
             <label className="text-sm font-medium mb-2 block">
@@ -497,7 +519,7 @@ export default function JobsPage() {
           <CardContent className="p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
               </div>
             ) : filteredJobs.length === 0 ? (
               <div className="text-center py-12">
@@ -513,8 +535,7 @@ export default function JobsPage() {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {paginatedJobs.map((job) => {
-                    const isPast =
-                      job.end_date < new Date().toISOString().split("T")[0];
+                    const isPast = job.end_date < today;
 
                     const totalPositionsNeeded =
                       job.total_positions_needed || 0;
@@ -577,7 +598,6 @@ export default function JobsPage() {
                               </span>
                             </div>
 
-                            {/* ✅ Translated workers display */}
                             <div className="flex items-center gap-2 text-sm">
                               <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                               <div className="flex items-center gap-2 flex-1">
@@ -633,33 +653,25 @@ export default function JobsPage() {
                               {t("card.editButton")}
                             </Button>
 
-                            {!isPast &&
-                              (() => {
-                                const today = new Date()
-                                  .toISOString()
-                                  .split("T")[0];
-                                const jobHasStarted = job.start_date <= today;
-
-                                return (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className={
-                                      jobHasStarted
-                                        ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                        : "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    }
-                                    onClick={() => handleCancelJob(job)}
-                                    title={
-                                      jobHasStarted
-                                        ? t("card.cancelShifts")
-                                        : t("card.deleteButton")
-                                    }
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </Button>
-                                );
-                              })()}
+                            {!isPast && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={
+                                  job.start_date <= today
+                                    ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    : "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                }
+                                onClick={() => handleCancelJob(job)}
+                                title={
+                                  job.start_date <= today
+                                    ? t("card.cancelShifts")
+                                    : t("card.deleteButton")
+                                }
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
                         </CardFooter>
                       </Card>
@@ -667,7 +679,6 @@ export default function JobsPage() {
                   })}
                 </div>
 
-                {/* ✅ Translated pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-6 pt-6 border-t">
                     <p className="text-sm text-muted-foreground">

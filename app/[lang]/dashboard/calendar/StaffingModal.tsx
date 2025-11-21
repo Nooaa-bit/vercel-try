@@ -1,7 +1,7 @@
 // app/[lang]/dashboard/calendar/StaffingModal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { createClient } from "@/lib/supabase/client";
@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, AlertCircle, X, Mail, UserMinus } from "lucide-react";
+import { Search, AlertCircle, X, Mail, UserMinus, Loader2 } from "lucide-react";
 import { getCompanyUsers } from "@/lib/company-users";
 import {
   fetchRemainingShifts,
@@ -41,6 +41,7 @@ import {
   type Employee,
 } from "./staffing-utils";
 import { ProfileAvatar } from "./ProfileAvatar";
+
 interface StaffingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,7 +58,7 @@ interface StaffingModalProps {
     workers_needed: number;
   };
   applyToRemaining?: boolean;
-  startFromShiftId?: number; // ✅ NEW: Optional shift ID to start from
+  startFromShiftId?: number;
 }
 
 const getErrorMessage = (error: unknown): string => {
@@ -74,10 +75,8 @@ const getCancellationReasonLabel = (
   t: (key: string) => string
 ): string => {
   if (!reason) return t("staffing.cancelReasons.unknown");
-
   const reasonKey = `staffing.cancelReasons.${reason}`;
   const translated = t(reasonKey);
-
   return translated !== reasonKey ? translated : reason;
 };
 
@@ -91,7 +90,7 @@ export function StaffingModal({
   singleShiftMode = false,
   singleShiftData,
   applyToRemaining = false,
-  startFromShiftId, // ✅ NEW: Add to destructuring
+  startFromShiftId,
 }: StaffingModalProps) {
   const { t } = useTranslation("jobs");
   const { activeRole } = useActiveRole();
@@ -128,90 +127,99 @@ export function StaffingModal({
     employeesToRemove: [],
   });
 
+  // ✅ Memoize modal title and description
+  const modalTitle = useMemo(
+    () =>
+      singleShiftMode && !applyToRemaining
+        ? t("staffing.titleSingleShift", { position: position || "Untitled" })
+        : t("staffing.title", { position: position || "Untitled" }),
+    [singleShiftMode, applyToRemaining, position, t]
+  );
+
+  const modalDescription = useMemo(
+    () =>
+      singleShiftMode && !applyToRemaining
+        ? t("staffing.descriptionSingleShift")
+        : t("staffing.description"),
+    [singleShiftMode, applyToRemaining, t]
+  );
+
+  // ✅ Optimized: Load data only when modal opens
   useEffect(() => {
     if (open) {
       loadStaffingData();
     } else {
+      // Clear state when closed
       setSelectedEmployees(new Set());
       setSelectedForRemoval(new Map());
       setSearchTerm("");
       setConfirmDialog({ open: false, employeesToRemove: [] });
     }
-  }, [open, applyToRemaining]);
+  }, [open, applyToRemaining, startFromShiftId]);
 
-  const loadStaffingData = async () => {
+  const loadStaffingData = useCallback(async () => {
     setLoadingEmployees(true);
     setLoadingAvailability(true);
 
     try {
-      const users = await getCompanyUsers(companyId);
-      setEmployees(users);
-      setSelectedEmployees(new Set());
-      setSelectedForRemoval(new Map());
-      setSearchTerm("");
-
-      let shifts: Shift[];
-
-      if (singleShiftMode && singleShiftData && !applyToRemaining) {
-        // Single shift mode
-        shifts = [
-          {
-            id: singleShiftData.id,
-            job_id: jobId,
-            shift_date: singleShiftData.shift_date,
-            start_time: singleShiftData.start_time,
-            end_time: singleShiftData.end_time,
-            workers_needed: singleShiftData.workers_needed,
-          },
-        ];
-      } else {
-        // Job mode or apply to remaining
-        const allRemainingShifts = await fetchRemainingShifts(supabase, jobId);
-
-        // ✅ NEW: If startFromShiftId is provided, filter to only include that shift and later ones
-        if (startFromShiftId) {
-          // Find the current shift to get its date and time
-          const currentShift = allRemainingShifts.find(
-            (s) => s.id === startFromShiftId
-          );
-
-          if (currentShift) {
-            // Filter shifts that are on or after the current shift
-            shifts = allRemainingShifts.filter((s) => {
-              // Compare dates first
-              if (s.shift_date > currentShift.shift_date) return true;
-              if (s.shift_date < currentShift.shift_date) return false;
-
-              // Same date - compare by ID to maintain order
-              return s.id >= currentShift.id;
-            });
+      // ✅ Step 1: Fetch employees and shifts in parallel
+      const [users, shiftsData] = await Promise.all([
+        getCompanyUsers(companyId),
+        (async () => {
+          if (singleShiftMode && singleShiftData && !applyToRemaining) {
+            return [
+              {
+                id: singleShiftData.id,
+                job_id: jobId,
+                shift_date: singleShiftData.shift_date,
+                start_time: singleShiftData.start_time,
+                end_time: singleShiftData.end_time,
+                workers_needed: singleShiftData.workers_needed,
+              },
+            ];
           } else {
-            shifts = allRemainingShifts;
+            const allRemainingShifts = await fetchRemainingShifts(
+              supabase,
+              jobId
+            );
+
+            if (startFromShiftId) {
+              const currentShift = allRemainingShifts.find(
+                (s) => s.id === startFromShiftId
+              );
+
+              if (currentShift) {
+                return allRemainingShifts.filter((s) => {
+                  if (s.shift_date > currentShift.shift_date) return true;
+                  if (s.shift_date < currentShift.shift_date) return false;
+                  return s.id >= currentShift.id;
+                });
+              }
+            }
+            return allRemainingShifts;
           }
-        } else {
-          shifts = allRemainingShifts;
-        }
-      }
+        })(),
+      ]);
 
-      setShiftsToUse(shifts);
+      setEmployees(users);
+      setShiftsToUse(shiftsData);
+      setLoadingEmployees(false);
 
-      if (shifts.length === 0) {
+      if (shiftsData.length === 0) {
         setLoadingAvailability(false);
-        setLoadingEmployees(false);
         toast.error(t("staffingToast.noRemainingShifts"));
         return;
       }
 
-      const shiftIds = shifts.map((s) => s.id);
-      const assignmentsMap = await fetchShiftAssignments(supabase, shiftIds);
-      const capacity = calculateShiftCapacity(shifts, assignmentsMap);
-      setShiftCapacity(capacity);
+      // ✅ Step 2: Calculate capacity and availabilities in parallel
+      const shiftIds = shiftsData.map((s) => s.id);
+      const [assignmentsMap, availabilities] = await Promise.all([
+        fetchShiftAssignments(supabase, shiftIds),
+        calculateAllEmployeesAvailability(supabase, users, shiftsData),
+      ]);
 
-      const availabilities = await calculateAllEmployeesAvailability(
-        supabase,
-        users,
-        shifts
-      );
+      const capacity = calculateShiftCapacity(shiftsData, assignmentsMap);
+      setShiftCapacity(capacity);
       setEmployeeAvailabilities(availabilities);
     } catch (error) {
       console.error("Failed to load staffing data:", error);
@@ -220,29 +228,45 @@ export function StaffingModal({
       setLoadingEmployees(false);
       setLoadingAvailability(false);
     }
-  };
+  }, [
+    companyId,
+    jobId,
+    singleShiftMode,
+    singleShiftData,
+    applyToRemaining,
+    startFromShiftId,
+    supabase,
+    t,
+  ]);
 
-  const toggleEmployee = (userId: number) => {
-    const newSelected = new Set(selectedEmployees);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
-    }
-    setSelectedEmployees(newSelected);
-  };
+  const toggleEmployee = useCallback((userId: number) => {
+    setSelectedEmployees((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(userId)) {
+        newSelected.delete(userId);
+      } else {
+        newSelected.add(userId);
+      }
+      return newSelected;
+    });
+  }, []);
 
-  const toggleEmployeeForRemoval = (userId: number, shiftIds: number[]) => {
-    const newSelectedForRemoval = new Map(selectedForRemoval);
-    if (newSelectedForRemoval.has(userId)) {
-      newSelectedForRemoval.delete(userId);
-    } else {
-      newSelectedForRemoval.set(userId, shiftIds);
-    }
-    setSelectedForRemoval(newSelectedForRemoval);
-  };
+  const toggleEmployeeForRemoval = useCallback(
+    (userId: number, shiftIds: number[]) => {
+      setSelectedForRemoval((prev) => {
+        const newSelectedForRemoval = new Map(prev);
+        if (newSelectedForRemoval.has(userId)) {
+          newSelectedForRemoval.delete(userId);
+        } else {
+          newSelectedForRemoval.set(userId, shiftIds);
+        }
+        return newSelectedForRemoval;
+      });
+    },
+    []
+  );
 
-  const handleBulkRemoveClick = () => {
+  const handleBulkRemoveClick = useCallback(() => {
     const employeesToRemove = Array.from(selectedForRemoval.entries()).map(
       ([userId, shiftIds]) => {
         const employee = employees.find((e) => e.userId === userId)!;
@@ -254,7 +278,7 @@ export function StaffingModal({
       open: true,
       employeesToRemove,
     });
-  };
+  }, [selectedForRemoval, employees]);
 
   const handleConfirmBulkRemove = async () => {
     if (!activeRole?.id) return;
@@ -461,10 +485,10 @@ export function StaffingModal({
 
         if (result.reactivated > 0) {
           toast.info(
-            t("staffingToast.reactivatedInfo", {
-              count: result.reactivated,
-            }),
-            { duration: 4000 }
+            t("staffingToast.reactivatedInfo", { count: result.reactivated }),
+            {
+              duration: 4000,
+            }
           );
         }
       }
@@ -487,24 +511,19 @@ export function StaffingModal({
     }
   };
 
-  const filteredAvailabilities = employeeAvailabilities.filter((avail) => {
-    const fullName = `${avail.employee.firstName || ""} ${
-      avail.employee.lastName || ""
-    }`.toLowerCase();
-    const email = avail.employee.email.toLowerCase();
+  // ✅ Memoize filtered availabilities
+  const filteredAvailabilities = useMemo(() => {
+    if (!searchTerm) return employeeAvailabilities;
+
     const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
-  });
-
-  const modalTitle =
-    singleShiftMode && !applyToRemaining
-      ? t("staffing.titleSingleShift", { position: position || "Untitled" })
-      : t("staffing.title", { position: position || "Untitled" });
-
-  const modalDescription =
-    singleShiftMode && !applyToRemaining
-      ? t("staffing.descriptionSingleShift")
-      : t("staffing.description");
+    return employeeAvailabilities.filter((avail) => {
+      const fullName = `${avail.employee.firstName || ""} ${
+        avail.employee.lastName || ""
+      }`.toLowerCase();
+      const email = avail.employee.email.toLowerCase();
+      return fullName.includes(search) || email.includes(search);
+    });
+  }, [employeeAvailabilities, searchTerm]);
 
   return (
     <>
@@ -521,10 +540,10 @@ export function StaffingModal({
             </DialogDescription>
           </DialogHeader>
 
-          {loadingEmployees || loadingAvailability ? (
+          {loadingEmployees ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">
                   {t("staffing.loadingEmployees")}
                 </p>
@@ -562,188 +581,200 @@ export function StaffingModal({
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0 border rounded-lg">
-                  <div className="h-full overflow-y-auto p-3">
-                    <div className="space-y-1.5">
-                      {filteredAvailabilities.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          {t("staffing.noEmployeesFound")}
-                        </div>
-                      ) : (
-                        filteredAvailabilities.map((avail) => {
-                          const isFullyAssigned = avail.isFullyAssigned;
-                          const hasAssignments = avail.alreadyAssigned > 0;
-                          const hasPendingInvitations =
-                            avail.pendingInvitations.length > 0;
-                          const isSelectedForRemoval = selectedForRemoval.has(
-                            avail.employee.userId
-                          );
-
-                          return (
-                            <div
-                              key={avail.employee.userId}
-                              className={`flex items-start gap-2 p-2 rounded transition-colors hover:bg-muted ${
-                                avail.hasCancelledBefore
-                                  ? "border border-orange-200 bg-orange-50/50 dark:bg-orange-950/10"
-                                  : ""
-                              } ${
-                                isSelectedForRemoval
-                                  ? "bg-red-50 border-red-200 dark:bg-red-950/20"
-                                  : ""
-                              }`}
-                            >
-                              {hasAssignments ? (
-                                <Checkbox
-                                  checked={isSelectedForRemoval}
-                                  onCheckedChange={() =>
-                                    toggleEmployeeForRemoval(
-                                      avail.employee.userId,
-                                      avail.assignedShiftIds
-                                    )
-                                  }
-                                  className="mt-0.5 border-red-500 data-[state=checked]:bg-red-500"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                <Checkbox
-                                  checked={selectedEmployees.has(
-                                    avail.employee.userId
-                                  )}
-                                  onCheckedChange={() => {
-                                    toggleEmployee(avail.employee.userId);
-                                  }}
-                                  className="mt-0.5"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              )}
-                              {/* ✅ NEW: Profile Picture */}
-                              <ProfileAvatar
-                                firstName={avail.employee.firstName}
-                                lastName={avail.employee.lastName}
-                                email={avail.employee.email}
-                                profilePicture={avail.employee.profilePicture}
-                                size="md"
-                                className="mt-0.5"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <div className="text-sm font-medium">
-                                    {avail.employee.firstName &&
-                                    avail.employee.lastName
-                                      ? `${avail.employee.firstName} ${avail.employee.lastName}`
-                                      : avail.employee.email}
-                                  </div>
-                                  {avail.hasCancelledBefore && (
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-orange-100 text-orange-700 border-orange-300 text-xs"
-                                    >
-                                      <AlertCircle className="w-3 h-3 mr-1" />
-                                      {t("staffing.cancelledBefore")}
-                                    </Badge>
-                                  )}
-                                  {hasPendingInvitations && (
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-blue-100 text-blue-700 border-blue-300 text-xs"
-                                    >
-                                      <Mail className="w-3 h-3 mr-1" />
-                                      {t("staffing.pendingInvitation")}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {avail.employee.email}
-                                </div>
-
-                                {avail.cancellationHistory.length > 0 && (
-                                  <div className="mt-1 max-h-16 overflow-y-auto space-y-0.5 pr-1">
-                                    {avail.cancellationHistory.map(
-                                      (cancel, idx) => (
-                                        <div
-                                          key={idx}
-                                          className="text-xs text-orange-600 dark:text-orange-400"
-                                        >
-                                          {t("staffing.cancelledCount", {
-                                            count: cancel.cancelCount,
-                                          })}
-                                          :{" "}
-                                          {getCancellationReasonLabel(
-                                            cancel.cancellationReason,
-                                            t
-                                          )}
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-                                )}
-
-                                {isFullyAssigned ? (
-                                  <div className="text-xs text-green-600 mt-0.5">
-                                    {t("staffing.assignedToAll", {
-                                      total: avail.total,
-                                    })}
-                                  </div>
-                                ) : avail.isUnavailable ? (
-                                  <div className="text-xs text-orange-600 mt-0.5">
-                                    {t("staffing.unavailableConflicts")}
-                                  </div>
-                                ) : (
-                                  <div className="text-xs mt-0.5">
-                                    <span
-                                      className={`font-medium ${
-                                        avail.available === avail.total
-                                          ? "text-green-600"
-                                          : "text-orange-600"
-                                      }`}
-                                    >
-                                      {t("staffing.shiftsAvailable", {
-                                        available: avail.available,
-                                        total: avail.total,
-                                      })}
-                                    </span>
-                                    {avail.alreadyAssigned > 0 && (
-                                      <span className="text-muted-foreground ml-1">
-                                        {t("staffing.alreadyAssigned", {
-                                          count: avail.alreadyAssigned,
-                                        })}
-                                      </span>
-                                    )}
-                                    {avail.conflicts > 0 && (
-                                      <span className="text-orange-600 ml-1">
-                                        {t("staffing.conflicts", {
-                                          count: avail.conflicts,
-                                        })}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {hasAssignments && (
-                                <Button
-                                  variant="outline"
-                                  size="default"
-                                  className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleEmployeeForRemoval(
-                                      avail.employee.userId,
-                                      avail.assignedShiftIds
-                                    );
-                                  }}
-                                >
-                                  <X className="w-4 h-4 mr-1.5" />
-                                  {t("staffing.confirmRemoveButton")}
-                                </Button>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
+                {loadingAvailability ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground">
+                        Calculating availability...
+                      </p>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex-1 min-h-0 border rounded-lg">
+                    <div className="h-full overflow-y-auto p-3">
+                      <div className="space-y-1.5">
+                        {filteredAvailabilities.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            {t("staffing.noEmployeesFound")}
+                          </div>
+                        ) : (
+                          filteredAvailabilities.map((avail) => {
+                            const isFullyAssigned = avail.isFullyAssigned;
+                            const hasAssignments = avail.alreadyAssigned > 0;
+                            const hasPendingInvitations =
+                              avail.pendingInvitations.length > 0;
+                            const isSelectedForRemoval = selectedForRemoval.has(
+                              avail.employee.userId
+                            );
+
+                            return (
+                              <div
+                                key={avail.employee.userId}
+                                className={`flex items-start gap-2 p-2 rounded transition-colors hover:bg-muted ${
+                                  avail.hasCancelledBefore
+                                    ? "border border-orange-200 bg-orange-50/50 dark:bg-orange-950/10"
+                                    : ""
+                                } ${
+                                  isSelectedForRemoval
+                                    ? "bg-red-50 border-red-200 dark:bg-red-950/20"
+                                    : ""
+                                }`}
+                              >
+                                {hasAssignments ? (
+                                  <Checkbox
+                                    checked={isSelectedForRemoval}
+                                    onCheckedChange={() =>
+                                      toggleEmployeeForRemoval(
+                                        avail.employee.userId,
+                                        avail.assignedShiftIds
+                                      )
+                                    }
+                                    className="mt-0.5 border-red-500 data-[state=checked]:bg-red-500"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <Checkbox
+                                    checked={selectedEmployees.has(
+                                      avail.employee.userId
+                                    )}
+                                    onCheckedChange={() => {
+                                      toggleEmployee(avail.employee.userId);
+                                    }}
+                                    className="mt-0.5"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                )}
+
+                                <ProfileAvatar
+                                  firstName={avail.employee.firstName}
+                                  lastName={avail.employee.lastName}
+                                  email={avail.employee.email}
+                                  profilePicture={avail.employee.profilePicture}
+                                  size="md"
+                                  className="mt-0.5"
+                                />
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="text-sm font-medium">
+                                      {avail.employee.firstName &&
+                                      avail.employee.lastName
+                                        ? `${avail.employee.firstName} ${avail.employee.lastName}`
+                                        : avail.employee.email}
+                                    </div>
+                                    {avail.hasCancelledBefore && (
+                                      <Badge
+                                        variant="outline"
+                                        className="bg-orange-100 text-orange-700 border-orange-300 text-xs"
+                                      >
+                                        <AlertCircle className="w-3 h-3 mr-1" />
+                                        {t("staffing.cancelledBefore")}
+                                      </Badge>
+                                    )}
+                                    {hasPendingInvitations && (
+                                      <Badge
+                                        variant="outline"
+                                        className="bg-blue-100 text-blue-700 border-blue-300 text-xs"
+                                      >
+                                        <Mail className="w-3 h-3 mr-1" />
+                                        {t("staffing.pendingInvitation")}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {avail.employee.email}
+                                  </div>
+
+                                  {avail.cancellationHistory.length > 0 && (
+                                    <div className="mt-1 max-h-16 overflow-y-auto space-y-0.5 pr-1">
+                                      {avail.cancellationHistory.map(
+                                        (cancel, idx) => (
+                                          <div
+                                            key={idx}
+                                            className="text-xs text-orange-600 dark:text-orange-400"
+                                          >
+                                            {t("staffing.cancelledCount", {
+                                              count: cancel.cancelCount,
+                                            })}
+                                            :{" "}
+                                            {getCancellationReasonLabel(
+                                              cancel.cancellationReason,
+                                              t
+                                            )}
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {isFullyAssigned ? (
+                                    <div className="text-xs text-green-600 mt-0.5">
+                                      {t("staffing.assignedToAll", {
+                                        total: avail.total,
+                                      })}
+                                    </div>
+                                  ) : avail.isUnavailable ? (
+                                    <div className="text-xs text-orange-600 mt-0.5">
+                                      {t("staffing.unavailableConflicts")}
+                                    </div>
+                                  ) : (
+                                    <div className="text-xs mt-0.5">
+                                      <span
+                                        className={`font-medium ${
+                                          avail.available === avail.total
+                                            ? "text-green-600"
+                                            : "text-orange-600"
+                                        }`}
+                                      >
+                                        {t("staffing.shiftsAvailable", {
+                                          available: avail.available,
+                                          total: avail.total,
+                                        })}
+                                      </span>
+                                      {avail.alreadyAssigned > 0 && (
+                                        <span className="text-muted-foreground ml-1">
+                                          {t("staffing.alreadyAssigned", {
+                                            count: avail.alreadyAssigned,
+                                          })}
+                                        </span>
+                                      )}
+                                      {avail.conflicts > 0 && (
+                                        <span className="text-orange-600 ml-1">
+                                          {t("staffing.conflicts", {
+                                            count: avail.conflicts,
+                                          })}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {hasAssignments && (
+                                  <Button
+                                    variant="outline"
+                                    size="default"
+                                    className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleEmployeeForRemoval(
+                                        avail.employee.userId,
+                                        avail.assignedShiftIds
+                                      );
+                                    }}
+                                  >
+                                    <X className="w-4 h-4 mr-1.5" />
+                                    {t("staffing.confirmRemoveButton")}
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex-shrink-0 flex items-center justify-between text-sm">
                   {selectedForRemoval.size > 0 ? (
@@ -786,10 +817,19 @@ export function StaffingModal({
                     }}
                     disabled={sendingInvites}
                   >
-                    <UserMinus className="w-4 h-4 mr-1.5" />
-                    {t("staffing.removeSelectedButton", {
-                      count: selectedForRemoval.size,
-                    })}
+                    {sendingInvites ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                        {t("staffing.removing")}
+                      </>
+                    ) : (
+                      <>
+                        <UserMinus className="w-4 h-4 mr-1.5" />
+                        {t("staffing.removeSelectedButton", {
+                          count: selectedForRemoval.size,
+                        })}
+                      </>
+                    )}
                   </Button>
                 ) : (
                   <>
@@ -803,9 +843,14 @@ export function StaffingModal({
                       }}
                       disabled={selectedEmployees.size === 0 || sendingInvites}
                     >
-                      {sendingInvites
-                        ? t("staffing.sending")
-                        : t("staffing.sendInvitationsButton")}
+                      {sendingInvites ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                          {t("staffing.sending")}
+                        </>
+                      ) : (
+                        t("staffing.sendInvitationsButton")
+                      )}
                     </Button>
                     <Button
                       type="button"
@@ -827,9 +872,14 @@ export function StaffingModal({
                           : t("staffing.assignTooltip")
                       }
                     >
-                      {sendingInvites
-                        ? t("staffing.assigning")
-                        : t("staffing.assignToShiftsButton")}
+                      {sendingInvites ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                          {t("staffing.assigning")}
+                        </>
+                      ) : (
+                        t("staffing.assignToShiftsButton")
+                      )}
                     </Button>
                   </>
                 )}
@@ -884,15 +934,22 @@ export function StaffingModal({
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("staffing.cancelButton")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={sendingInvites}>
+              {t("staffing.cancelButton")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmBulkRemove}
               className="bg-red-600 hover:bg-red-700"
               disabled={sendingInvites}
             >
-              {sendingInvites
-                ? t("staffing.removing")
-                : t("staffing.confirmRemoveButton")}
+              {sendingInvites ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {t("staffing.removing")}
+                </>
+              ) : (
+                t("staffing.confirmRemoveButton")
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

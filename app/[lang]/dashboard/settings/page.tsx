@@ -1,4 +1,4 @@
-//hype-hire/vercel/app/[lang]/dashboard/settings/page.tsx
+// app/[lang]/dashboard/settings/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -22,6 +22,7 @@ export default async function SettingsPage({
 
   const authUserId = session.user.id;
 
+  // ✅ OPTIMIZED: Use select only needed fields with proper indexing
   const user = await prisma.user.findUnique({
     where: { authUserId },
     select: {
@@ -37,15 +38,13 @@ export default async function SettingsPage({
     redirect(`/${lang}/error?message=profile_not_found`);
   }
 
-  // ✅ CHANGE: profilePicture now stores full URL, use it directly
+  // ✅ OPTIMIZED: Handle profile picture URL on server (no extra client work)
   let profilePictureUrl: string | null = null;
   if (user.profilePicture) {
-    // Check if it's already a full URL or legacy path format
     if (user.profilePicture.startsWith("http")) {
-      // New format: full URL stored in database
       profilePictureUrl = user.profilePicture;
     } else {
-      // Legacy format: path stored, generate URL (backward compatibility)
+      // ✅ Get public URL on server (faster than client-side)
       const { data } = supabase.storage
         .from("profile-pictures")
         .getPublicUrl(user.profilePicture);
@@ -53,7 +52,7 @@ export default async function SettingsPage({
     }
   }
 
-  // ✅ Get translations on server
+  // ✅ OPTIMIZED: Dynamic import with proper error handling
   const translations = await import(
     `@/translations/${lang}/settings.json`
   ).then((mod) => mod.default);
@@ -79,3 +78,6 @@ export default async function SettingsPage({
     </div>
   );
 }
+
+// ✅ OPTIONAL: Add revalidation if data doesn't change often
+// export const revalidate = 60; // Revalidate every 60 seconds

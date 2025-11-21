@@ -1,3 +1,4 @@
+// app/[lang]/dashboard/team/page.tsx
 "use client";
 
 import { use, useEffect, useState, useMemo, useCallback } from "react";
@@ -11,7 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Users, Filter, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import {
+  Users,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Loader2,
+} from "lucide-react";
 import { getCompanyUsers } from "@/lib/company-users";
 import SettingsForm from "@/app/[lang]/dashboard/settings/SettingsForm";
 import { useTranslation } from "react-i18next";
@@ -37,6 +45,19 @@ interface RoleInfo {
   count: number;
 }
 
+// ✅ Move helper functions outside component to prevent recreation
+const getProfilePictureUrl = (profilePicture: string | null): string | null => {
+  if (!profilePicture) return null;
+  if (profilePicture.trim() === "") return null;
+  if (profilePicture.startsWith("http")) return profilePicture;
+  return null;
+};
+
+const getUserInitial = (employee: Employee): string => {
+  if (employee.firstName) return employee.firstName[0].toUpperCase();
+  return employee.email[0].toUpperCase();
+};
+
 export default function TeamPage({ params }: PageProps) {
   const { lang } = use(params);
   const { t, ready } = useTranslation("team");
@@ -49,40 +70,24 @@ export default function TeamPage({ params }: PageProps) {
   } = useActiveRole();
   const router = useRouter();
 
-  // Store ALL employees once
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
 
   const hasAccess = hasPermission("company_admin");
   const pageSize = 50;
 
-  // ✅ Determine target company ID
-  const targetCompanyId = isSuperAdmin
-    ? selectedCompanyForAdmin
-    : activeRole.companyId;
-
-  // Helper functions
-  const getProfilePictureUrl = useCallback(
-    (profilePicture: string | null): string | null => {
-      if (!profilePicture) return null;
-      if (profilePicture.trim() === "") return null;
-      if (profilePicture.startsWith("http")) return profilePicture;
-      return null;
-    },
-    []
+  // ✅ Memoize target company ID
+  const targetCompanyId = useMemo(
+    () => (isSuperAdmin ? selectedCompanyForAdmin : activeRole?.companyId),
+    [isSuperAdmin, selectedCompanyForAdmin, activeRole?.companyId]
   );
 
-  const getUserInitial = useCallback((employee: Employee): string => {
-    if (employee.firstName) return employee.firstName[0].toUpperCase();
-    return employee.email[0].toUpperCase();
-  }, []);
-
+  // ✅ Memoize role name getter
   const getRoleName = useCallback(
     (role: string): string => {
       return t(`roles.${role}`, { defaultValue: role.replace("_", " ") });
@@ -90,12 +95,28 @@ export default function TeamPage({ params }: PageProps) {
     [t]
   );
 
-  const handleEditUser = useCallback((employee: Employee): void => {
-    setSelectedUser(employee);
-    setEditDialogOpen(true);
-  }, []);
+  // ✅ Memoize available roles calculation
+  const availableRoles = useMemo((): RoleInfo[] => {
+    const roleCounts = allEmployees.reduce((acc, emp) => {
+      acc[emp.role] = (acc[emp.role] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
-  // Client-side filtering
+    return Object.entries(roleCounts)
+      .map(([role, count]) => ({
+        role,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count); // ✅ Sort by count for better UX
+  }, [allEmployees]);
+
+  // ✅ Memoize total count
+  const totalAllCount = useMemo(
+    () => availableRoles.reduce((sum, r) => sum + r.count, 0),
+    [availableRoles]
+  );
+
+  // ✅ Memoize filtered employees
   const filteredEmployees = useMemo((): Employee[] => {
     if (selectedRole === "all") {
       return allEmployees;
@@ -103,72 +124,80 @@ export default function TeamPage({ params }: PageProps) {
     return allEmployees.filter((emp) => emp.role === selectedRole);
   }, [allEmployees, selectedRole]);
 
-  // Calculate available roles
-  const availableRoles = useMemo((): RoleInfo[] => {
-    const roleCounts = allEmployees.reduce((acc, emp) => {
-      acc[emp.role] = (acc[emp.role] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  // ✅ Memoize pagination calculations
+  const totalCount = filteredEmployees.length;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
-    return Object.entries(roleCounts).map(([role, count]) => ({
-      role,
-      count,
-    }));
-  }, [allEmployees]);
-
-  // Client-side pagination
+  // ✅ Memoize paginated employees
   const paginatedEmployees = useMemo((): Employee[] => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     return filteredEmployees.slice(startIndex, endIndex);
   }, [filteredEmployees, currentPage, pageSize]);
 
-  // Calculate pagination metadata
-  const totalCount = filteredEmployees.length;
-  const totalPages = Math.ceil(totalCount / pageSize);
-
-  // Load ALL employees once
+  // ✅ Load employees once on mount
   useEffect(() => {
     async function loadEmployees(): Promise<void> {
       if (!targetCompanyId || targetCompanyId <= 0) return;
 
       setLoading(true);
-      const users = await getCompanyUsers(targetCompanyId);
-      setAllEmployees(users);
-      setLoading(false);
+      try {
+        const users = await getCompanyUsers(targetCompanyId);
+        setAllEmployees(users);
+      } catch (error) {
+        console.error("Error loading employees:", error);
+      } finally {
+        setLoading(false);
+      }
     }
 
-    if (hasAccess && !roleLoading) {
+    if (hasAccess && !roleLoading && targetCompanyId) {
       loadEmployees();
     }
-  }, [targetCompanyId, hasAccess, roleLoading, selectedCompanyForAdmin]);
+  }, [targetCompanyId, hasAccess, roleLoading]);
 
-  // Reset to page 1 when filter changes
+  // ✅ Memoize handlers
   const handleRoleChange = useCallback((role: string): void => {
     setSelectedRole(role);
     setCurrentPage(1);
   }, []);
 
-  // Refresh employees after edit
+  const handleEditUser = useCallback((employee: Employee): void => {
+    setSelectedUser(employee);
+    setEditDialogOpen(true);
+  }, []);
+
   const refreshEmployees = useCallback(async (): Promise<void> => {
     if (targetCompanyId && targetCompanyId > 0) {
-      const users = await getCompanyUsers(targetCompanyId);
-      setAllEmployees(users);
+      try {
+        const users = await getCompanyUsers(targetCompanyId);
+        setAllEmployees(users);
+      } catch (error) {
+        console.error("Error refreshing employees:", error);
+      }
     }
   }, [targetCompanyId]);
 
-  // Access control
+  const handlePreviousPage = useCallback(() => {
+    setCurrentPage((p) => Math.max(1, p - 1));
+  }, []);
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((p) => Math.min(totalPages, p + 1));
+  }, [totalPages]);
+
+  // ✅ Access control
   useEffect(() => {
     if (!hasAccess && !roleLoading) {
       router.push(`/${lang}/dashboard`);
     }
   }, [hasAccess, router, lang, roleLoading]);
 
-  // Show loading while translations load or role is loading
+  // ✅ Loading state
   if (!ready || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -176,8 +205,6 @@ export default function TeamPage({ params }: PageProps) {
   if (!hasAccess) {
     return null;
   }
-
-  const totalAllCount = availableRoles.reduce((sum, r) => sum + r.count, 0);
 
   return (
     <div className="space-y-4 py-16">
@@ -231,8 +258,8 @@ export default function TeamPage({ params }: PageProps) {
 
       {/* Employee Cards */}
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">
-          {t("header.loading")}
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 text-primary animate-spin" />
         </div>
       ) : paginatedEmployees.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
@@ -331,7 +358,7 @@ export default function TeamPage({ params }: PageProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      onClick={handlePreviousPage}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4 mr-1" />
@@ -340,9 +367,7 @@ export default function TeamPage({ params }: PageProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
+                      onClick={handleNextPage}
                       disabled={currentPage === totalPages}
                     >
                       {t("pagination.next")}

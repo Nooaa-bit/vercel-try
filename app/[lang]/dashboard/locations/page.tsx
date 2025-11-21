@@ -1,6 +1,7 @@
+// app/[lang]/dashboard/locations/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useTranslation } from "react-i18next";
@@ -15,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, MapPin, Building2, Trash2, Pencil } from "lucide-react";
+import { Plus, MapPin, Building2, Trash2, Pencil, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // Lazy load the map dialog component
@@ -23,7 +24,7 @@ const MapDialog = dynamic(() => import("./MapDialog"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center p-8">
-      <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+      <Loader2 className="w-8 h-8 text-primary animate-spin" />
     </div>
   ),
 });
@@ -77,7 +78,6 @@ interface GeoapifyResponse {
 export default function LocationsPage() {
   const { t, ready } = useTranslation("locations");
   const router = useRouter();
-  // ✅ Get company selection from context
   const {
     activeRole,
     loading: roleLoading,
@@ -105,65 +105,73 @@ export default function LocationsPage() {
   } | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Location types with translations
-  const LOCATION_TYPES = [
-    { value: "Office", label: t("locationTypes.Office") },
-    { value: "Warehouse", label: t("locationTypes.Warehouse") },
-    { value: "RetailStore", label: t("locationTypes.RetailStore") },
-    { value: "Restaurant", label: t("locationTypes.Restaurant") },
-    { value: "EventSpace", label: t("locationTypes.EventSpace") },
-    { value: "ConstructionSite", label: t("locationTypes.ConstructionSite") },
-    { value: "Factory", label: t("locationTypes.Factory") },
-    {
-      value: "HealthcareFacility",
-      label: t("locationTypes.HealthcareFacility"),
-    },
-    { value: "Hotel", label: t("locationTypes.Hotel") },
-    { value: "Educational", label: t("locationTypes.Educational") },
-    { value: "Other", label: t("locationTypes.Other") },
-  ];
+  // ✅ Memoize location types
+  const LOCATION_TYPES = useMemo(
+    () => [
+      { value: "Office", label: t("locationTypes.Office") },
+      { value: "Warehouse", label: t("locationTypes.Warehouse") },
+      { value: "RetailStore", label: t("locationTypes.RetailStore") },
+      { value: "Restaurant", label: t("locationTypes.Restaurant") },
+      { value: "EventSpace", label: t("locationTypes.EventSpace") },
+      { value: "ConstructionSite", label: t("locationTypes.ConstructionSite") },
+      { value: "Factory", label: t("locationTypes.Factory") },
+      {
+        value: "HealthcareFacility",
+        label: t("locationTypes.HealthcareFacility"),
+      },
+      { value: "Hotel", label: t("locationTypes.Hotel") },
+      { value: "Educational", label: t("locationTypes.Educational") },
+      { value: "Other", label: t("locationTypes.Other") },
+    ],
+    [t]
+  );
 
-  // ✅ Determine target company ID
-  const targetCompanyId = isSuperAdmin
-    ? selectedCompanyForAdmin
-    : activeRole.companyId;
+  const targetCompanyId = useMemo(
+    () => (isSuperAdmin ? selectedCompanyForAdmin : activeRole?.companyId),
+    [isSuperAdmin, selectedCompanyForAdmin, activeRole?.companyId]
+  );
 
+  // ✅ Redirect non-admin users
   useEffect(() => {
     if (roleLoading) return;
-    if (activeRole.role === "supervisor" || activeRole.role === "talent") {
+    if (activeRole?.role === "supervisor" || activeRole?.role === "talent") {
       router.push("/dashboard");
     }
-  }, [roleLoading, activeRole.role, router]);
+  }, [roleLoading, activeRole?.role, router]);
 
-  // ✅ Updated: Use targetCompanyId and add selectedCompanyForAdmin to dependencies
+  // ✅ Optimized: Memoized fetch function
   const fetchLocations = useCallback(async () => {
     if (!targetCompanyId || targetCompanyId <= 0) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from("location")
-      .select("*")
-      .eq("company_id", targetCompanyId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("location")
+        .select("*")
+        .eq("company_id", targetCompanyId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setLocations(data);
+      if (error) throw error;
+      setLocations(data || []);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      toast.error(t("toast.loadFailed"));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [targetCompanyId, supabase]);
+  }, [targetCompanyId, supabase, t]);
 
-  // ✅ Updated: Add selectedCompanyForAdmin to dependency array
   useEffect(() => {
-    if (roleLoading) return;
-    if (activeRole.role === "supervisor" || activeRole.role === "talent")
+    if (roleLoading || !ready) return;
+    if (activeRole?.role === "supervisor" || activeRole?.role === "talent")
       return;
     fetchLocations();
-  }, [roleLoading, activeRole.role, fetchLocations, selectedCompanyForAdmin]);
+  }, [roleLoading, ready, activeRole?.role, fetchLocations]);
 
-  // Memoized search address function
+  // ✅ Optimized: Memoized search with abort controller
   const searchAddress = useCallback(
-    async (query: string) => {
+    async (query: string, signal?: AbortSignal) => {
       setSearchingAddress(true);
       try {
         const apiKey = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
@@ -175,8 +183,11 @@ export default function LocationsPage() {
         const response = await fetch(
           `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(
             query
-          )}&apiKey=${apiKey}`
+          )}&apiKey=${apiKey}`,
+          { signal }
         );
+
+        if (!response.ok) throw new Error("Address search failed");
 
         const data: GeoapifyResponse = await response.json();
 
@@ -198,16 +209,19 @@ export default function LocationsPage() {
           setSuggestions([]);
           setShowDropdown(false);
         }
-      } catch (error) {
-        toast.error(t("toast.failedToSearchAddresses"));
-        setShowDropdown(false);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          toast.error(t("toast.failedToSearchAddresses"));
+          setShowDropdown(false);
+        }
+      } finally {
+        setSearchingAddress(false);
       }
-      setSearchingAddress(false);
     },
     [t]
   );
 
-  // Debounced address search
+  // ✅ Optimized: Debounced address search with abort controller
   useEffect(() => {
     if (addressSearch.length < 3) {
       setShowDropdown(false);
@@ -220,14 +234,17 @@ export default function LocationsPage() {
       return;
     }
 
+    const abortController = new AbortController();
     const timer = setTimeout(() => {
-      searchAddress(addressSearch);
+      searchAddress(addressSearch, abortController.signal);
     }, 400);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      abortController.abort();
+    };
   }, [addressSearch, selectedAddress, searchAddress]);
 
-  // Memoized address selection handler
   const handleAddressSelect = useCallback((address: AddressSuggestion) => {
     setSelectedAddress(address);
     setAddressSearch(address.formatted);
@@ -265,6 +282,10 @@ export default function LocationsPage() {
 
   const handleDelete = useCallback(
     async (locationId: number, locationName: string) => {
+      if (!confirm(t("confirmations.deleteLocation", { name: locationName }))) {
+        return;
+      }
+
       toast.promise(
         async () => {
           const now = new Date().toISOString();
@@ -286,20 +307,45 @@ export default function LocationsPage() {
     [supabase, fetchLocations, t]
   );
 
-  // ✅ Updated: Use targetCompanyId for create operation
   const handleSaveLocation = useCallback(async () => {
     if (!locationName || !selectedAddress || !markerPosition) {
       toast.error(t("toast.provideNameAndAddress"));
       return;
     }
 
+    if (!targetCompanyId) {
+      toast.error(t("toast.noCompanySelected"));
+      return;
+    }
+
     setSaving(true);
     const now = new Date().toISOString();
 
-    if (editingLocation) {
-      const { error } = await supabase
-        .from("location")
-        .update({
+    try {
+      if (editingLocation) {
+        const { error } = await supabase
+          .from("location")
+          .update({
+            name: locationName,
+            type: locationType,
+            address: selectedAddress.address_line1,
+            address_line_2: selectedAddress.address_line2 || null,
+            city: selectedAddress.city,
+            state: selectedAddress.state || null,
+            postcode: selectedAddress.postcode || null,
+            country: selectedAddress.country,
+            latitude: markerPosition.lat.toString(),
+            longitude: markerPosition.lng.toString(),
+            access_instructions: accessInstructions || null,
+            updated_at: now,
+          })
+          .eq("id", editingLocation.id);
+
+        if (error) throw error;
+        toast.success(t("toast.updateSuccess"));
+      } else {
+        const { error } = await supabase.from("location").insert({
+          company_id: targetCompanyId,
           name: locationName,
           type: locationType,
           address: selectedAddress.address_line1,
@@ -311,48 +357,29 @@ export default function LocationsPage() {
           latitude: markerPosition.lat.toString(),
           longitude: markerPosition.lng.toString(),
           access_instructions: accessInstructions || null,
+          is_active: true,
+          created_at: now,
           updated_at: now,
-        })
-        .eq("id", editingLocation.id);
+        });
 
-      if (error) {
-        toast.error(t("toast.updateFailed", { message: error.message }));
-      } else {
-        toast.success(t("toast.updateSuccess"));
-        setDialogOpen(false);
-        resetForm();
-        fetchLocations();
-      }
-    } else {
-      const { error } = await supabase.from("location").insert({
-        company_id: targetCompanyId, // ✅ Use targetCompanyId
-        name: locationName,
-        type: locationType,
-        address: selectedAddress.address_line1,
-        address_line_2: selectedAddress.address_line2 || null,
-        city: selectedAddress.city,
-        state: selectedAddress.state || null,
-        postcode: selectedAddress.postcode || null,
-        country: selectedAddress.country,
-        latitude: markerPosition.lat.toString(),
-        longitude: markerPosition.lng.toString(),
-        access_instructions: accessInstructions || null,
-        is_active: true,
-        created_at: now,
-        updated_at: now,
-      });
-
-      if (error) {
-        toast.error(t("toast.createFailed", { message: error.message }));
-      } else {
+        if (error) throw error;
         toast.success(t("toast.createSuccess"));
-        setDialogOpen(false);
-        resetForm();
-        fetchLocations();
       }
-    }
 
-    setSaving(false);
+      setDialogOpen(false);
+      resetForm();
+      await fetchLocations();
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(
+        editingLocation
+          ? t("toast.updateFailed", { message: errorMessage })
+          : t("toast.createFailed", { message: errorMessage })
+      );
+    } finally {
+      setSaving(false);
+    }
   }, [
     locationName,
     selectedAddress,
@@ -360,7 +387,7 @@ export default function LocationsPage() {
     locationType,
     accessInstructions,
     editingLocation,
-    targetCompanyId, // ✅ Updated dependency
+    targetCompanyId,
     supabase,
     fetchLocations,
     t,
@@ -378,15 +405,23 @@ export default function LocationsPage() {
     setEditingLocation(null);
   }, []);
 
+  const handleDialogChange = useCallback(
+    (open: boolean) => {
+      setDialogOpen(open);
+      if (!open) resetForm();
+    },
+    [resetForm]
+  );
+
   if (!ready || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
 
-  if (activeRole.role === "supervisor" || activeRole.role === "talent") {
+  if (activeRole?.role === "supervisor" || activeRole?.role === "talent") {
     return null;
   }
 
@@ -406,15 +441,9 @@ export default function LocationsPage() {
               </CardDescription>
             </div>
 
-            <Dialog
-              open={dialogOpen}
-              onOpenChange={(open) => {
-                setDialogOpen(open);
-                if (!open) resetForm();
-              }}
-            >
+            <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
               <DialogTrigger asChild>
-                <Button className="bg-pulse-500 hover:bg-pulse-600">
+                <Button className="bg-primary hover:bg-primary/90">
                   <Plus className="w-4 h-4 mr-2" />
                   {t("card.addButton")}
                 </Button>
@@ -453,7 +482,7 @@ export default function LocationsPage() {
         <CardContent className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-pulse-500 border-t-transparent rounded-full animate-spin"></div>
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
             </div>
           ) : locations.length === 0 ? (
             <div className="text-center py-12">
@@ -474,13 +503,13 @@ export default function LocationsPage() {
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-5 h-5 text-pulse-500" />
-                        <CardTitle className="text-lg">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <MapPin className="w-5 h-5 text-primary flex-shrink-0" />
+                        <CardTitle className="text-lg truncate">
                           {location.name}
                         </CardTitle>
                       </div>
-                      <span className="text-xs bg-muted px-2 py-1 rounded">
+                      <span className="text-xs bg-muted px-2 py-1 rounded flex-shrink-0">
                         {
                           LOCATION_TYPES.find((t) => t.value === location.type)
                             ?.label
@@ -490,8 +519,8 @@ export default function LocationsPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="text-sm text-muted-foreground">
-                      <p>{location.address}</p>
-                      <p>
+                      <p className="truncate">{location.address}</p>
+                      <p className="truncate">
                         {location.city}
                         {location.state && `, ${location.state}`}
                       </p>

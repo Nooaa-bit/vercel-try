@@ -1,10 +1,11 @@
-//hype-hire/vercel/app/[lang]/dashboard/settings/SettingsForm.tsx
+// app/[lang]/dashboard/settings/SettingsForm.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import ProfilePictureCrop from "@/components/ProfilePictureCrop";
+import { Loader2 } from "lucide-react";
 
 interface SettingsFormProps {
   user: {
@@ -13,8 +14,8 @@ interface SettingsFormProps {
     email: string;
     profilePictureUrl: string | null;
   };
-  targetUserId?: number; // ✅ NEW: if provided, editing someone else
-  onSuccess?: () => void; // ✅ NEW: callback after successful save
+  targetUserId?: number;
+  onSuccess?: () => void;
 }
 
 export default function SettingsForm({
@@ -32,25 +33,41 @@ export default function SettingsForm({
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // ✅ Sync with prop changes
+  // ✅ Memoize API URL
+  const apiUrl = useMemo(
+    () => (targetUserId ? "/api/update-user" : "/api/update-profile"),
+    [targetUserId]
+  );
+
+  // ✅ Sync with prop changes (optimized)
   useEffect(() => {
     setFirstName(user.firstName);
     setLastName(user.lastName);
     setDisplayPictureUrl(user.profilePictureUrl);
   }, [user.firstName, user.lastName, user.profilePictureUrl]);
 
-  const handleImageSelected = (file: File) => {
-    setSelectedFile(file);
+  // ✅ Memoize validation
+  const isValid = useMemo(() => {
+    return firstName.trim().length >= 2 && lastName.trim().length >= 2;
+  }, [firstName, lastName]);
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
+  // ✅ Use useCallback for handlers
+  const handleImageSelected = useCallback(
+    (file: File) => {
+      setSelectedFile(file);
 
-    const newPreviewUrl = URL.createObjectURL(file);
-    setPreviewUrl(newPreviewUrl);
-    setDisplayPictureUrl(newPreviewUrl);
-  };
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
 
+      const newPreviewUrl = URL.createObjectURL(file);
+      setPreviewUrl(newPreviewUrl);
+      setDisplayPictureUrl(newPreviewUrl);
+    },
+    [previewUrl]
+  );
+
+  // ✅ Cleanup preview URLs
   useEffect(() => {
     return () => {
       if (previewUrl) {
@@ -59,64 +76,70 @@ export default function SettingsForm({
     };
   }, [previewUrl]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    if (!firstName.trim() || !lastName.trim()) {
-      toast.error(t("validation.required"));
-      return;
-    }
-
-    if (firstName.trim().length < 2 || lastName.trim().length < 2) {
-      toast.error(t("validation.nameLength"));
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("firstName", firstName.trim());
-      formData.append("lastName", lastName.trim());
-
-      // ✅ If targetUserId provided, we're editing someone else
-      if (targetUserId) {
-        formData.append("userId", targetUserId.toString());
+      if (!firstName.trim() || !lastName.trim()) {
+        toast.error(t("validation.required"));
+        return;
       }
 
-      if (selectedFile) {
-        formData.append("profilePicture", selectedFile);
+      if (!isValid) {
+        toast.error(t("validation.nameLength"));
+        return;
       }
 
-      // ✅ Use different API based on context
-      const apiUrl = targetUserId
-        ? "/api/update-user"
-        : "/api/update-profile";
+      setSaving(true);
 
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        body: formData,
-      });
+      try {
+        const formData = new FormData();
+        formData.append("firstName", firstName.trim());
+        formData.append("lastName", lastName.trim());
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success(t("success.profileUpdated"));
-        setSelectedFile(null);
-
-        if (previewUrl) {
-          URL.revokeObjectURL(previewUrl);
-          setPreviewUrl(null);
+        if (targetUserId) {
+          formData.append("userId", targetUserId.toString());
         }
 
-        if (data.profilePictureUrl) {
-          setDisplayPictureUrl(data.profilePictureUrl);
+        if (selectedFile) {
+          formData.append("profilePicture", selectedFile);
         }
 
-        // ✅ Call success callback if provided
-        onSuccess?.();
-      } else {
-        toast.error(data.error || t("errors.updateFailed"));
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          toast.success(t("success.profileUpdated"));
+          setSelectedFile(null);
+
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+          }
+
+          if (data.profilePictureUrl) {
+            setDisplayPictureUrl(data.profilePictureUrl);
+          }
+
+          onSuccess?.();
+        } else {
+          toast.error(data.error || t("errors.updateFailed"));
+          setSelectedFile(null);
+
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+          }
+
+          setDisplayPictureUrl(user.profilePictureUrl);
+        }
+      } catch (error) {
+        console.error("Error saving profile:", error);
+        toast.error(t("errors.genericError"));
         setSelectedFile(null);
 
         if (previewUrl) {
@@ -125,22 +148,23 @@ export default function SettingsForm({
         }
 
         setDisplayPictureUrl(user.profilePictureUrl);
+      } finally {
+        setSaving(false);
       }
-    } catch (error) {
-      console.error("Error saving profile:", error);
-      toast.error(t("errors.genericError"));
-      setSelectedFile(null);
-
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(null);
-      }
-
-      setDisplayPictureUrl(user.profilePictureUrl);
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    [
+      firstName,
+      lastName,
+      isValid,
+      selectedFile,
+      targetUserId,
+      apiUrl,
+      previewUrl,
+      user.profilePictureUrl,
+      onSuccess,
+      t,
+    ]
+  );
 
   return (
     <div className="bg-card rounded-2xl shadow-elegant border border-border p-8">
@@ -173,6 +197,8 @@ export default function SettingsForm({
                 onChange={(e) => setFirstName(e.target.value)}
                 className="w-full px-4 py-3 bg-background border border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                 placeholder={t("fields.firstName.placeholder")}
+                minLength={2}
+                required
               />
             </div>
             <div className="space-y-3">
@@ -189,6 +215,8 @@ export default function SettingsForm({
                 onChange={(e) => setLastName(e.target.value)}
                 className="w-full px-4 py-3 bg-background border border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                 placeholder={t("fields.lastName.placeholder")}
+                minLength={2}
+                required
               />
             </div>
           </div>
@@ -273,9 +301,10 @@ export default function SettingsForm({
         <div className="pt-4">
           <button
             type="submit"
-            disabled={saving}
-            className="px-8 py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:bg-primary/90 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={saving || !isValid}
+            className="px-8 py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:bg-primary/90 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {saving ? t("buttons.saving") : t("buttons.saveChanges")}
           </button>
         </div>
@@ -283,14 +312,3 @@ export default function SettingsForm({
     </div>
   );
 }
-
-
-
-//Save as user types (with debouncing):
-//useEffect(() => {
-//  const timeout = setTimeout(() => {
-    // Auto-save after 2 seconds of no typing
- //   saveProfile();
-//  }, 2000); 
-//  return () => clearTimeout(timeout);
-//}, [firstName, lastName]);

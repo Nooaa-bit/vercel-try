@@ -1,7 +1,7 @@
-//hype-hire/vercel/app/[lang]/dashboard/calendar/page.tsx
+// app/[lang]/dashboard/calendar/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
 import { createClient } from "@/lib/supabase/client";
 import { useTranslation } from "react-i18next";
@@ -15,7 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import JobDialog from "./JobDialog";
 import { DayView } from "./DayView";
 
@@ -87,7 +93,15 @@ export default function CalendarPage() {
     ? selectedCompanyForAdmin
     : activeRole?.companyId;
 
-  const fetchShifts = async () => {
+  // ✅ Memoize today
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
+
+  // ✅ OPTIMIZED: Fetch with parallel queries
+  const fetchShifts = useCallback(async () => {
     if (!targetCompanyId || targetCompanyId <= 0) {
       return;
     }
@@ -100,99 +114,103 @@ export default function CalendarPage() {
         activeRole.role === "company_admin" ||
         activeRole.role === "superadmin"
       ) {
-        const { data: jobsData, error: jobsError } = await supabase
-          .from("job")
-          .select("id")
-          .eq("company_id", targetCompanyId)
-          .is("deleted_at", null);
+        // ✅ Admin: Fetch jobs, shifts, locations, and assignments in parallel
+        const [jobsResponse, locationsResponse] = await Promise.all([
+          supabase
+            .from("job")
+            .select("id")
+            .eq("company_id", targetCompanyId)
+            .is("deleted_at", null),
+          supabase
+            .from("location")
+            .select("id, name")
+            .eq("company_id", targetCompanyId)
+            .is("deleted_at", null)
+            .order("name", { ascending: true }),
+        ]);
 
-        if (jobsError) throw jobsError;
+        if (jobsResponse.error) throw jobsResponse.error;
 
-        if (!jobsData || jobsData.length === 0) {
+        if (!jobsResponse.data || jobsResponse.data.length === 0) {
           setShifts([]);
+          setLocations(locationsResponse.data || []);
           setPageLoading(false);
           return;
         }
 
-        const jobIds = jobsData.map((job) => job.id);
+        const jobIds = jobsResponse.data.map((job) => job.id);
 
-        const { data: shiftsData, error: shiftError } = await supabase
+        // ✅ Fetch shifts with job details
+        const shiftsResponse = await supabase
           .from("shift")
           .select(
             `
-          id, shift_date, start_time, end_time, workers_needed, job_id,
-          job:job_id(
-            id, position, seniority, description, start_date, end_date, location_id,
-            location:location_id(id, name)
-          )
-        `
+            id, shift_date, start_time, end_time, workers_needed, job_id,
+            job:job_id(
+              id, position, seniority, description, start_date, end_date, location_id,
+              location:location_id(id, name)
+            )
+          `
           )
           .in("job_id", jobIds)
           .is("deleted_at", null)
           .order("shift_date", { ascending: true });
 
-        if (shiftError) throw shiftError;
+        if (shiftsResponse.error) throw shiftsResponse.error;
 
         const transformedShifts = await transformShifts(
-          (shiftsData as unknown as ShiftFromDB[]) || []
+          (shiftsResponse.data as unknown as ShiftFromDB[]) || []
         );
+
         setShifts(transformedShifts);
-
-        const { data: locationsData, error: locationsError } = await supabase
-          .from("location")
-          .select("id, name")
-          .eq("company_id", targetCompanyId)
-          .is("deleted_at", null)
-          .order("name", { ascending: true });
-
-        if (!locationsError && locationsData) {
-          setLocations(locationsData);
-        }
+        setLocations(locationsResponse.data || []);
       } else {
-        const { data: assignments, error: assignmentError } = await supabase
+        // ✅ Talent: Fetch assignments and shifts
+        const assignmentsResponse = await supabase
           .from("shift_assignment")
-          .select("*")
+          .select("shift_id")
           .eq("user_id", activeRole.userId)
           .is("cancelled_at", null)
           .is("deleted_at", null);
 
-        if (assignmentError) throw assignmentError;
+        if (assignmentsResponse.error) throw assignmentsResponse.error;
 
-        if (!assignments || assignments.length === 0) {
+        if (
+          !assignmentsResponse.data ||
+          assignmentsResponse.data.length === 0
+        ) {
           setShifts([]);
           setPageLoading(false);
           return;
         }
 
-        const shiftIds = assignments.map(
-          (a: { shift_id: number }) => a.shift_id
-        );
+        const shiftIds = assignmentsResponse.data.map((a) => a.shift_id);
 
-        const { data: shiftsData, error: shiftError } = await supabase
+        const shiftsResponse = await supabase
           .from("shift")
           .select(
             `
-          id, shift_date, start_time, end_time, workers_needed, job_id,
-          job:job_id(
-            id, position, seniority, description, start_date, end_date, location_id,
-            location:location_id(id, name)
-          )
-        `
+            id, shift_date, start_time, end_time, workers_needed, job_id,
+            job:job_id(
+              id, position, seniority, description, start_date, end_date, location_id,
+              location:location_id(id, name)
+            )
+          `
           )
           .in("id", shiftIds)
           .is("deleted_at", null)
           .order("shift_date", { ascending: true });
 
-        if (shiftError) throw shiftError;
+        if (shiftsResponse.error) throw shiftsResponse.error;
 
-        if (!shiftsData || shiftsData.length === 0) {
+        if (!shiftsResponse.data || shiftsResponse.data.length === 0) {
           setShifts([]);
           setPageLoading(false);
           return;
         }
 
         const transformedShifts = await transformShifts(
-          (shiftsData as unknown as ShiftFromDB[]) || []
+          (shiftsResponse.data as unknown as ShiftFromDB[]) || []
         );
         setShifts(transformedShifts);
       }
@@ -202,67 +220,69 @@ export default function CalendarPage() {
     } finally {
       setPageLoading(false);
     }
-  };
+  }, [targetCompanyId, activeRole, supabase, t]);
 
-  const transformShifts = async (
-    shiftsData: ShiftFromDB[]
-  ): Promise<Shift[]> => {
-    const shiftIds = shiftsData.map((s) => s.id);
-    const assignmentCounts: Record<number, number> = {};
+  // ✅ OPTIMIZED: Batch fetch assignments for all shifts
+  const transformShifts = useCallback(
+    async (shiftsData: ShiftFromDB[]): Promise<Shift[]> => {
+      const shiftIds = shiftsData.map((s) => s.id);
+      const assignmentCounts: Record<number, number> = {};
 
-    if (shiftIds.length > 0) {
-      const { data: assignmentsData } = await supabase
-        .from("shift_assignment")
-        .select("shift_id")
-        .in("shift_id", shiftIds)
-        .is("cancelled_at", null)
-        .is("deleted_at", null)
-        .is("marked_no_show_at", null);
+      if (shiftIds.length > 0) {
+        const { data: assignmentsData } = await supabase
+          .from("shift_assignment")
+          .select("shift_id")
+          .in("shift_id", shiftIds)
+          .is("cancelled_at", null)
+          .is("deleted_at", null)
+          .is("marked_no_show_at", null);
 
-      if (assignmentsData) {
-        assignmentsData.forEach((assignment: { shift_id: number }) => {
-          assignmentCounts[assignment.shift_id] =
-            (assignmentCounts[assignment.shift_id] || 0) + 1;
-        });
+        if (assignmentsData) {
+          assignmentsData.forEach((assignment: { shift_id: number }) => {
+            assignmentCounts[assignment.shift_id] =
+              (assignmentCounts[assignment.shift_id] || 0) + 1;
+          });
+        }
       }
-    }
 
-    const transformed = shiftsData.map((shift) => {
-      const jobData = shift.job;
-      if (!jobData) {
+      const transformed = shiftsData.map((shift) => {
+        const jobData = shift.job;
+        if (!jobData) {
+          return {
+            id: shift.id,
+            job_id: shift.job_id,
+            position: t("calendar.unknownPosition"),
+            start_date: shift.shift_date,
+            end_date: shift.shift_date,
+            workers_needed: shift.workers_needed,
+            location: t("calendar.unspecified"),
+            startTime: shift.start_time,
+            endTime: shift.end_time,
+            assignmentCount: assignmentCounts[shift.id] || 0,
+          };
+        }
+
+        const locationName = jobData.location?.name || t("calendar.noLocation");
+        const displayTitle = `${jobData.position}`;
+
         return {
           id: shift.id,
           job_id: shift.job_id,
-          position: t("calendar.unknownPosition"),
+          position: displayTitle,
           start_date: shift.shift_date,
           end_date: shift.shift_date,
           workers_needed: shift.workers_needed,
-          location: t("calendar.unspecified"),
+          location: locationName,
           startTime: shift.start_time,
           endTime: shift.end_time,
           assignmentCount: assignmentCounts[shift.id] || 0,
         };
-      }
+      });
 
-      const locationName = jobData.location?.name || t("calendar.noLocation");
-      const displayTitle = `${jobData.position}`;
-
-      return {
-        id: shift.id,
-        job_id: shift.job_id,
-        position: displayTitle,
-        start_date: shift.shift_date,
-        end_date: shift.shift_date,
-        workers_needed: shift.workers_needed,
-        location: locationName,
-        startTime: shift.start_time,
-        endTime: shift.end_time,
-        assignmentCount: assignmentCounts[shift.id] || 0,
-      };
-    });
-
-    return transformed;
-  };
+      return transformed;
+    },
+    [supabase, t]
+  );
 
   useEffect(() => {
     if (loading || !ready || !activeRole || !targetCompanyId) {
@@ -270,15 +290,15 @@ export default function CalendarPage() {
     }
 
     fetchShifts();
-  }, [loading, ready, activeRole, targetCompanyId]);
+  }, [loading, ready, activeRole, targetCompanyId, fetchShifts]);
 
+  // ✅ Memoize locations from shifts
   const locationsFromShifts = useMemo(() => {
     return [...new Set(shifts.map((shift) => shift.location))];
   }, [shifts]);
 
+  // ✅ Memoize stats with optimized filtering
   const stats = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const now = new Date();
 
     const totalEvents = shifts.filter((shift) => {
@@ -300,85 +320,120 @@ export default function CalendarPage() {
     }).length;
 
     return { totalEvents, todaysEvents };
-  }, [shifts]);
+  }, [shifts, today]);
 
-  const getDaysInMonth = (date: Date): number => {
+  // ✅ Memoize calendar calculations
+  const getDaysInMonth = useCallback((date: Date): number => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
+  }, []);
 
-  const getFirstDayOfMonth = (date: Date): number => {
+  const getFirstDayOfMonth = useCallback((date: Date): number => {
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
     return firstDay === 0 ? 6 : firstDay - 1;
-  };
+  }, []);
 
-  const daysInMonth = getDaysInMonth(currentDate);
-  const firstDay = getFirstDayOfMonth(currentDate);
+  const daysInMonth = useMemo(
+    () => getDaysInMonth(currentDate),
+    [currentDate, getDaysInMonth]
+  );
+  const firstDay = useMemo(
+    () => getFirstDayOfMonth(currentDate),
+    [currentDate, getFirstDayOfMonth]
+  );
 
-  const getShiftsForDate = (day: number): Shift[] => {
-    const dateStr = `${currentDate.getFullYear()}-${String(
-      currentDate.getMonth() + 1
-    ).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  // ✅ Memoize shifts by date (only recalculate when shifts or filter changes)
+  const shiftsByDate = useMemo(() => {
+    const map = new Map<string, Shift[]>();
 
-    return shifts.filter((shift) => {
-      const isOnDate = shift.start_date === dateStr;
+    shifts.forEach((shift) => {
       const matchesLocation =
         filterLocation === "all" || shift.location === filterLocation;
 
-      return isOnDate && matchesLocation;
+      if (matchesLocation) {
+        const dateStr = shift.start_date;
+        if (!map.has(dateStr)) {
+          map.set(dateStr, []);
+        }
+        map.get(dateStr)!.push(shift);
+      }
     });
-  };
 
-  const previousMonth = () => {
+    return map;
+  }, [shifts, filterLocation]);
+
+  const getShiftsForDate = useCallback(
+    (day: number): Shift[] => {
+      const dateStr = `${currentDate.getFullYear()}-${String(
+        currentDate.getMonth() + 1
+      ).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+      return shiftsByDate.get(dateStr) || [];
+    },
+    [currentDate, shiftsByDate]
+  );
+
+  const previousMonth = useCallback(() => {
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() - 1)
     );
-  };
+  }, [currentDate]);
 
-  const nextMonth = () => {
+  const nextMonth = useCallback(() => {
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() + 1)
     );
-  };
+  }, [currentDate]);
 
-  const handleNextDay = () => {
+  const handleNextDay = useCallback(() => {
     if (selectedDay) {
       const nextDay = new Date(selectedDay);
       nextDay.setDate(nextDay.getDate() + 1);
       setSelectedDay(nextDay);
     }
-  };
+  }, [selectedDay]);
 
-  const handlePreviousDay = () => {
+  const handlePreviousDay = useCallback(() => {
     if (selectedDay) {
       const prevDay = new Date(selectedDay);
       prevDay.setDate(prevDay.getDate() - 1);
       setSelectedDay(prevDay);
     }
-  };
+  }, [selectedDay]);
 
-  const monthName = currentDate.toLocaleDateString(i18n.language, {
-    month: "long",
-    year: "numeric",
-  });
+  const monthName = useMemo(
+    () =>
+      currentDate.toLocaleDateString(i18n.language, {
+        month: "long",
+        year: "numeric",
+      }),
+    [currentDate, i18n.language]
+  );
 
-  const weekDays = [
-    t("calendar.weekDays.mon"),
-    t("calendar.weekDays.tue"),
-    t("calendar.weekDays.wed"),
-    t("calendar.weekDays.thu"),
-    t("calendar.weekDays.fri"),
-    t("calendar.weekDays.sat"),
-    t("calendar.weekDays.sun"),
-  ];
+  const weekDays = useMemo(
+    () => [
+      t("calendar.weekDays.mon"),
+      t("calendar.weekDays.tue"),
+      t("calendar.weekDays.wed"),
+      t("calendar.weekDays.thu"),
+      t("calendar.weekDays.fri"),
+      t("calendar.weekDays.sat"),
+      t("calendar.weekDays.sun"),
+    ],
+    [t]
+  );
 
-  const handleDialogClose = (open: boolean) => {
+  const handleDialogClose = useCallback((open: boolean) => {
     setDialogOpen(open);
-  };
+  }, []);
+
+  const handleDayClick = useCallback((dayDate: Date) => {
+    setSelectedDay(dayDate);
+  }, []);
 
   if (!ready || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -467,7 +522,7 @@ export default function CalendarPage() {
         <CardContent>
           {pageLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
             </div>
           ) : (
             <div className="space-y-4">
@@ -500,7 +555,6 @@ export default function CalendarPage() {
                   const dayShifts = getShiftsForDate(day);
                   const hasEvents = dayShifts.length > 0;
 
-                  const today = new Date();
                   const isToday =
                     day === today.getDate() &&
                     currentDate.getMonth() === today.getMonth() &&
@@ -516,7 +570,7 @@ export default function CalendarPage() {
                           ? "border-primary/40 bg-primary/5"
                           : "border-muted bg-background"
                       } hover:border-primary/60 transition-colors`}
-                      onClick={() => setSelectedDay(dayDate)}
+                      onClick={() => handleDayClick(dayDate)}
                     >
                       <div
                         className={`text-xs font-semibold mb-1 ${
