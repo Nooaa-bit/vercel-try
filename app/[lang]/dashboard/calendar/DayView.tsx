@@ -1,7 +1,7 @@
 // app/[lang]/dashboard/calendar/DayView.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight, X, Plus } from "lucide-react";
 import JobDialog from "./JobDialog";
 import { ShiftEditDialog } from "./ShiftEditDialog";
 import { ProfileAvatar } from "./ProfileAvatar";
-import { fetchAssignedStaffForShift, type Employee } from "./staffing-utils";
+import { type Employee } from "./staffing-utils";
 
 interface Shift {
   id: number;
@@ -57,6 +57,18 @@ interface ShiftFromDB {
 const SWIMLANE_WIDTH_PX = 140;
 const SWIMLANE_GAP_PX = 8;
 
+function getShiftPosition(startTime: string): number {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  return hours + minutes / 60;
+}
+
+function getShiftHeight(startTime: string, endTime: string): number {
+  const start = getShiftPosition(startTime);
+  const end = getShiftPosition(endTime);
+  const duration = end - start;
+  return Math.max(duration, 0.5);
+}
+
 export function DayView({
   date,
   shifts,
@@ -80,13 +92,126 @@ export function DayView({
   const hoursScrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
-  // ✅ NEW: Store assigned staff for each shift
   const [assignedStaffMap, setAssignedStaffMap] = useState<
     Map<number, Employee[]>
   >(new Map());
+  const fetchedDateRef = useRef("");
 
   const canEdit =
     activeRole.role === "company_admin" || activeRole.role === "superadmin";
+
+  const dateStr = useMemo(() => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(date.getDate()).padStart(2, "0")}`;
+  }, [date]);
+
+  const dayShifts = useMemo(() => {
+    return shifts.filter((shift) => shift.start_date === dateStr);
+  }, [shifts, dateStr]);
+
+  const dayName = useMemo(
+    () =>
+      date.toLocaleDateString(i18n.language, {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+    [date, i18n.language]
+  );
+
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+
+  const swimlanes = useMemo(() => {
+    const lanes: Array<{
+      id: number;
+      shifts: Shift[];
+      swimlaneIndex: number;
+    }> = [];
+
+    if (dayShifts.length === 0) return lanes;
+
+    const sortedShifts = [...dayShifts].sort(
+      (a, b) => getShiftPosition(a.startTime) - getShiftPosition(b.startTime)
+    );
+
+    const gapInHours = SWIMLANE_GAP_PX / 64;
+
+    sortedShifts.forEach((shift) => {
+      const shiftStart = getShiftPosition(shift.startTime);
+      const shiftHeight = getShiftHeight(shift.startTime, shift.endTime);
+      const shiftEnd = shiftStart + shiftHeight;
+
+      let placed = false;
+
+      for (let i = 0; i < lanes.length; i++) {
+        let canPlace = true;
+
+        for (const existingShift of lanes[i].shifts) {
+          const existingStart = getShiftPosition(existingShift.startTime);
+          const existingHeight = getShiftHeight(
+            existingShift.startTime,
+            existingShift.endTime
+          );
+          const existingEnd = existingStart + existingHeight + gapInHours;
+
+          if (shiftStart < existingEnd && shiftEnd > existingStart) {
+            canPlace = false;
+            break;
+          }
+        }
+
+        if (canPlace) {
+          lanes[i].shifts.push(shift);
+          placed = true;
+          break;
+        }
+      }
+
+      if (!placed) {
+        lanes.push({
+          id: lanes.length,
+          shifts: [shift],
+          swimlaneIndex: lanes.length,
+        });
+      }
+    });
+
+    return lanes;
+  }, [dayShifts]);
+
+  // ✅ Pre-calculate all shift styles
+  const shiftStyles = useMemo(() => {
+    const styles = new Map<
+      number,
+      {
+        top: number;
+        height: number;
+        isFullyStaffed: boolean;
+        isOverstaffed: boolean;
+      }
+    >();
+
+    swimlanes.forEach((swimlane) => {
+      swimlane.shifts.forEach((shift) => {
+        const startPosition = getShiftPosition(shift.startTime);
+        const height = getShiftHeight(shift.startTime, shift.endTime);
+        const assignmentCount = shift.assignmentCount ?? 0;
+        const workersNeeded = shift.workers_needed;
+
+        styles.set(shift.id, {
+          top: startPosition * 64,
+          height: height * 64,
+          isFullyStaffed: assignmentCount === workersNeeded,
+          isOverstaffed: assignmentCount > workersNeeded,
+        });
+      });
+    });
+
+    return styles;
+  }, [swimlanes]);
 
   useEffect(() => {
     const shiftsDiv = shiftsScrollRef.current;
@@ -102,141 +227,113 @@ export function DayView({
     return () => shiftsDiv.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // ✅ NEW: Fetch assigned staff for all visible shifts
+  // ✅ Fetch staff data
   useEffect(() => {
-    const loadAssignedStaff = async () => {
-      if (!canEdit || dayShifts.length === 0) return;
+    if (fetchedDateRef.current !== dateStr) {
+      setAssignedStaffMap(new Map());
+      fetchedDateRef.current = "";
+    }
 
-      const staffMap = new Map<number, Employee[]>();
-
-      for (const shift of dayShifts) {
-        const staff = await fetchAssignedStaffForShift(supabase, shift.id);
-        staffMap.set(shift.id, staff);
-      }
-
-      setAssignedStaffMap(staffMap);
-    };
-
-    loadAssignedStaff();
-  }, [shifts, date, canEdit]);
-
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getDate()).padStart(2, "0")}`;
-
-  const dayShifts = shifts.filter((shift) => shift.start_date === dateStr);
-
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-
-  const getShiftPosition = (startTime: string) => {
-    const [hours, minutes] = startTime.split(":").map(Number);
-    return hours + minutes / 60;
-  };
-
-  const getShiftHeight = (startTime: string, endTime: string) => {
-    const start = getShiftPosition(startTime);
-    const end = getShiftPosition(endTime);
-    const duration = end - start;
-    return Math.max(duration, 0.5);
-  };
-
-  const getSwimlanesLayout = () => {
-    const swimlanes: Array<{
-      id: number;
-      shifts: Shift[];
-      swimlaneIndex: number;
-    }> = [];
-
-    const sortedShifts = [...dayShifts].sort(
-      (a, b) => getShiftPosition(a.startTime) - getShiftPosition(b.startTime)
-    );
-
-    const gapInHours = SWIMLANE_GAP_PX / 64;
-
-    sortedShifts.forEach((shift) => {
-      const shiftStart = getShiftPosition(shift.startTime);
-      const shiftHeight = getShiftHeight(shift.startTime, shift.endTime);
-      const shiftEnd = shiftStart + shiftHeight;
-
-      let swimlaneIndex = 0;
-      let placed = false;
-
-      for (let i = 0; i < swimlanes.length; i++) {
-        let canPlace = true;
-
-        for (const existingShift of swimlanes[i].shifts) {
-          const existingStart = getShiftPosition(existingShift.startTime);
-          const existingHeight = getShiftHeight(
-            existingShift.startTime,
-            existingShift.endTime
-          );
-          const existingEnd = existingStart + existingHeight + gapInHours;
-
-          if (shiftStart < existingEnd && shiftEnd > existingStart) {
-            canPlace = false;
-            break;
-          }
-        }
-
-        if (canPlace) {
-          swimlanes[i].shifts.push(shift);
-          swimlaneIndex = i;
-          placed = true;
-          break;
-        }
-      }
-
-      if (!placed) {
-        swimlanes.push({
-          id: swimlanes.length,
-          shifts: [shift],
-          swimlaneIndex: swimlanes.length,
-        });
-      }
-    });
-
-    return swimlanes;
-  };
-
-  const swimlanes = getSwimlanesLayout();
-
-  const dayName = date.toLocaleDateString(i18n.language, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
-  const handleDialogClose = (open: boolean) => {
-    setDialogOpen(open);
-  };
-
-  const handleShiftClick = async (shift: Shift) => {
-    if (!canEdit) {
+    if (
+      !canEdit ||
+      dayShifts.length === 0 ||
+      fetchedDateRef.current === dateStr
+    ) {
       return;
     }
 
+    fetchedDateRef.current = dateStr;
+    let isCancelled = false;
+
+    const loadStaff = async () => {
+      try {
+        const staffMap = new Map<number, Employee[]>();
+
+        await Promise.all(
+          dayShifts.map(async (shift) => {
+            const { data, error } = await supabase
+              .from("shift_assignment")
+              .select(
+                `
+                user_id,
+                user:user_id (
+                  id,
+                  email,
+                  first_name,
+                  last_name,
+                  profile_picture
+                )
+              `
+              )
+              .eq("shift_id", shift.id)
+              .is("cancelled_at", null)
+              .is("deleted_at", null);
+
+            if (!error && data && !isCancelled) {
+              const employees: Employee[] = data.map((item) => {
+                const user = item.user as unknown as {
+                  id: number;
+                  email: string;
+                  first_name: string | null;
+                  last_name: string | null;
+                  profile_picture: string | null;
+                };
+
+                return {
+                  userId: user.id,
+                  email: user.email,
+                  firstName: user.first_name,
+                  lastName: user.last_name,
+                  profilePicture: user.profile_picture,
+                  role: "talent",
+                };
+              });
+
+              staffMap.set(shift.id, employees);
+            }
+          })
+        );
+
+        if (!isCancelled) {
+          setAssignedStaffMap(staffMap);
+        }
+      } catch (error) {
+        console.error("Error loading staff:", error);
+      }
+    };
+
+    loadStaff();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [dateStr, canEdit, dayShifts, supabase]);
+
+  const handleShiftClick = async (shift: Shift) => {
+    if (!canEdit) return;
+
     try {
-      const { data: shiftData, error: shiftError } = await supabase
-        .from("shift")
-        .select("id, job_id, shift_date, start_time, end_time, workers_needed")
-        .eq("id", shift.id)
-        .single();
+      const [shiftResponse, countResponse] = await Promise.all([
+        supabase
+          .from("shift")
+          .select(
+            "id, job_id, shift_date, start_time, end_time, workers_needed"
+          )
+          .eq("id", shift.id)
+          .single(),
+        supabase
+          .from("shift_assignment")
+          .select("*", { count: "exact", head: true })
+          .eq("shift_id", shift.id)
+          .is("cancelled_at", null)
+          .is("deleted_at", null),
+      ]);
 
-      if (shiftError) throw shiftError;
+      if (shiftResponse.error) throw shiftResponse.error;
+      if (countResponse.error) throw countResponse.error;
 
-      const { count, error: countError } = await supabase
-        .from("shift_assignment")
-        .select("*", { count: "exact", head: true })
-        .eq("shift_id", shift.id)
-        .is("cancelled_at", null)
-        .is("deleted_at", null);
-
-      if (countError) throw countError;
-
-      setEditingShiftData(shiftData);
-      setShiftAssignmentCount(count || 0);
+      setEditingShiftData(shiftResponse.data);
+      setShiftAssignmentCount(countResponse.count || 0);
       setShiftPosition(shift.position);
       setShiftEditDialogOpen(true);
     } catch (error) {
@@ -278,7 +375,7 @@ export function DayView({
 
               <div className="flex gap-2">
                 {canEdit && (
-                  <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
                       <Button className="bg-primary hover:bg-primary/90">
                         <Plus className="w-4 h-4 mr-2" />
@@ -292,6 +389,7 @@ export function DayView({
                         defaultStartDate={dateStr}
                         onSave={async () => {
                           setDialogOpen(false);
+                          fetchedDateRef.current = "";
                           onSave();
                         }}
                         onCancel={() => {
@@ -316,7 +414,6 @@ export function DayView({
           </CardHeader>
 
           <CardContent className="flex-1 overflow-hidden p-0 flex">
-            {/* Hours Column */}
             <div
               ref={hoursScrollRef}
               className="w-20 border-r bg-muted/30 flex flex-col overflow-y-scroll scrollbar-hide"
@@ -331,12 +428,10 @@ export function DayView({
               ))}
             </div>
 
-            {/* Shifts Swimlanes */}
             <div
               ref={shiftsScrollRef}
               className="flex-1 overflow-y-scroll overflow-x-auto relative bg-background"
             >
-              {/* Hour dividers background */}
               {hours.map((hour) => (
                 <div
                   key={`divider-${hour}`}
@@ -346,7 +441,6 @@ export function DayView({
                 </div>
               ))}
 
-              {/* Shifts */}
               {dayShifts.length > 0 ? (
                 <div className="absolute inset-0 flex">
                   {swimlanes.map((swimlane) => (
@@ -359,19 +453,9 @@ export function DayView({
                       }}
                     >
                       {swimlane.shifts.map((shift) => {
-                        const startPosition = getShiftPosition(shift.startTime);
-                        const height = getShiftHeight(
-                          shift.startTime,
-                          shift.endTime
-                        );
-
+                        const style = shiftStyles.get(shift.id)!;
                         const assignmentCount = shift.assignmentCount ?? 0;
                         const workersNeeded = shift.workers_needed;
-                        const isFullyStaffed =
-                          assignmentCount === workersNeeded;
-                        const isOverstaffed = assignmentCount > workersNeeded;
-
-                        // ✅ Get assigned staff for this shift
                         const assignedStaff =
                           assignedStaffMap.get(shift.id) || [];
                         const maxAvatarsToShow = 6;
@@ -383,14 +467,15 @@ export function DayView({
                         return (
                           <div
                             key={shift.id}
-                            className={`absolute rounded-lg p-2 border transition-shadow overflow-hidden left-1 right-1 ${
+                            className={`absolute rounded-lg p-2 border overflow-hidden left-1 right-1 bg-primary text-primary-foreground border-primary/30 ${
                               canEdit
-                                ? "hover:shadow-lg hover:shadow-primary/20 cursor-pointer"
+                                ? "cursor-pointer hover:shadow-lg"
                                 : "cursor-default"
-                            } bg-primary text-primary-foreground border-primary/30`}
+                            }`}
                             style={{
-                              top: `${startPosition * 64}px`,
-                              height: `${height * 64}px`,
+                              top: `${style.top}px`,
+                              height: `${style.height}px`,
+                              willChange: "auto",
                             }}
                             title={
                               canEdit
@@ -414,13 +499,12 @@ export function DayView({
 
                             {canEdit && (
                               <div className="mt-1 space-y-1">
-                                {/* Staffing Badge */}
                                 <div className="flex items-center gap-1">
                                   <div
                                     className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                      isFullyStaffed
+                                      style.isFullyStaffed
                                         ? "bg-green-600 text-white dark:bg-green-500"
-                                        : isOverstaffed
+                                        : style.isOverstaffed
                                         ? "bg-red-600 text-white dark:bg-red-500"
                                         : "bg-orange-600 text-white dark:bg-orange-500"
                                     }`}
@@ -429,7 +513,6 @@ export function DayView({
                                   </div>
                                 </div>
 
-                                {/* ✅ UPDATED: Stacked Profile Avatars with Wrapping */}
                                 {assignedStaff.length > 0 && (
                                   <div className="flex items-start gap-0.5 flex-wrap max-w-full">
                                     {assignedStaff
@@ -493,7 +576,6 @@ export function DayView({
         </Card>
       </div>
 
-      {/* ShiftEditDialog */}
       {canEdit && shiftEditDialogOpen && editingShiftData && (
         <Dialog
           open={shiftEditDialogOpen}
@@ -508,6 +590,7 @@ export function DayView({
             onSave={() => {
               setShiftEditDialogOpen(false);
               setEditingShiftData(null);
+              fetchedDateRef.current = "";
               onSave();
             }}
             onCancel={() => {
