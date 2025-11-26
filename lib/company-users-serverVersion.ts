@@ -1,3 +1,4 @@
+//hype-hire/vercel/lib/company-users-serverVersion.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -10,6 +11,7 @@ type PaginatedResult = {
     firstName: string | null;
     lastName: string | null;
     profilePicture: string | null;
+    phoneNumber: string | null; // ✅ Added
     role: string;
     roleId: number;
     joinedAt: Date;
@@ -45,7 +47,7 @@ export async function getCompanyUsers(
     // ✅ OPTIMIZED: Run all queries in parallel
     const [totalCount, userRoles, roleCounts] = await Promise.all([
       prisma.user_company_role.count({ where: whereClause }),
-      
+
       prisma.user_company_role.findMany({
         where: whereClause,
         include: {
@@ -56,6 +58,7 @@ export async function getCompanyUsers(
               firstName: true,
               lastName: true,
               profilePicture: true,
+              phoneNumber: true, // ✅ Added
               createdAt: true,
             },
           },
@@ -68,7 +71,7 @@ export async function getCompanyUsers(
         skip,
         take: pageSize,
       }),
-      
+
       prisma.user_company_role.groupBy({
         by: ["role"],
         where: {
@@ -97,6 +100,7 @@ export async function getCompanyUsers(
       firstName: ur.user.firstName,
       lastName: ur.user.lastName,
       profilePicture: ur.user.profilePicture,
+      phoneNumber: ur.user.phoneNumber, // ✅ Added
       role: ur.role,
       roleId: ur.id,
       joinedAt: ur.createdAt,

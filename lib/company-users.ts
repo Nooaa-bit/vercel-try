@@ -1,5 +1,4 @@
 // lib/company-users.ts
-
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -11,6 +10,7 @@ type Employee = {
   firstName: string | null;
   lastName: string | null;
   profilePicture: string | null;
+  phoneNumber: string | null; // ✅ Added
   role: string;
   roleId: number;
   joinedAt: Date;
@@ -37,6 +37,7 @@ export async function getCompanyUsers(companyId: number): Promise<Employee[]> {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            phoneNumber: true, // ✅ Added
             createdAt: true,
           },
         },
@@ -54,6 +55,7 @@ export async function getCompanyUsers(companyId: number): Promise<Employee[]> {
       firstName: ur.user.firstName,
       lastName: ur.user.lastName,
       profilePicture: ur.user.profilePicture,
+      phoneNumber: ur.user.phoneNumber, // ✅ Added
       role: ur.role,
       roleId: ur.id,
       joinedAt: ur.createdAt,

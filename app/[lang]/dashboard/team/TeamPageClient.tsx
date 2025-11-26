@@ -1,4 +1,3 @@
-//Server-side filtering and pagination of company users
 //hype-hire/vercel/app/[lang]/dashboard/team/TeamPageClient.tsx
 "use client";
 
@@ -24,6 +23,7 @@ type Employee = {
   firstName: string | null;
   lastName: string | null;
   profilePicture: string | null;
+  phoneNumber: string | null; // ✅ Added
   role: string;
   roleId: number;
   joinedAt: Date;
@@ -335,6 +335,7 @@ export default function TeamPageClient({ lang }: TeamPageClientProps) {
                 firstName: selectedUser.firstName || "",
                 lastName: selectedUser.lastName || "",
                 email: selectedUser.email,
+                phoneNumber: selectedUser.phoneNumber || "", // ✅ Added
                 profilePictureUrl: getProfilePictureUrl(
                   selectedUser.profilePicture
                 ),

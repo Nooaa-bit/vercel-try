@@ -30,6 +30,7 @@ type Employee = {
   firstName: string | null;
   lastName: string | null;
   profilePicture: string | null;
+  phoneNumber: string | null; // ✅ Added
   role: string;
   roleId: number;
   joinedAt: Date;
@@ -398,6 +399,7 @@ export default function TeamPage({ params }: PageProps) {
                 firstName: selectedUser.firstName || "",
                 lastName: selectedUser.lastName || "",
                 email: selectedUser.email,
+                phoneNumber: selectedUser.phoneNumber || "", // ✅ Added
                 profilePictureUrl: getProfilePictureUrl(
                   selectedUser.profilePicture
                 ),
