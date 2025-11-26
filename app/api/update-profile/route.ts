@@ -1,4 +1,4 @@
-//hype-hire/vercel/app/api/update-profile/route.ts
+// app/api/update-profile/route.ts
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
@@ -19,7 +19,6 @@ const MAX_NAME_LENGTH = 100;
 
 export async function POST(request: NextRequest) {
   try {
-    // ✅ Use regular client to get authenticated user
     const supabase = await createClient();
 
     const {
@@ -33,6 +32,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const firstName = formData.get("firstName") as string;
     const lastName = formData.get("lastName") as string;
+    const phoneNumber = formData.get("phoneNumber") as string; // ✅ Get phone number
     const file = formData.get("profilePicture") as File | null;
 
     // Server-side validation
@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
 
     // Handle file upload if present
     if (file) {
-      // Validate file
       if (!ALLOWED_TYPES.includes(file.type)) {
         return NextResponse.json(
           { error: "Only JPG, PNG, WebP, and HEIC images are allowed" },
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
 
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json(
-          { error: "Image must be smaller than 5MB" },
+          { error: "Image must be smaller than 10MB" },
           { status: 400 }
         );
       }
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
         select: { profilePicture: true },
       });
 
-      // ✅ Convert HEIC/HEIF to JPEG, use other formats as-is
+      // Convert HEIC/HEIF to JPEG, use other formats as-is
       let fileToUpload: Buffer;
       let finalContentType: string;
       let fileExtension: string;
@@ -100,18 +99,15 @@ export async function POST(request: NextRequest) {
           );
         }
       } else {
-        // For other formats (JPEG, PNG, WebP), use as-is
         const buffer = await file.arrayBuffer();
         fileToUpload = Buffer.from(buffer);
         finalContentType = file.type;
         fileExtension = file.name.split(".").pop() || "jpg";
       }
 
-      // ✅ Use timestamped filename for cache busting
       const timestamp = Date.now();
       const fileName = `${user.id}/profile-${timestamp}.${fileExtension}`;
 
-      // ✅ Use admin client for storage (needs elevated permissions)
       const adminClient = createAdminClient();
 
       const { error: uploadError } = await adminClient.storage
@@ -129,10 +125,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // ✅ Extract old path from URL if it exists (for cleanup)
+      // Extract old path from URL if it exists (for cleanup)
       let oldFilePath: string | null = null;
       if (currentUser?.profilePicture) {
-        // If it's a full URL, extract the path; if it's already a path, use as-is
         if (
           currentUser.profilePicture.includes(
             "/storage/v1/object/public/profile-pictures/"
@@ -146,26 +141,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // ✅ Delete old file if it exists
+      // Delete old file if it exists
       if (oldFilePath) {
         await adminClient.storage
           .from("profile-pictures")
           .remove([oldFilePath]);
       }
 
-      // ✅ Generate and store the full public URL
+      // Generate and store the full public URL
       const { data } = adminClient.storage
         .from("profile-pictures")
         .getPublicUrl(fileName);
       profilePictureUrl = data.publicUrl;
     }
 
-    // ✅ Store the full URL instead of the path
+    // ✅ Update user profile INCLUDING phone number
     await prisma.user.update({
       where: { authUserId: user.id },
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        phoneNumber: phoneNumber?.trim() || null, // ✅ Save phone number (allow empty)
         ...(profilePictureUrl && { profilePicture: profilePictureUrl }),
       },
     });

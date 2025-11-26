@@ -31,6 +31,8 @@ model user {
   lastName       String? @map("last_name")
   hasPassword    Boolean @default(false) @map("has_password")
   profilePicture String? @map("profile_picture")
+  phoneNumber    String? @map("phone_number")  
+
 
   // GDPR: Anonymization support
   isAnonymized Boolean   @default(false) @map("is_anonymized")

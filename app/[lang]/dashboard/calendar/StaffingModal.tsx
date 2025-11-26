@@ -127,7 +127,6 @@ export function StaffingModal({
     employeesToRemove: [],
   });
 
-  // ✅ Memoize modal title and description
   const modalTitle = useMemo(
     () =>
       singleShiftMode && !applyToRemaining
@@ -144,25 +143,11 @@ export function StaffingModal({
     [singleShiftMode, applyToRemaining, t]
   );
 
-  // ✅ Optimized: Load data only when modal opens
-  useEffect(() => {
-    if (open) {
-      loadStaffingData();
-    } else {
-      // Clear state when closed
-      setSelectedEmployees(new Set());
-      setSelectedForRemoval(new Map());
-      setSearchTerm("");
-      setConfirmDialog({ open: false, employeesToRemove: [] });
-    }
-  }, [open, applyToRemaining, startFromShiftId]);
-
   const loadStaffingData = useCallback(async () => {
     setLoadingEmployees(true);
     setLoadingAvailability(true);
 
     try {
-      // ✅ Step 1: Fetch employees and shifts in parallel
       const [users, shiftsData] = await Promise.all([
         getCompanyUsers(companyId),
         (async () => {
@@ -211,7 +196,6 @@ export function StaffingModal({
         return;
       }
 
-      // ✅ Step 2: Calculate capacity and availabilities in parallel
       const shiftIds = shiftsData.map((s) => s.id);
       const [assignmentsMap, availabilities] = await Promise.all([
         fetchShiftAssignments(supabase, shiftIds),
@@ -238,6 +222,17 @@ export function StaffingModal({
     supabase,
     t,
   ]);
+
+  useEffect(() => {
+    if (open) {
+      void loadStaffingData();
+    } else {
+      setSelectedEmployees(new Set());
+      setSelectedForRemoval(new Map());
+      setSearchTerm("");
+      setConfirmDialog({ open: false, employeesToRemove: [] });
+    }
+  }, [open, loadStaffingData]);
 
   const toggleEmployee = useCallback((userId: number) => {
     setSelectedEmployees((prev) => {
@@ -336,98 +331,201 @@ export function StaffingModal({
     }
   };
 
-  const handleSendInvites = async () => {
-    if (selectedEmployees.size === 0) {
-      toast.error(t("staffingToast.selectEmployee"));
+const handleSendInvites = async () => {
+  console.log("🚀🚀🚀 HANDLE SEND INVITES CALLED 🚀🚀🚀");
+
+  if (selectedEmployees.size === 0) {
+    console.log("❌ No employees selected");
+    toast.error(t("staffingToast.selectEmployee"));
+    return;
+  }
+
+  console.log("✅ Employees selected:", selectedEmployees.size);
+  setSendingInvites(true);
+
+  try {
+    console.log("1️⃣ Getting authenticated user...");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.log("❌ Not authenticated");
+      toast.error("Not authenticated");
+      setSendingInvites(false);
       return;
     }
 
-    setSendingInvites(true);
+    console.log("✅ User authenticated:", user.id);
+
+    console.log("2️⃣ Getting user database record...");
+    const { data: userData } = await supabase
+      .from("user")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single();
+
+    if (!userData) {
+      console.log("❌ User not found in database");
+      toast.error("User not found");
+      setSendingInvites(false);
+      return;
+    }
+
+    console.log("✅ User DB record found:", userData.id);
+
+    const now = new Date().toISOString();
+    const invitations = [];
+
+    console.log("3️⃣ Building invitations...");
+    for (const userId of Array.from(selectedEmployees)) {
+      const userAvailability = employeeAvailabilities.find(
+        (a) => a.employee.userId === userId
+      );
+
+      const availableShiftIds = shiftsToUse
+        .filter((shift) => {
+          if (userAvailability?.assignedShiftIds.includes(shift.id)) {
+            return false;
+          }
+          const hasConflict = userAvailability?.conflictDetails.some((detail) =>
+            detail.includes(shift.shift_date)
+          );
+          return !hasConflict;
+        })
+        .map((s) => s.id);
+
+      if (availableShiftIds.length > 0) {
+        invitations.push({
+          job_id: jobId,
+          user_id: userId,
+          invited_by: userData.id,
+          shift_ids: availableShiftIds,
+          status: "pending",
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    }
+
+    console.log("✅ Built invitations:", invitations);
+
+    if (invitations.length === 0) {
+      console.log("❌ No available shifts");
+      toast.error(t("staffingToast.noAvailableShifts"));
+      setSendingInvites(false);
+      return;
+    }
+
+    console.log("4️⃣ Inserting into database...");
+    const { data: createdInvitations, error } = await supabase
+      .from("job_invitation")
+      .insert(invitations)
+      .select("id, job_id, user_id, shift_ids");
+
+    if (error) {
+      console.error("❌ Supabase insert error:", error);
+      throw error;
+    }
+
+    console.log("✅ Invitations created in DB:", createdInvitations);
+
+    if (!createdInvitations || createdInvitations.length === 0) {
+      console.error("❌ No invitations returned from DB");
+      throw new Error("No invitations were created");
+    }
+
+    // ============================================
+    // THIS IS THE CRITICAL PART
+    // ============================================
+    console.log("5️⃣ Preparing to call notification API...");
+
+    const invitationIds = createdInvitations.map((inv) => inv.id);
+    console.log("📧 Invitation IDs:", invitationIds);
+
+    const apiUrl = "/api/job-invitation";
+    console.log("📧 API URL:", apiUrl);
+
+const currentLanguage = window.location.pathname.split("/")[1]; // Gets 'en' or 'el' from URL
+const requestBody = {
+  invitationIds,
+  language: currentLanguage === "el" ? "el" : "en",
+};    console.log("📧 Request body:", requestBody);
+
+    console.log("📧 Making fetch call NOW...");
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Not authenticated");
-        return;
-      }
+      const apiResponse = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-      const { data: userData } = await supabase
-        .from("user")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
+      console.log("📬 Fetch completed!");
+      console.log("📬 Response status:", apiResponse.status);
+      console.log("📬 Response ok:", apiResponse.ok);
+      console.log(
+        "📬 Response headers:",
+        Object.fromEntries(apiResponse.headers.entries())
+      );
 
-      if (!userData) {
-        toast.error("User not found");
-        return;
-      }
+      const responseText = await apiResponse.text();
+      console.log("📬 Response text:", responseText);
 
-      const now = new Date().toISOString();
+      if (!apiResponse.ok) {
+        console.error("❌ API returned non-OK status");
+        console.error("❌ Response:", responseText);
 
-      const invitations = [];
-      for (const userId of Array.from(selectedEmployees)) {
-        const userAvailability = employeeAvailabilities.find(
-          (a) => a.employee.userId === userId
+        toast.warning(
+          "Invitations created but email/SMS may have failed. Check logs."
         );
-
-        const availableShiftIds = shiftsToUse
-          .filter((shift) => {
-            if (userAvailability?.assignedShiftIds.includes(shift.id)) {
-              return false;
-            }
-            const hasConflict = userAvailability?.conflictDetails.some(
-              (detail) => detail.includes(shift.shift_date)
-            );
-            return !hasConflict;
-          })
-          .map((s) => s.id);
-
-        if (availableShiftIds.length > 0) {
-          invitations.push({
-            job_id: jobId,
-            user_id: userId,
-            invited_by: userData.id,
-            shift_ids: availableShiftIds,
-            status: "pending",
-            created_at: now,
-            updated_at: now,
-          });
+      } else {
+        try {
+          const apiResult = JSON.parse(responseText);
+          console.log("✅ API Result:", apiResult);
+        } catch (e) {
+          console.error("❌ Failed to parse JSON:", e);
         }
       }
+    } catch (fetchError) {
+      console.error("❌❌❌ FETCH ERROR:", fetchError);
+      console.error("Error details:", {
+        name: fetchError instanceof Error ? fetchError.name : "unknown",
+        message: fetchError instanceof Error ? fetchError.message : "unknown",
+        stack: fetchError instanceof Error ? fetchError.stack : "unknown",
+      });
 
-      if (invitations.length === 0) {
-        toast.error(t("staffingToast.noAvailableShifts"));
-        setSendingInvites(false);
-        return;
-      }
-
-      const { error } = await supabase
-        .from("job_invitation")
-        .insert(invitations);
-
-      if (error) throw error;
-
-      toast.success(
-        t("staffingToast.invitationsSent", { count: invitations.length }),
-        {
-          description: t("staffingToast.invitationsDescription"),
-        }
+      toast.warning(
+        "Invitations created but notification API failed. Check console."
       );
-
-      setSelectedEmployees(new Set());
-      await loadStaffingData();
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      console.error("❌ Error sending invitations:", errorMessage);
-      toast.error(
-        t("staffingToast.invitationsFailed", { error: errorMessage })
-      );
-    } finally {
-      setSendingInvites(false);
     }
-  };
+
+    console.log("6️⃣ Showing success toast...");
+    toast.success(
+      t("staffingToast.invitationsSent", { count: invitations.length }),
+      {
+        description: t("staffingToast.invitationsDescription"),
+      }
+    );
+
+    console.log("7️⃣ Cleaning up...");
+    setSelectedEmployees(new Set());
+    await loadStaffingData();
+
+    console.log("✅✅✅ HANDLE SEND INVITES COMPLETED ✅✅✅");
+  } catch (error) {
+    const errorMessage = getErrorMessage(error);
+    console.error("❌❌❌ ERROR IN HANDLE SEND INVITES:", error);
+    console.error("Error message:", errorMessage);
+    toast.error(t("staffingToast.invitationsFailed", { error: errorMessage }));
+  } finally {
+    setSendingInvites(false);
+  }
+};
+
+
 
   const handleAssignStaff = async () => {
     if (selectedEmployees.size === 0) {
@@ -511,7 +609,6 @@ export function StaffingModal({
     }
   };
 
-  // ✅ Memoize filtered availabilities
   const filteredAvailabilities = useMemo(() => {
     if (!searchTerm) return employeeAvailabilities;
 

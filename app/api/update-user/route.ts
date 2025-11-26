@@ -1,9 +1,9 @@
-//hype-hire/vercel/app/api/update-user/route.ts
+// app/api/update-user/route.ts
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp"; // ✅ ADD THIS
+import sharp from "sharp";
 
 // Validation constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -14,12 +14,12 @@ const ALLOWED_TYPES = [
   "image/heic",
   "image/heif",
   "image/webp",
-]; // ✅ UPDATED
+];
 const MAX_NAME_LENGTH = 100;
 
 export async function POST(request: NextRequest) {
   try {
-    // ✅ Get authenticated admin user
+    // Get authenticated admin user
     const supabase = await createClient();
 
     const {
@@ -34,9 +34,10 @@ export async function POST(request: NextRequest) {
     const userId = formData.get("userId") as string;
     const firstName = formData.get("firstName") as string;
     const lastName = formData.get("lastName") as string;
+    const phoneNumber = formData.get("phoneNumber") as string; // ✅ Get phone number
     const file = formData.get("profilePicture") as File | null;
 
-    // ✅ Validate userId is provided
+    // Validate userId is provided
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
 
-    // ✅ Get admin user with their roles
+    // Get admin user with their roles
     const adminUser = await prisma.user.findUnique({
       where: { authUserId: adminAuthUser.id },
       select: {
@@ -73,12 +74,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ Check if admin is a superadmin
+    // Check if admin is a superadmin
     const isSuperAdmin = adminUser.userCompanyRoles.some(
       (r) => r.role === "superadmin"
     );
 
-    // ✅ Get target user with their roles
+    // Get target user with their roles
     const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId },
       select: {
@@ -104,12 +105,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ Check if target user is a superadmin
+    // Check if target user is a superadmin
     const targetIsSuperAdmin = targetUser.userCompanyRoles.some(
       (r) => r.role === "superadmin"
     );
 
-    // ✅ Permission Logic
+    // Permission Logic
     let hasPermission = false;
 
     if (isSuperAdmin) {
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ Validate names
+    // Validate names
     if (!firstName?.trim() || firstName.length > MAX_NAME_LENGTH) {
       return NextResponse.json(
         {
@@ -176,9 +177,8 @@ export async function POST(request: NextRequest) {
 
     let profilePictureUrl: string | null = null;
 
-    // ✅ Handle file upload if present
+    // Handle file upload if present
     if (file) {
-      // Validate file type
       if (!ALLOWED_TYPES.includes(file.type)) {
         return NextResponse.json(
           { error: "Only JPG, PNG, WebP, and HEIC images are allowed" },
@@ -186,15 +186,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate file size
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json(
-          { error: "Image must be smaller than 5MB" },
+          { error: "Image must be smaller than 10MB" },
           { status: 400 }
         );
       }
 
-      // ✅ NEW: Convert HEIC/HEIF to JPEG
+      // Convert HEIC/HEIF to JPEG, use other formats as-is
       let fileToUpload: Buffer;
       let finalContentType: string;
       let fileExtension: string;
@@ -217,7 +216,6 @@ export async function POST(request: NextRequest) {
           );
         }
       } else {
-        // For other formats (JPEG, PNG, WebP), use as-is
         const buffer = await file.arrayBuffer();
         fileToUpload = Buffer.from(buffer);
         finalContentType = file.type;
@@ -230,7 +228,6 @@ export async function POST(request: NextRequest) {
 
       const adminClient = createAdminClient();
 
-      // ✅ UPDATED: Upload buffer instead of file
       const { error: uploadError } = await adminClient.storage
         .from("profile-pictures")
         .upload(fileName, fileToUpload, {
@@ -276,12 +273,13 @@ export async function POST(request: NextRequest) {
       profilePictureUrl = data.publicUrl;
     }
 
-    // ✅ Update target user's profile
+    // ✅ Update target user's profile INCLUDING phone number
     await prisma.user.update({
       where: { id: targetUserId },
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        phoneNumber: phoneNumber?.trim() || null, // ✅ Save phone number (allow empty)
         ...(profilePictureUrl && { profilePicture: profilePictureUrl }),
       },
     });

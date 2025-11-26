@@ -22,7 +22,6 @@ export default async function SettingsPage({
 
   const authUserId = session.user.id;
 
-  // ✅ OPTIMIZED: Use select only needed fields with proper indexing
   const user = await prisma.user.findUnique({
     where: { authUserId },
     select: {
@@ -30,6 +29,7 @@ export default async function SettingsPage({
       lastName: true,
       email: true,
       profilePicture: true,
+      phoneNumber: true,
     },
   });
 
@@ -38,13 +38,11 @@ export default async function SettingsPage({
     redirect(`/${lang}/error?message=profile_not_found`);
   }
 
-  // ✅ OPTIMIZED: Handle profile picture URL on server (no extra client work)
   let profilePictureUrl: string | null = null;
   if (user.profilePicture) {
     if (user.profilePicture.startsWith("http")) {
       profilePictureUrl = user.profilePicture;
     } else {
-      // ✅ Get public URL on server (faster than client-side)
       const { data } = supabase.storage
         .from("profile-pictures")
         .getPublicUrl(user.profilePicture);
@@ -52,15 +50,18 @@ export default async function SettingsPage({
     }
   }
 
-  // ✅ OPTIMIZED: Dynamic import with proper error handling
   const translations = await import(
     `@/translations/${lang}/settings.json`
   ).then((mod) => mod.default);
 
   return (
     <div className="min-h-screen bg-background p-20">
+      {" "}
+      {/* ✅ p-8 → p-4 */}
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-4">
+          {" "}
+          {/* ✅ mb-6 → mb-4 */}
           <h1 className="text-3xl font-bold text-foreground">
             {translations.pageTitle}
           </h1>
@@ -71,6 +72,7 @@ export default async function SettingsPage({
             firstName: user.firstName || "",
             lastName: user.lastName || "",
             email: user.email || "",
+            phoneNumber: user.phoneNumber || "",
             profilePictureUrl: profilePictureUrl,
           }}
         />
