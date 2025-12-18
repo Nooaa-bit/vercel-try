@@ -611,3 +611,96 @@ enum cancellation_reason {
 // typeId      Int        @map("type_id")
 //type        LocationType @relation(fields: [typeId], references: [id])
 // ... rest of model ...}
+
+model RawCandle {
+  id         BigInt   @id @default(autoincrement())
+  symbol     String   @db.VarChar(20)
+  timeframe  String   @db.VarChar(10)
+  timestamp  DateTime @db.Timestamp(6)
+  open       Decimal  @db.Decimal(20, 8)
+  high       Decimal  @db.Decimal(20, 8)
+  low        Decimal  @db.Decimal(20, 8)
+  close      Decimal  @db.Decimal(20, 8)
+  volume     Decimal  @db.Decimal(20, 8)
+  createdAt  DateTime @default(now())
+  
+  @@unique([symbol, timeframe, timestamp], name: "raw_unique_candle")
+  @@index([symbol, timeframe, timestamp(sort: Desc)], name: "raw_query_idx")
+  @@map("raw_candles")
+}
+
+model ProcessedCandle {
+  id         BigInt   @id @default(autoincrement())
+  symbol     String   @db.VarChar(20)
+  timeframe  String   @db.VarChar(10)
+  timestamp  DateTime @db.Timestamp(6)
+  
+  // OHLCV data (duplicated from raw)
+  open       Decimal  @db.Decimal(20, 8)
+  high       Decimal  @db.Decimal(20, 8)
+  low        Decimal  @db.Decimal(20, 8)
+  close      Decimal  @db.Decimal(20, 8)
+  volume     Decimal  @db.Decimal(20, 8)
+  
+  datetimeUtc    DateTime
+  candleNumber   Int
+  
+  // WaveTrend indicators
+  wt1            Decimal? @db.Decimal(10, 4)
+  wt2            Decimal? @db.Decimal(10, 4)
+  buySignal      Boolean  @default(false)
+  sellSignal     Boolean  @default(false)
+  
+  // Base EMAs (all timeframes have these)
+  ema50          Decimal? @db.Decimal(20, 8)
+  ema100         Decimal? @db.Decimal(20, 8)
+  ema200         Decimal? @db.Decimal(20, 8)
+  
+  // Cross-timeframe EMAs (only certain timeframes)
+  tf1hEma100     Decimal? @db.Decimal(20, 8)
+  tf1hEma200     Decimal? @db.Decimal(20, 8)
+  tf4hEma100     Decimal? @db.Decimal(20, 8)
+  tf4hEma200     Decimal? @db.Decimal(20, 8)
+  tf12hEma100    Decimal? @db.Decimal(20, 8)
+  tf12hEma200    Decimal? @db.Decimal(20, 8)
+  
+  // Cross-timeframe EMA distance percentages
+  tf1hEma100DistPct   Decimal? @db.Decimal(10, 4)
+  tf1hEma200DistPct   Decimal? @db.Decimal(10, 4)
+  tf4hEma100DistPct   Decimal? @db.Decimal(10, 4)
+  tf4hEma200DistPct   Decimal? @db.Decimal(10, 4)
+  tf12hEma100DistPct  Decimal? @db.Decimal(10, 4)
+  tf12hEma200DistPct  Decimal? @db.Decimal(10, 4)
+  
+  // Cross-timeframe signals
+  tf4hBuySignal   Boolean @default(false)
+  tf4hSellSignal  Boolean @default(false)
+  tf12hBuySignal  Boolean @default(false)
+  tf12hSellSignal Boolean @default(false)
+  
+  // Cross-timeframe WaveTrend
+  tf4hWt2   Decimal? @db.Decimal(10, 4)
+  tf12hWt2  Decimal? @db.Decimal(10, 4)
+  
+  // Divergence detection (only 30m and 1h have these)
+  hasDivergence                Boolean  @default(false)
+  divTypeClosest               String?  @db.VarChar(20)
+  divRefCandleClosest          Int?
+  divCandlesBackClosest        Int?
+  divPriceChangePctClosest     Decimal? @db.Decimal(10, 4)
+  divWt2ChangePointsClosest    Decimal? @db.Decimal(10, 4)
+  divDmiClosest                Decimal? @db.Decimal(10, 4)
+  
+  divTypeBiggest               String?  @db.VarChar(20)
+  divRefCandleBiggest          Int?
+  divCandlesBackBiggest        Int?
+  divPriceChangePctBiggest     Decimal? @db.Decimal(10, 4)
+  divWt2ChangePointsBiggest    Decimal? @db.Decimal(10, 4)
+  divDmiBiggest                Decimal? @db.Decimal(10, 4)
+  
+  updatedAt  DateTime @updatedAt
+  
+  @@unique([symbol, timeframe, timestamp], name: "processed_unique_candle")
+  @@index([symbol, timeframe, timestamp(sort: Desc)], name: "processed_query_idx")
+  @@map("processed_candles")
+}
