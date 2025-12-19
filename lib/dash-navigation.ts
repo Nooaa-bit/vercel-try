@@ -34,7 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
     titleKey: "calendar",
     url: "/dashboard/calendar",
     icon: CalendarIcon,
-   // requiredRole: "company_admin", this is about the visibility of the tab in Appsidebar
+    // requiredRole: "company_admin", this is about the visibility of the tab in Appsidebar
     section: "main",
   },
   {
@@ -70,6 +70,13 @@ export const NAV_ITEMS: NavItem[] = [
     titleKey: "contracts",
     url: "/dashboard/contracts",
     icon: FileText,
+    section: "documents",
+  },
+  {
+    titleKey: "trading",
+    url: "/dashboard/trading",
+    icon: BarChart3,
+    requiredRole: "superadmin",
     section: "documents",
   },
 
