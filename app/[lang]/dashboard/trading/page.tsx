@@ -293,7 +293,7 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   useEffect(() => {
     const fetchSymbols = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/symbols`);
+        const response = await fetch(`/api/assets/symbols`);
         const data = await response.json();
 
         if (data.symbols && data.symbols.length > 0) {
@@ -320,10 +320,7 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   useEffect(() => {
     const fetchDateRange = async () => {
       try {
-        const symbolEncoded = encodeURIComponent(activeSymbol);
-        const response = await fetch(
-          `${API_URL}/api/date-range/${symbolEncoded}`
-        );
+       const response = await fetch(`/api/assets/date-range/${activeSymbol}`);
         const data = await response.json();
 
         if (data.min_date && data.max_date) {
@@ -364,7 +361,6 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
         setError(null);
         console.log(`🔄 Fetching ${symbol} ${timeframe} data...`);
 
-        const symbolEncoded = encodeURIComponent(symbol);
 
         const [
           candlesResponse,
@@ -372,12 +368,10 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
           emaResponse,
           divergencesResponse,
         ] = await Promise.all([
-          fetch(`${API_URL}/api/candles/${symbolEncoded}/${timeframe}`),
-          fetch(
-            `${API_URL}/api/indicators/wavetrend/${symbolEncoded}/${timeframe}`
-          ),
-          fetch(`${API_URL}/api/indicators/ema/${symbolEncoded}/${timeframe}`),
-          fetch(`${API_URL}/api/divergences/${symbolEncoded}/${timeframe}`),
+          fetch(`/api/assets/candles/${symbol}/${timeframe}`),
+          fetch(`/api/assets/indicators/wavetrend/${symbol}/${timeframe}`),
+          fetch(`/api/assets/indicators/ema/${symbol}/${timeframe}`),
+          fetch(`/api/assets/divergencies/${symbol}/${timeframe}`),
         ]);
 
         if (
