@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/api/assets/symbols/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 

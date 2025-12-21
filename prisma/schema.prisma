@@ -648,6 +648,8 @@ model ProcessedCandle {
   // WaveTrend indicators
   wt1            Decimal? @db.Decimal(10, 4)
   wt2            Decimal? @db.Decimal(10, 4)
+  vwap           Decimal? @db.Decimal(10, 4)
+  vwapHigher     Decimal? @db.Decimal(10, 4)
   buySignal      Boolean  @default(false)
   sellSignal     Boolean  @default(false)
   

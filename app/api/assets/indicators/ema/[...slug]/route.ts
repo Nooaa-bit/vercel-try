@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/api/assets/indicators/ema/[...slug]/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { EmaDataPoint, EmaResponse } from "@/app/api/assets/types/crypto";

@@ -32,3 +32,4 @@ export const CROSS_TF_WT_MAPPING: Record<string, string[]> = {
   "30m": ["4h", "12h"],
   "1h": ["4h", "12h"],
 };
+

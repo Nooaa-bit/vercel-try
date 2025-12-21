@@ -13,7 +13,7 @@ import {
 import { ProtectedPage } from "@/components/ProtectedPage";
 
 const TIMEFRAMES = ["5m", "30m", "1h"];
-const API_URL = "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/assets";
 
 const TIMEZONE_OPTIONS = [
   { label: "UTC", offset: 0 },
@@ -63,7 +63,9 @@ interface IndicatorData {
   wt2_4h?: number;
   wt2_12h?: number;
   wt2_1h?: number;
-  wt2_30m?: number;
+  wt2_30m?: number;  
+  vwap?: number;        
+  vwapHigher?: number;    
   cross_signals?: {
     "4h_buy"?: boolean;
     "4h_sell"?: boolean;
@@ -112,7 +114,7 @@ export default function Home() {
   const priceChartRef = useRef<IChartApi | null>(null);
   const indicatorChartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const wt2SeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const wt2SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const whitespaceSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const ema50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -127,6 +129,8 @@ export default function Home() {
 
   const htfIndicatorLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const htfIndicator12hLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const vwapSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const vwapHigherSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const divergenceWT2SeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(
     new Map()
@@ -134,14 +138,13 @@ export default function Home() {
   const divergencePriceSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(
     new Map()
   );
-const referenceLinesRef = useRef<{
-  overboughtLine: ISeriesApi<"Line">;
-  oversoldLine: ISeriesApi<"Line">;
-  zeroLine: ISeriesApi<"Line">;
-} | null>(null);
+  const referenceLinesRef = useRef<{
+    overboughtLine: ISeriesApi<"Line">;
+    oversoldLine: ISeriesApi<"Line">;
+    zeroLine: ISeriesApi<"Line">;
+  } | null>(null);
 
-
-const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   const [activeSymbol, setActiveSymbol] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("activeSymbol");
@@ -320,7 +323,7 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   useEffect(() => {
     const fetchDateRange = async () => {
       try {
-       const response = await fetch(`/api/assets/date-range/${activeSymbol}`);
+        const response = await fetch(`/api/assets/date-range/${activeSymbol}`);
         const data = await response.json();
 
         if (data.min_date && data.max_date) {
@@ -360,7 +363,6 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
         setLoading(true);
         setError(null);
         console.log(`🔄 Fetching ${symbol} ${timeframe} data...`);
-
 
         const [
           candlesResponse,
@@ -600,6 +602,63 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
     return result;
   }, [getCachedData, convertTimezone, activeTimeframe]);
 
+  // VWAP data processing
+  const { vwapData, vwapHigherData } = useMemo(() => {
+    const cached = getCachedData();
+    if (!cached) {
+      return { vwapData: [], vwapHigherData: [] };
+    }
+
+    const vwapMap = new Map<number, number>();
+    const vwapHigherMap = new Map<number, number>();
+
+    cached.indicators.forEach((ind) => {
+      if (ind.vwap !== null && ind.vwap !== undefined && !isNaN(ind.vwap)) {
+        vwapMap.set(ind.time, ind.vwap);
+      }
+      if (
+        ind.vwapHigher !== null &&
+        ind.vwapHigher !== undefined &&
+        !isNaN(ind.vwapHigher) &&
+        ind.vwapHigher !== 0
+      ) {
+        vwapHigherMap.set(ind.time, ind.vwapHigher);
+      }
+    });
+
+    const vwap = cached.candles
+      .map((candle) => {
+        const vwapValue = vwapMap.get(candle.time);
+        if (vwapValue !== undefined) {
+          return {
+            time: convertTimezone(candle.time) as Time,
+            value: vwapValue,
+          };
+        }
+        return null;
+      })
+      .filter((d) => d !== null) as Array<{ time: Time; value: number }>;
+
+    const vwapHigher = cached.candles
+      .map((candle) => {
+        const vwapHigherValue = vwapHigherMap.get(candle.time);
+        if (vwapHigherValue !== undefined) {
+          return {
+            time: convertTimezone(candle.time) as Time,
+            value: vwapHigherValue,
+          };
+        }
+        return null;
+      })
+      .filter((d) => d !== null) as Array<{ time: Time; value: number }>;
+
+    console.log(
+      `📊 VWAP data: ${vwap.length} points, VWAPHigher: ${vwapHigher.length} points`
+    );
+
+    return { vwapData: vwap, vwapHigherData: vwapHigher };
+  }, [getCachedData, convertTimezone]);
+
   const { buySignals, sellSignals } = useMemo(() => {
     const cached = getCachedData();
     if (!cached) return { buySignals: [], sellSignals: [] };
@@ -632,23 +691,22 @@ const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
     const cached = getCachedData();
     if (!cached) return { "4h": [], "12h": [] };
 
-const signals4h: Array<{
-  time: Time;
-  position: "belowBar" | "aboveBar";
-  color: string;
-  shape: "arrowUp" | "arrowDown";
-  text: string;
-  size: number;
-}> = [];
-const signals12h: Array<{
-  time: Time;
-  position: "belowBar" | "aboveBar";
-  color: string;
-  shape: "arrowUp" | "arrowDown";
-  text: string;
-  size: number;
-}> = [];
-    
+    const signals4h: Array<{
+      time: Time;
+      position: "belowBar" | "aboveBar";
+      color: string;
+      shape: "arrowUp" | "arrowDown";
+      text: string;
+      size: number;
+    }> = [];
+    const signals12h: Array<{
+      time: Time;
+      position: "belowBar" | "aboveBar";
+      color: string;
+      shape: "arrowUp" | "arrowDown";
+      text: string;
+      size: number;
+    }> = [];
 
     cached.indicators.forEach((indicator) => {
       if (!indicator.cross_signals) return;
@@ -1025,18 +1083,28 @@ const signals12h: Array<{
           if (convertedWT2.length > 0) {
             wt2SeriesRef.current.setData(convertedWT2);
 
+            // Set VWAP data
+            if (vwapSeriesRef.current) {
+              vwapSeriesRef.current.setData(vwapData);
+              console.log(`✓ Set VWAP: ${vwapData.length} points`);
+            }
+
+            // Set VWAP Higher data
+            if (vwapHigherSeriesRef.current) {
+              vwapHigherSeriesRef.current.setData(vwapHigherData);
+              console.log(`✓ Set VWAP Higher: ${vwapHigherData.length} points`);
+            }
+
             // Update HTF indicator line (4h)
             if (htfIndicatorLineRef.current) {
               if (htfIndicatorLine.length > 0) {
-                    const segments = htfIndicatorLine.map((point: {
-  time: Time;
-  value: number;
-  color: string;
-}) => ({
-                  time: point.time,
-                  value: point.value,
-                  color: point.color,
-                }));
+                const segments = htfIndicatorLine.map(
+                  (point: { time: Time; value: number; color: string }) => ({
+                    time: point.time,
+                    value: point.value,
+                    color: point.color,
+                  })
+                );
                 htfIndicatorLineRef.current.setData(segments);
                 console.log(`✓ Set 4H line: ${segments.length} points`);
               } else {
@@ -1050,13 +1118,13 @@ const signals12h: Array<{
             // Update HTF indicator line (12h)
             if (htfIndicator12hLineRef.current) {
               if (htfIndicator12hLine.length > 0) {
-const segments = htfIndicator12hLine.map(
-  (point: { time: Time; value: number; color: string }) => ({
-    time: point.time,
-    value: point.value,
-    color: point.color,
-  })
-);
+                const segments = htfIndicator12hLine.map(
+                  (point: { time: Time; value: number; color: string }) => ({
+                    time: point.time,
+                    value: point.value,
+                    color: point.color,
+                  })
+                );
                 htfIndicator12hLineRef.current.setData(segments);
                 console.log(`✓ Set 12H line: ${segments.length} points`);
               } else {
@@ -1186,6 +1254,8 @@ const segments = htfIndicator12hLine.map(
   }, [
     convertedCandles,
     convertedWT2,
+    vwapData,
+    vwapHigherData,
     htfIndicatorLine,
     htfIndicator12hLine,
     buySignals,
@@ -1387,8 +1457,8 @@ const segments = htfIndicator12hLine.map(
     console.log("🎨 Initializing charts...");
 
     const chartWidth = priceChartContainerRef.current.clientWidth;
-    const priceChartHeight = Math.floor(window.innerHeight * 0.65);
-    const indicatorChartHeight = Math.floor(window.innerHeight * 0.2);
+    const priceChartHeight = Math.floor(window.innerHeight * 0.7);
+    const indicatorChartHeight = Math.floor(window.innerHeight * 0.5);
 
     const priceChart = createChart(priceChartContainerRef.current, {
       layout: {
@@ -1531,8 +1601,8 @@ const segments = htfIndicator12hLine.map(
       priceLineVisible: false,
       autoscaleInfoProvider: () => ({
         priceRange: {
-          minValue: -160,
-          maxValue: 120,
+          minValue: -100,
+          maxValue: 100,
         },
       }),
     });
@@ -1556,17 +1626,38 @@ const segments = htfIndicator12hLine.map(
       color: "#0a0808ea",
     });
 
-    wt2SeriesRef.current = indicatorChart.addAreaSeries({
-      lineColor: "#2962FF",
-      topColor: "rgba(41, 98, 255, 0.4)",
-      bottomColor: "rgba(41, 98, 255, 0.0)",
+    wt2SeriesRef.current = indicatorChart.addLineSeries({
+      color: "#2962FF",
       lineWidth: 2,
+      lineStyle: LineStyle.Solid,
+      lastValueVisible: true,
+      priceLineVisible: false,
       autoscaleInfoProvider: () => ({
         priceRange: {
-          minValue: -150,
-          maxValue: 120,
+          minValue: -100,
+          maxValue: 100,
         },
       }),
+    });
+
+    // VWAP (current timeframe) - LINE not AREA lineStyle: LineStyle.Dashed,
+    vwapSeriesRef.current = indicatorChart.addLineSeries({
+      color: "rgba(217, 224, 169, 0.95)",
+      lineWidth: 1,
+      lineStyle: LineStyle.Solid,
+      lastValueVisible: true,
+      priceLineVisible: false,
+      title: "VWAP",
+    });
+
+    // VWAP Higher (higher timeframe) - LINE not AREA
+    vwapHigherSeriesRef.current = indicatorChart.addLineSeries({
+      color: "rgba(228, 44, 216, 0.95)",
+      lineWidth: 1,
+      lineStyle: LineStyle.Solid,
+      lastValueVisible: true,
+      priceLineVisible: false,
+      title: "VWAP Higher",
     });
 
     const overboughtLine = indicatorChart.addLineSeries({
@@ -1593,11 +1684,11 @@ const segments = htfIndicator12hLine.map(
       priceLineVisible: false,
     });
 
-      referenceLinesRef.current = {
-        overboughtLine,
-        oversoldLine,
-        zeroLine,
-      };
+    referenceLinesRef.current = {
+      overboughtLine,
+      oversoldLine,
+      zeroLine,
+    };
 
     let isSyncing = false;
 
@@ -1628,7 +1719,7 @@ const segments = htfIndicator12hLine.map(
     };
 
     // Store sync function for later use
-      initialSync();
+    initialSync();
 
     const updateCrosshairLine = (
       chartSource: "price" | "indicator",
@@ -1678,8 +1769,8 @@ const segments = htfIndicator12hLine.map(
         indicatorChartRef.current
       ) {
         const newWidth = priceChartContainerRef.current.clientWidth;
-        const newPriceHeight = Math.floor(window.innerHeight * 0.65);
-        const newIndicatorHeight = Math.floor(window.innerHeight * 0.2);
+        const newPriceHeight = Math.floor(window.innerHeight * 0.7);
+        const newIndicatorHeight = Math.floor(window.innerHeight * 0.5);
 
         priceChartRef.current.applyOptions({
           width: newWidth,
@@ -1736,6 +1827,9 @@ const segments = htfIndicator12hLine.map(
       ema12h100SeriesRef.current = null;
       ema12h200SeriesRef.current = null;
       htfIndicatorLineRef.current = null;
+      htfIndicator12hLineRef.current = null;
+      vwapSeriesRef.current = null;
+      vwapHigherSeriesRef.current = null;
 
       setChartsInitialized(false);
     };
@@ -1747,7 +1841,7 @@ const segments = htfIndicator12hLine.map(
 
   return (
     <ProtectedPage requiredRole="superadmin">
-      <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden mt-9">
+      <div className="flex flex-col min-h-screen bg-gray-900 text-white overflow-hidden mt-9">
         {/* Top Control Bar */}
         <div className=" mt-9 bg-gray-800 border-b border-gray-700 px-3 py-1.5 flex items-center gap-2 text-[10px]">
           {/* Symbol Selector */}
@@ -2071,12 +2165,13 @@ const segments = htfIndicator12hLine.map(
         )}
 
         {/* Chart Area */}
-        <div className="flex-1 flex flex-col">
-          <div className="bg-gray-900 px-2 py-1 text-xs text-gray-400">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-gray-900 px-2 py-1 text-xs text-gray-400 shrink-0">
             {activeTimeframe.toUpperCase()} - {currentTzLabel}
           </div>
 
-          <div ref={chartsWrapperRef} className="flex-1 relative">
+          {/*<div ref={chartsWrapperRef} className="flex-1 relative">*/}
+          <div ref={chartsWrapperRef} className="flex-1 overflow-hidden relative">
             <div
               ref={crosshairLineRef}
               className="absolute top-0 bottom-0 w-px bg-gray-500 pointer-events-none z-10"

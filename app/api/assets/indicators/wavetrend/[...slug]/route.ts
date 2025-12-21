@@ -68,6 +68,19 @@ export async function GET(
           sell: toBoolean(candle.sellSignal),
         };
 
+        // Add VWAP (current timeframe)
+        if (candle.vwap !== null) {
+          dataPoint.vwap = toNumber(candle.vwap);
+        }
+
+        // Add VWAP from higher timeframe
+        if (candle.vwapHigher !== null) {
+          const vwapHigherVal = toNumber(candle.vwapHigher);
+          if (vwapHigherVal !== 0) {
+            // Only include if not zero
+            dataPoint.vwapHigher = vwapHigherVal;
+          }
+        }
         // Add cross-timeframe WT2 values
         if (CROSS_TF_WT_MAPPING[timeframe]) {
           if (CROSS_TF_WT_MAPPING[timeframe].includes("4h") && candle.tf4hWt2) {

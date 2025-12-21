@@ -17,6 +17,8 @@ export interface WaveTrendData {
   time: number;
   wt1: number;
   wt2: number;
+  vwap?: number; 
+  vwapHigher?: number;
   buy: boolean;
   sell: boolean;
   wt2_4h?: number;

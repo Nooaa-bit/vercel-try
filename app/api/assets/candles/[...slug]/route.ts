@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/api/assets/candles/[...slug]/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { CandleData } from "@/app/api/assets/types/crypto";
