@@ -54,6 +54,7 @@ export async function GET(
       },
       select: {
         datetimeUtc: true,
+        candleNumber: true, 
         open: true,
         high: true,
         low: true,
@@ -69,6 +70,7 @@ export async function GET(
 
     const candleData: CandleData[] = candles.map((candle) => ({
       time: toUnixTimestamp(candle.datetimeUtc),
+      candle_number: candle.candleNumber, 
       open: toNumber(candle.open),
       high: toNumber(candle.high),
       low: toNumber(candle.low),

@@ -5,7 +5,8 @@ export type ProcessedCandle = PrismaProcessedCandle;
 
 // API Response types (matching your Flask responses)
 export interface CandleData {
-  time: number; // Unix timestamp in seconds
+  time: number;
+  candle_number: number; 
   open: number;
   high: number;
   low: number;

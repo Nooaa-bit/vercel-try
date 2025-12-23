@@ -48,6 +48,7 @@ const EMA_COLORS = {
 
 interface CandleData {
   time: number;
+  candle_number: number;
   open: number;
   high: number;
   low: number;
@@ -835,7 +836,7 @@ export default function Home() {
 
     if (enabledTypes.size === 0) return;
 
-    const candleMap = new Map(cached.candles.map((c, idx) => [idx + 1, c]));
+    const candleMap = new Map(cached.candles.map((c) => [c.candle_number, c]));
     const indicatorMap = new Map(
       cached.indicators.map((ind) => [ind.time, ind.wt2])
     );
@@ -871,11 +872,21 @@ export default function Home() {
         lastValueVisible: false,
         priceLineVisible: false,
       });
+      
+      // In updateDivergenceLinesWT2
+      if (refCandle.time === div.time) {
+        console.warn(
+          `⚠️ Skipping self-referencing WT2 divergence at ${refCandle.time}`
+        );
+        return;
+      }
 
-      lineSeries.setData([
+      const points = [
         { time: convertTimezone(refCandle.time) as Time, value: refWT2 },
         { time: convertTimezone(div.time) as Time, value: currentWT2 },
-      ]);
+      ].sort((a, b) => (a.time as number) - (b.time as number));
+
+      lineSeries.setData(points); // 👈 Use sorted points
 
       divergenceWT2SeriesRef.current.set(`${divInfo.type}_${idx}`, lineSeries);
       lineCount++;
@@ -976,6 +987,13 @@ export default function Home() {
         return;
       }
 
+       if (refCandle.time === currentCandle.time) {
+         console.warn(
+           `⚠️ Skipping self-referencing divergence at ${refCandle.time}`
+         );
+         return;
+       }
+
       const color = DIVERGENCE_COLORS[divInfo.type] || "#FFFFFF";
 
       try {
@@ -988,7 +1006,8 @@ export default function Home() {
           priceLineVisible: false,
         });
 
-        lineSeries.setData([
+        // 👇 SORT THE POINTS BY TIME
+        const points = [
           {
             time: convertTimezone(refCandle.time) as Time,
             value: refCandle.close,
@@ -997,7 +1016,9 @@ export default function Home() {
             time: convertTimezone(currentCandle.time) as Time,
             value: currentCandle.close,
           },
-        ]);
+        ].sort((a, b) => (a.time as number) - (b.time as number));
+
+        lineSeries.setData(points); // 👈 Use sorted points
 
         divergencePriceSeriesRef.current.set(
           `price_${divInfo.type}_${idx}`,
