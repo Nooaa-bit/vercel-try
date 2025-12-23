@@ -1478,8 +1478,8 @@ export default function Home() {
     console.log("🎨 Initializing charts...");
 
     const chartWidth = priceChartContainerRef.current.clientWidth;
-    const priceChartHeight = Math.floor(window.innerHeight * 0.7);
-    const indicatorChartHeight = Math.floor(window.innerHeight * 0.5);
+    const priceChartHeight = Math.floor(window.innerHeight * 0.8);
+    const indicatorChartHeight = Math.floor(window.innerHeight * 0.8);
 
     const priceChart = createChart(priceChartContainerRef.current, {
       layout: {
@@ -1790,8 +1790,8 @@ export default function Home() {
         indicatorChartRef.current
       ) {
         const newWidth = priceChartContainerRef.current.clientWidth;
-        const newPriceHeight = Math.floor(window.innerHeight * 0.7);
-        const newIndicatorHeight = Math.floor(window.innerHeight * 0.5);
+        const newPriceHeight = Math.floor(window.innerHeight * 0.8);
+        const newIndicatorHeight = Math.floor(window.innerHeight * 0.8);
 
         priceChartRef.current.applyOptions({
           width: newWidth,
