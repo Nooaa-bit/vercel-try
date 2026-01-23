@@ -29,9 +29,9 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-background pt-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold">My Dashboard</h1>
+            <h1 className="text-3xl font-bold">{t("myDashboard")}</h1>
             <p className="text-muted-foreground mt-2">
-              Manage your job invitations and upcoming shifts
+              {t("manageInvitations")}
             </p>
           </div>
 
@@ -49,20 +49,20 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pt-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold">{t("adminDashboard")}</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your company operations
+            {t("manageCompany")}
           </p>
         </div>
 
         {/* ✅ Admin dashboard content - you can add metrics, charts, etc. here */}
         <Card>
           <CardHeader>
-            <CardTitle>Welcome, Admin</CardTitle>
+            <CardTitle>{t("welcomeAdmin")}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Use the navigation menu to manage jobs, calendar, and company settings.
+              {t("useNavigation")}
             </p>
           </CardContent>
         </Card>

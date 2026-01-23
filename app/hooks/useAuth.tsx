@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import useSWR from "swr";
+import useSWR from "swr"; //Show cached profile instantly → Refetch background, ❌ useEffect + fetch(): Manual loading/error/cache hell ✅ SWR/Zod: 3 lines, handles everything✅ React Query: Similar, more features✅ tRPC: If full-stack typesafety needed
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -76,7 +76,9 @@ export function useAuth() {
     revalidateOnReconnect: true,
   });
 
-  // Main auth state handler
+  // Main auth state handler.
+  //Initial load: Check URL for magic link OR getSession(). Real-time: Listen for login/logout anywhere (other tabs, mobile)
+  //Email click → /en#access_token=xyz → setSession → Clean URL → Logged in 
   useEffect(() => {
     const handleAuthState = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));

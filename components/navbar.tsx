@@ -1,3 +1,4 @@
+//hype-hire/vercel/components/navbar.tsx
 "use client";
 
 import React, { useMemo } from "react";
@@ -9,12 +10,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { createClient } from "@/lib/supabase/client";
-
 // Custom hooks
 import { useAuth } from "@/app/hooks/useAuth";
 import { useTheme } from "@/app/hooks/useTheme";
 import { useScrollPosition } from "@/app/hooks/useScrollPosition";
 import { useMobileMenu } from "@/app/hooks/useMobileMenu";
+//Segm1 Imports finished
 
 const Navbar = () => {
   const { t, i18n, ready } = useTranslation("nav");
@@ -27,38 +28,38 @@ const Navbar = () => {
     close: closeMenu,
     scrollToTop,
   } = useMobileMenu();
-
   const router = useRouter();
   const pathname = usePathname();
-
   // Extract lang from pathname; middleware guarantees /en or /el
   const match = pathname.match(/^\/(en|el)(?=\/|$)/);
   const lang = (match?.[1] as "en" | "el") ?? "en";
-
-  const homePath = `/${lang}`;
   const isHomePage = /^\/(en|el)?\/?$/.test(pathname);
+  // Extract language from pathname (useAuth style)
+  //const lang = pathname.split("/")[1] === "el" ? "el" : "en";
+  //const isHomePage = pathname === `/${lang}` || pathname === "/";
+  const homePath = `/${lang}`;
+  // Extract lang from pathname; middleware guarantees /en or /el
   const isDashboardPage = pathname.includes("dashboard");
   const darkMode = theme === "dark";
+  /*Segm 2 Hooks & Path Logic end*/
 
-  // ✅ UPDATED: Get profile picture URL - handle both URL and path formats
+  /*Segm 3 Handlers start*/
   const profilePictureUrl = useMemo(() => {
+    // UPDATED: Get profile picture URL - handle both URL and path formats
     if (!profile?.profilePicture) return null;
-
-    // Check if it's already a full URL (new format)
     if (profile.profilePicture.startsWith("http")) {
+      // Check if it's already a full URL (new format)
       return profile.profilePicture;
     }
-
     // Legacy format: it's a path, generate URL
     const supabase = createClient();
     const { data } = supabase.storage
       .from("profile-pictures")
       .getPublicUrl(profile.profilePicture);
-
     return data.publicUrl;
   }, [profile?.profilePicture]);
 
-  // ✅ Handle profile picture click
+  // Handle profile picture click
   const handleProfileClick = (e: React.MouseEvent) => {
     e.preventDefault();
     router.push(`/${lang}/dashboard/settings`);
@@ -106,11 +107,11 @@ const Navbar = () => {
     ? []
     : [
         { label: t("home"), href: homePath, onClick: handleHomeClick },
-       // {
-       // label: t("about"),
-       //   href: `${homePath}#features`,
-       //   onClick: handleHashNav("features"),
-       // },
+        // {
+        // label: t("about"),
+        //   href: `${homePath}#features`,
+        //   onClick: handleHashNav("features"),
+        // },
         {
           label: t("contact"),
           href: `${homePath}#details`,
@@ -118,6 +119,7 @@ const Navbar = () => {
         },
       ];
 
+  //Home or scroll top
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (isHomePage) {
@@ -127,12 +129,14 @@ const Navbar = () => {
     }
   };
 
+  //To dashboard
   const handleDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
     router.push(`/${lang}/dashboard`);
-  };
+  }; /*Segm 3 Handlers end*/
 
   const renderAuthSection = (isMobile = false) => {
+    // Loading State
     if (authLoading) {
       return (
         <div className="flex items-center justify-center space-x-2">
@@ -150,13 +154,18 @@ const Navbar = () => {
         user.user_metadata?.first_name?.[0]?.toUpperCase() ||
         user.email?.[0]?.toUpperCase();
 
+      //Navbar
       return (
         <div
+          /* Navbar layout start */
           className={cn(
             "flex items-center",
-            isMobile ? "flex-col space-y-4 w-full" : "gap-1.5 lg:gap-2 xl:gap-3"
-          )}
+            isMobile
+              ? "flex-col space-y-4 w-full" // Mobile menu, [Big Avatar + Name/Email Stack]  ← 300px tall block, [Full Width Logout Button],     ↑ space-y-4 = 16px vertical gaps
+              : "gap-1.5 lg:gap-2 xl:gap-3", // Desktop, [Small Avatar][Tiny Name][Logout Btn]  ← 40px horizontal row
+          )} /* Navbar layout finish */
         >
+          {/* MOBILE Auth Block start */}
           {isMobile && (
             <div className="flex items-center space-x-3 justify-center">
               {/* ✅ Clickable profile picture for mobile */}
@@ -187,7 +196,8 @@ const Navbar = () => {
               </div>
             </div>
           )}
-
+          {/* MOBILE Auth Block finish */}
+          {/* DESKTOP Auth Block start */}
           {!isMobile && (
             <>
               {/* ✅ Clickable profile picture for desktop */}
@@ -217,7 +227,8 @@ const Navbar = () => {
               </div>
             </>
           )}
-
+          {/* DESKTOP Auth Block finish SHARED Logout Button*/}
+          {/* SHARED Logout Button finish*/}
           <Button
             variant="outline"
             size="sm"
@@ -233,7 +244,7 @@ const Navbar = () => {
               "border-red-300 text-red-600 hover:bg-red-50 hover:border-red-300",
               isMobile
                 ? "w-full"
-                : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
+                : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9",
             )}
           >
             <LogOut
@@ -243,10 +254,11 @@ const Navbar = () => {
               {t("signOut")}
             </span>
           </Button>
+          {/* SHARED Logout Button finish*/}
         </div>
       );
     }
-
+    //Log in button
     return (
       <Button
         variant="outline"
@@ -263,7 +275,7 @@ const Navbar = () => {
           "border-pulse-500 text-pulse-500 hover:bg-pulse-500 hover:text-white transition-all duration-300",
           isMobile
             ? "w-full bg-pulse-500 text-white"
-            : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9"
+            : "bg-transparent text-xs lg:text-sm px-2 lg:px-3 h-8 lg:h-9",
         )}
       >
         <User className={cn("w-3 h-3 lg:w-4 lg:h-4", !isMobile && "lg:mr-2")} />
@@ -271,8 +283,8 @@ const Navbar = () => {
       </Button>
     );
   };
-  // <div className="container flex items-center justify-between px-4 sm:px-6 lg:px-8">
 
+  // UX Safeguard: show loading state until i18n is ready
   if (!ready) {
     return (
       <header className="fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 bg-white/80 backdrop-blur-md">
@@ -290,16 +302,18 @@ const Navbar = () => {
     );
   }
 
+  /*Final UI assembly*/
   return (
     <>
       <header
+        //Smart backgrounds:Home start: Transparent (hero bleed), Scrolled: White blur, Dashboard: Solid (content contrast)
         className={cn(
           "fixed top-0 left-0 right-0 z-50 py-2 sm:py-3 md:py-4 transition-all duration-300",
           isDashboardPage
             ? "bg-background shadow-sm"
             : isScrolled
-            ? "bg-white/60 backdrop-blur-lg shadow-sm"
-            : "bg-transparent"
+              ? "bg-white/60 backdrop-blur-lg shadow-sm"
+              : "bg-transparent",
         )}
       >
         <div className="w-full max-w-[2000px] mx-auto flex items-center justify-between gap-2 md:gap-4 px-4 sm:px-6 lg:px-8">
@@ -387,7 +401,7 @@ const Navbar = () => {
           "fixed inset-0 z-[60] bg-muted flex flex-col pt-16 px-6 md:hidden transition-all duration-300 ease-in-out",
           isMenuOpen
             ? "opacity-100 translate-x-0"
-            : "opacity-0 translate-x-full pointer-events-none"
+            : "opacity-0 translate-x-full pointer-events-none",
         )}
         style={{ backgroundColor: "hsl(30 23% 93%)" }}
       >
@@ -451,7 +465,7 @@ const Navbar = () => {
           <div
             className={cn(
               "w-full",
-              isHomePage ? "mt-6 pt-6 border-t border-gray-300/50" : "mt-6"
+              isHomePage ? "mt-6 pt-6 border-t border-gray-300/50" : "mt-6",
             )}
           >
             {renderAuthSection(true)}
@@ -460,6 +474,6 @@ const Navbar = () => {
       </div>
     </>
   );
-};
+};;
 
 export default Navbar;
