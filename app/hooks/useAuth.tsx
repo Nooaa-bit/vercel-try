@@ -137,6 +137,7 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, [router, mutateProfile]);
 
+  /*
   // Dashboard protection - redirect to homepage if not logged in
   useEffect(() => {
     // Wait until loading is complete
@@ -150,7 +151,7 @@ export function useAuth() {
       console.log("🔒 Unauthorized dashboard access, redirecting to homepage");
       router.replace(`/${lang}/login`);
     }
-  }, [loading, user, pathname, router, lang]);
+  }, [loading, user, pathname, router, lang]); */
 
   // Sign out function
   const signOut = async () => {
