@@ -13,6 +13,7 @@ model PasswordResetToken {
   id        String    @id @default(cuid())
   email     String    @map("email")
   userId    Int       @map("user_id")
+  // ↑ Use in code           ↑ Actual DB column name
   token     String    @unique @map("token")
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")

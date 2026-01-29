@@ -8,8 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface UserProfile {
-  id: number;
-  authUserId: string;
+  id: number; // Internal auto-increment ID (user.id)
+  authUserId: string; // Supabase Auth UUID (user.auth_user_id)
   email: string;
   firstName?: string;
   lastName?: string;
@@ -20,15 +20,15 @@ interface UserProfile {
 
 const supabase = createClient();
 
-// SWR fetcher for profile data
-async function fetchProfile(userId: string): Promise<UserProfile | null> {
+// SWR fetcher for profile data. Returns a UserProfile object that matches interface
+async function fetchProfile(authUserId: string): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
       .from("user")
       .select(
-        "id, auth_user_id, email, first_name, last_name, profile_picture, has_password, created_at"
+        "id, auth_user_id, email, first_name, last_name, profile_picture, has_password, created_at",
       )
-      .eq("auth_user_id", userId)
+      .eq("auth_user_id", authUserId) 
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -65,20 +65,24 @@ export function useAuth() {
   // Extract language from pathname
   const lang = pathname.split("/")[1] === "el" ? "el" : "en";
 
-  // Use SWR for profile fetching with 10-minute cache
+  // SWR receives the UserProfile object and Sets data to the profile object  (data: profile,)
   const {
     data: profile,
     mutate: mutateProfile,
     isLoading: profileLoading,
-  } = useSWR(user ? `profile-${user.id}` : null, () => fetchProfile(user!.id), {
-    dedupingInterval: 600000, // 10 minutes
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-  });
+  } = useSWR(
+    user ? `profile-${user.id}` : null,
+    () => fetchProfile(user!.id), // user.id is the auth UUID (string)
+    {
+      dedupingInterval: 600000, // 10 minutes
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+    },
+  );
 
   // Main auth state handler.
   //Initial load: Check URL for magic link OR getSession(). Real-time: Listen for login/logout anywhere (other tabs, mobile)
-  //Email click → /en#access_token=xyz → setSession → Clean URL → Logged in 
+  //Email click → /en#access_token=xyz → setSession → Clean URL → Logged in
   useEffect(() => {
     const handleAuthState = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -137,7 +141,6 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, [router, mutateProfile]);
 
-  /*
   // Dashboard protection - redirect to homepage if not logged in
   useEffect(() => {
     // Wait until loading is complete
@@ -151,7 +154,7 @@ export function useAuth() {
       console.log("🔒 Unauthorized dashboard access, redirecting to homepage");
       router.replace(`/${lang}/login`);
     }
-  }, [loading, user, pathname, router, lang]); */
+  }, [loading, user, pathname, router, lang]);
 
   // Sign out function
   const signOut = async () => {
@@ -181,10 +184,12 @@ export function useAuth() {
   };
 
   return {
-    user,
-    profile: profile ?? null,
+    user /*Supabase Auth user object (contains auth UUID, email, etc.)
+     Use user.id to get the auth UUID (string)*/,
+    profile: profile ??null /* Internal user profile (contains integer ID, firstName, etc.)
+    Use profile.id to get the internal user ID (number). Use profile.authUserId to get the auth UUID (string) */,
     loading: loading || profileLoading,
-    signIn,
-    signOut,
+    signIn /*  Navigate to login page */,
+    signOut /* Sign out and redirect */,
   };
 }

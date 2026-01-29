@@ -10,7 +10,7 @@ import {
   IChartApi,
   ISeriesApi,
 } from "lightweight-charts";
-import { ProtectedPage } from "@/components/ProtectedPage";
+import { ProtectedPage } from "@/components/ProtectedSection";
 
 const TIMEFRAMES = ["5m", "30m", "1h"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/assets";

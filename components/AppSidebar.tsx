@@ -1,3 +1,4 @@
+//hype-hire/vercel/components/AppSidebar.tsx
 "use client";
 
 import { ChevronDown, Search, X } from "lucide-react";
@@ -211,12 +212,15 @@ export function AppSidebar({ user }: AppSidebarProps) {
                       return (
                         <button
                           key={itemId}
-                          onClick={() => {
+                          onClick={async () => {
                             if (isSuperAdmin) {
                               setSelectedCompanyForAdmin(item.id);
                             } else {
-                              setActiveRole(item.id);
-                            }
+    const success = await setActiveRole(item.id);
+    if (!success) {
+      // Optional: Show error toast
+      console.error("Failed to switch role");
+    }}
                             setIsSwitcherOpen(false);
                             setSearchQuery("");
                           }}
@@ -224,7 +228,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                             "w-full flex items-center gap-2 p-2 rounded-lg transition-colors",
                             isSelected
                               ? "bg-pulse-500/20 text-pulse-600 dark:text-pulse-400"
-                              : "hover:bg-muted/50"
+                              : "hover:bg-muted/50",
                           )}
                         >
                           <div className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium">

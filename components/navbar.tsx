@@ -18,7 +18,7 @@ import { useMobileMenu } from "@/app/hooks/useMobileMenu";
 //Segm1 Imports finished
 
 const Navbar = () => {
-  const { t, i18n, ready } = useTranslation("nav");
+  const { t, ready } = useTranslation("nav");
   const { user, profile, loading: authLoading, signIn, signOut } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const isScrolled = useScrollPosition(10);
