@@ -204,12 +204,12 @@ export function MyShiftsCard({
                     </div>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => handleCancelClick(assignment)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="text-white border-destructive/30 bg-red-400/90 hover:bg-destructive/20 hover:border-destructive/50 hover:text-destructive font-medium"
                   >
-                    <XCircle className="h-4 w-4 mr-2" />
+                    <XCircle className="w-4 h-4 mr-1" />
                     {t("cancel.button")}
                   </Button>
                 </div>

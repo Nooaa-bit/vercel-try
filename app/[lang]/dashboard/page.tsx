@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/server-auth";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { DashboardClient } from "./dashboard-client-big";
+import { DashboardClient } from "./dashboard-client";
 
 // ============================================================================
 // TYPES

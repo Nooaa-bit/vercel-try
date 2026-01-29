@@ -365,12 +365,12 @@ const Navbar = () => {
                 <Switch
                   checked={darkMode}
                   onCheckedChange={toggleTheme}
-                  className="scale-75 lg:scale-100"
+                  className="scale-75 lg:scale-100 data-[state=unchecked]:bg-gray-300 data-[state=checked]:bg-gray-300 border border-gray-300"
                 />
                 {darkMode ? (
                   <Moon className="h-3 w-3 lg:h-4 lg:w-4" />
                 ) : (
-                  <Sun className="h-3 w-3 lg:h-4 lg:w-4" />
+                  <Sun className="h-4 w-4 text-yellow-600" />
                 )}
               </div>
             )}

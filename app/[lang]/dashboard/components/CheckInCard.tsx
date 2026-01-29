@@ -114,7 +114,7 @@ export function CheckInCard({ shift, userId, currentTime }: CheckInCardProps) {
 
   return (
     <>
-      <Card className="h-fit border-2 border-primary">
+      <Card className="h-fit border-2 border-primary shadow-lg hover:shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Timer className="h-5 w-5 text-primary" />
