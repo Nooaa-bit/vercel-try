@@ -43,9 +43,9 @@ export interface CheckInData {
 }
 
 export interface ShiftWithCheckIn extends ShiftAssignment {
-  canCheckIn: boolean;
-  checkInOpensAt: Date | null;
-  checkInWindowMinutes: number;
+  canCheckIn: boolean; // UI control - opens 30 min before
+  checkInOpensAt: Date | null; // When card becomes active
+  checkInWindowMinutes: number; // Server validation - actual check-in window
   shiftStartDateTime: Date;
   shiftEndDateTime: Date;
   checkInData: CheckInData | null;
@@ -130,10 +130,10 @@ async function fetchMyShifts(
       .from("job")
       .select(
         `
-        id, 
-        position, 
+        id,
+        position,
         check_in_window_minutes,
-        location_id, 
+        location_id,
         location:location_id (name)
       `,
       )
@@ -155,6 +155,7 @@ async function fetchMyShifts(
 
     // Fetch check-in data for all assignments
     const assignmentIds = assignmentsData.map((a) => a.id);
+
     const { data: checkInsData } = await supabase
       .from("check_in_out")
       .select("id, assignment_id, check_in_time, check_out_time")
@@ -172,8 +173,10 @@ async function fetchMyShifts(
     );
 
     const now = new Date();
-
     const results: ShiftWithCheckIn[] = [];
+
+    // Card display window: Opens 30 minutes before shift
+    const CARD_DISPLAY_WINDOW_MINUTES = 30;
 
     for (const assignment of assignmentsData) {
       const shiftData = shiftsData.find((s) => s.id === assignment.shift_id);
@@ -182,7 +185,7 @@ async function fetchMyShifts(
       const job = jobsMap.get(shiftData.job_id) || {
         position: "Unknown Position",
         location: null,
-        checkInWindowMinutes: 45,
+        checkInWindowMinutes: 5,
       };
 
       // Calculate shift start and end date-times
@@ -198,10 +201,9 @@ async function fetchMyShifts(
       const shiftEndDateTime = new Date(shiftData.shift_date);
       shiftEndDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0);
 
-      // Calculate check-in window
-      const checkInWindowMinutes = job.checkInWindowMinutes;
+      // Card display window: Opens 30 minutes before shift
       const checkInOpensAt = new Date(
-        shiftStartDateTime.getTime() - checkInWindowMinutes * 60000,
+        shiftStartDateTime.getTime() - CARD_DISPLAY_WINDOW_MINUTES * 60000,
       );
       const canCheckIn = now >= checkInOpensAt && now <= shiftEndDateTime;
 
@@ -218,9 +220,9 @@ async function fetchMyShifts(
           job_id: shiftData.job_id,
           job,
         },
-        canCheckIn,
+        canCheckIn, // UI control - 30 min window
         checkInOpensAt,
-        checkInWindowMinutes,
+        checkInWindowMinutes: job.checkInWindowMinutes, // Server validation - job's actual window
         shiftStartDateTime,
         shiftEndDateTime,
         checkInData,
@@ -228,7 +230,6 @@ async function fetchMyShifts(
     }
 
     return results;
-
   } catch (error) {
     console.error("[fetchMyShifts] Error:", error);
     return [];
@@ -305,6 +306,7 @@ async function fetchPendingInvitations(
         .map((shiftId: number) => {
           const shift = shiftsMap.get(shiftId);
           if (!shift) return null;
+
           return {
             id: shift.id,
             shift_date: shift.shift_date,
@@ -342,13 +344,21 @@ export default async function DashboardPage({
 }: {
   params: { lang: string };
 }) {
-  // ✅ Authenticate
+  // ✅ Authenticate using new auth system
   const authResult = await getAuthenticatedUser();
   if (!authResult.success) {
     redirect(`/${params.lang}/login`);
   }
 
-  const { userId } = authResult.data;
+  const { userId, roles } = authResult.data;
+
+  // ✅ Check if user has admin privileges
+  const isAdmin = roles.some((role) =>
+    ["supervisor", "company_admin", "superadmin"].includes(role.role),
+  );
+
+  console.log(`[Dashboard] User ${userId} - isAdmin: ${isAdmin}`);
+
   const supabase = await createSupabaseServer();
 
   // ✅ Fetch all data in parallel
@@ -357,12 +367,13 @@ export default async function DashboardPage({
     fetchPendingInvitations(userId, supabase),
   ]);
 
-  // ✅ Pass everything to one client component
+  // ✅ Pass everything including admin status to client component
   return (
     <DashboardClient
       userId={userId}
       myShifts={myShifts}
       pendingInvitations={pendingInvitations}
+      isAdmin={isAdmin}
     />
   );
 }
