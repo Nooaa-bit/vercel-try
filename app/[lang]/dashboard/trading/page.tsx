@@ -10,7 +10,7 @@ import {
   IChartApi,
   ISeriesApi,
 } from "lightweight-charts";
-import { ProtectedPage } from "@/components/ProtectedSection";
+import { ProtectedSection } from "@/components/ProtectedSection";
 
 const TIMEFRAMES = ["5m", "30m", "1h"];
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/assets";
@@ -1861,7 +1861,7 @@ export default function Home() {
     `UTC${selectedTimezone >= 0 ? "+" : ""}${selectedTimezone}`;
 
   return (
-    <ProtectedPage requiredRole="superadmin">
+    <ProtectedSection requiredRole="superadmin">
       <div className="flex flex-col min-h-screen bg-gray-900 text-white overflow-hidden mt-9">
         {/* Top Control Bar */}
         <div className=" mt-9 bg-gray-800 border-b border-gray-700 px-3 py-1.5 flex items-center gap-2 text-[10px]">
@@ -2192,7 +2192,10 @@ export default function Home() {
           </div>
 
           {/*<div ref={chartsWrapperRef} className="flex-1 relative">*/}
-          <div ref={chartsWrapperRef} className="flex-1 overflow-hidden relative">
+          <div
+            ref={chartsWrapperRef}
+            className="flex-1 overflow-hidden relative"
+          >
             <div
               ref={crosshairLineRef}
               className="absolute top-0 bottom-0 w-px bg-gray-500 pointer-events-none z-10"
@@ -2203,6 +2206,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </ProtectedPage>
+    </ProtectedSection>
   );
 }
