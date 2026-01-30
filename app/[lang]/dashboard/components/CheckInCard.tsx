@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/components/CheckInCard.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -57,6 +58,8 @@ export function CheckInCard({ shift, userId }: CheckInCardProps) {
     };
   }, []);
 
+
+  
   const isCheckedIn = !!shift.checkInData?.checkInTime;
   const isCheckedOut = !!shift.checkInData?.checkOutTime;
   const checkInTime = shift.checkInData?.checkInTime;

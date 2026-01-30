@@ -148,7 +148,7 @@ export function AdminCheckInList() {
       const workerIds = [...new Set(assignmentsData.map((a) => a.user_id))];
       const { data: workersData, error: workersError } = await supabase
         .from("user")
-        .select("id, full_name, email")
+        .select("id, first_name, last_name, email")
         .in("id", workerIds);
 
       if (workersError) {
@@ -159,7 +159,13 @@ export function AdminCheckInList() {
       const workersMap = new Map(
         (workersData || []).map((w) => [
           w.id,
-          { id: w.id, full_name: w.full_name, email: w.email },
+          {
+            id: w.id,
+            full_name:
+              `${w.first_name || ""} ${w.last_name || ""}`.trim() ||
+              "Unknown User",
+            email: w.email,
+          },
         ]),
       );
 

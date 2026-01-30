@@ -514,7 +514,10 @@ export async function adminCheckIn(assignmentId: number, workerId: number) {
     if (!authResult.success) {
       return { success: false, error: "Unauthorized" };
     }
-
+    // ADD THIS DEBUG LOGGING:
+    console.log("[adminCheckIn] User roles:", authResult.data.roles);
+    console.log("[adminCheckIn] Checking authorization...");
+    
     // ✅ Check if user has supervisor or higher role
     const isAuthorized = authResult.data.roles.some((role) =>
       hasMinimumRole(role.role, "supervisor"),
