@@ -23,9 +23,17 @@ export async function sendSignInLinkEmail({
   userType = "existing",
   language = "en",
 }: SendSignInLinkParams) {
+  // 🔍 TEMPORARY DEBUGGING - REMOVE AFTER FIXING
+  console.log("🔑 API Key exists:", !!process.env.BREVO_API_KEY);
+  console.log("🔑 API Key length:", process.env.BREVO_API_KEY?.length || 0);
+  console.log(
+    "🔑 API Key prefix:",
+    process.env.BREVO_API_KEY?.substring(0, 10) || "MISSING",
+  );
+  console.log("📧 Sender email:", process.env.BREVO_SENDER_EMAIL || "MISSING");
   console.log("📧 Preparing to send sign-in email to:", to);
   console.log("🌐 Language:", language);
-   console.log("🏢 Company Name received:", companyName);
+  console.log("🏢 Company Name received:", companyName);
 
   // Translation dictionary for email content
   const translations = {
@@ -269,7 +277,7 @@ ${t.footerSentTo} ${to} ${t.footerReason}
     throw new Error(
       `Failed to send sign-in email: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
