@@ -28,16 +28,26 @@ import { toast } from "sonner";
 import { Users } from "lucide-react";
 import { TimePickerSelect } from "@/components/TimePickerSelect";
 import { StaffingModal } from "./StaffingModal";
+import {
+  VALID_POSITIONS,
+  isValidPosition,
+  type JobPosition,
+} from "@/lib/positions";
 
 interface Job {
   id: number;
   company_id: number;
   position: string;
+  title: string | null; 
   seniority: "junior" | "senior";
   description: string | null;
   start_date: string;
   end_date: string;
   location_id: number | null;
+  hourly_rate: string | null;
+  shift_rate: string | null;
+  check_in_radius_job: number | null;
+  check_in_window_minutes: number;
   created_at: string;
   created_by: number;
   deleted_at: string | null;
@@ -80,6 +90,7 @@ export default function JobDialog({
   const supabase = createClient();
 
   const [position, setPosition] = useState("");
+  const [title, setTitle] = useState(""); 
   const [seniority, setSeniority] = useState<"junior" | "senior">("junior");
   const [description, setDescription] = useState("");
   const [workersNeeded, setWorkersNeeded] = useState(1);
@@ -98,16 +109,27 @@ export default function JobDialog({
   const [staffingOpen, setStaffingOpen] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
+  const [hourlyRate, setHourlyRate] = useState<string>("");
+  const [shiftRate, setShiftRate] = useState<string>("");
+  const [checkInRadius, setCheckInRadius] = useState<number>(0);
+  const [checkInWindow, setCheckInWindow] = useState<number>(0);
 
   useEffect(() => {
     if (editingJob) {
       setPosition(editingJob.position);
+      setTitle(editingJob.title || ""); 
       setSeniority(editingJob.seniority);
       setDescription(editingJob.description || "");
       setLocationId(editingJob.location_id);
       setStartDate(editingJob.start_date);
       setEndDate(editingJob.end_date);
       setIsMultipleDays(editingJob.start_date !== editingJob.end_date);
+
+      // Load new fields
+      setHourlyRate(editingJob.hourly_rate || "");
+      setShiftRate(editingJob.shift_rate || "");
+      setCheckInRadius(editingJob.check_in_radius_job || 50);
+      setCheckInWindow(editingJob.check_in_window_minutes || 5);
     }
   }, [editingJob]);
 
@@ -187,7 +209,7 @@ export default function JobDialog({
             parseInt(hours),
             parseInt(minutes),
             parseInt(seconds || "0"),
-            0
+            0,
           );
 
           const timeDiffInHours =
@@ -273,6 +295,10 @@ export default function JobDialog({
       toast.error(t("validation.fillRequired"));
       return;
     }
+    if (!startDate) {
+      toast.error(t("validation.fillRequired"));
+      return;
+    }
 
     if (!editingJob) {
       if (!startTime || !endTime) {
@@ -320,7 +346,7 @@ export default function JobDialog({
 
       if (startDate === todayStr) {
         const newShiftStartDateTime = new Date(
-          startDate + "T" + shiftStartTime + ":00"
+          startDate + "T" + shiftStartTime + ":00",
         );
 
         if (newShiftStartDateTime < now) {
@@ -369,7 +395,7 @@ export default function JobDialog({
         });
 
         const overassignedShifts = shiftsWithAssignments.filter(
-          (shift) => (assignmentsByShift[shift.id] || 0) > workersNeeded
+          (shift) => (assignmentsByShift[shift.id] || 0) > workersNeeded,
         );
 
         if (overassignedShifts.length > 0) {
@@ -382,7 +408,7 @@ export default function JobDialog({
               date: exampleShift.shift_date,
               assigned: assignedCount,
             }),
-            { duration: 6000 }
+            { duration: 6000 },
           );
           return;
         }
@@ -420,12 +446,12 @@ export default function JobDialog({
           const hasAssignments = (assignmentCount || 0) > 0;
 
           const todayShift = outsideShifts.find(
-            (s) => s.shift_date === todayStr
+            (s) => s.shift_date === todayStr,
           );
 
           if (todayShift && hasAssignments) {
             const todayHasAssignments = assignments?.some(
-              (a) => a.shift_id === todayShift.id
+              (a) => a.shift_id === todayShift.id,
             );
 
             if (todayHasAssignments) {
@@ -436,7 +462,7 @@ export default function JobDialog({
                 parseInt(hours),
                 parseInt(minutes),
                 parseInt(seconds || "0"),
-                0
+                0,
               );
 
               const timeDiffInHours =
@@ -448,7 +474,7 @@ export default function JobDialog({
                   t("validation.cannotChangeDates", {
                     time: todayShift.start_time.slice(0, 5),
                   }),
-                  { duration: 6000 }
+                  { duration: 6000 },
                 );
                 return;
               }
@@ -487,7 +513,7 @@ export default function JobDialog({
               "delete_shifts_outside_range",
               {
                 p_shift_ids: shiftIds,
-              }
+              },
             );
 
             if (deleteError) {
@@ -496,13 +522,13 @@ export default function JobDialog({
             }
 
             toast.info(
-              t("validation.shiftsDeleted", { count: outsideShifts.length })
+              t("validation.shiftsDeleted", { count: outsideShifts.length }),
             );
           } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error("Error handling outside shifts:", errorMessage);
             toast.error(
-              t("validation.dateChangeFailed", { error: errorMessage })
+              t("validation.dateChangeFailed", { error: errorMessage }),
             );
             return;
           }
@@ -532,11 +558,16 @@ export default function JobDialog({
           .from("job")
           .update({
             position,
+            title: title || null,
             seniority,
             description: description || null,
             location_id: locationId,
             start_date: startDate,
             end_date: finalEndDate,
+            hourly_rate: hourlyRate || null,
+            shift_rate: shiftRate || null,
+            check_in_radius_job: checkInRadius || null,
+            check_in_window_minutes: checkInWindow,
           })
           .eq("id", editingJob.id);
 
@@ -552,7 +583,7 @@ export default function JobDialog({
             p_start_time: shiftStartTime + ":00",
             p_end_time: shiftEndTime + ":00",
             p_workers_needed: workersNeeded,
-          }
+          },
         );
 
         if (shiftError) {
@@ -589,6 +620,7 @@ export default function JobDialog({
           {
             p_company_id: companyId,
             p_position: position,
+            p_title: title || null,
             p_seniority: seniority,
             p_description: description || null,
             p_workers_needed: workersNeeded,
@@ -598,7 +630,11 @@ export default function JobDialog({
             p_start_time: startTime + ":00",
             p_end_time: endTime + ":00",
             p_created_by: activeRole.userId,
-          }
+            p_hourly_rate: hourlyRate || null,
+            p_shift_rate: shiftRate || null,
+            p_check_in_radius_job: checkInRadius || null,
+            p_check_in_window_minutes: checkInWindow,
+          },
         );
 
         if (rpcError) {
@@ -607,7 +643,7 @@ export default function JobDialog({
         }
 
         toast.success(
-          t("toast.createSuccess", { count: rpcData.created_shifts })
+          t("toast.createSuccess", { count: rpcData.created_shifts }),
         );
       }
 
@@ -627,8 +663,8 @@ export default function JobDialog({
 
   return (
     <>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&_button[data-radix-dialog-close]]:z-50">
-        <DialogHeader className="top-0 bg-background z-8 pt-6 border-b pb-4">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
           <DialogTitle>
             {editingJob ? t("dialog.editTitle") : t("dialog.createTitle")}
           </DialogTitle>
@@ -639,40 +675,48 @@ export default function JobDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 pr-4">
-          {/* Position */}
+        <div className="space-y-4">
+          {/* 1. POSITION - Dropdown , JOB TITLE (Optional)*/}
           <div>
-            <Label htmlFor="position" className="text-sm font-medium">
+            <Label>
               {t("fields.position")} {t("fields.required")}
             </Label>
-            <Input
-              id="position"
+            <Select
               value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              placeholder={t("fields.positionPlaceholder")}
-              className="mt-2"
-            />
+              onValueChange={(value) => setPosition(value)}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder={t("fields.selectPosition")} />
+              </SelectTrigger>
+              <SelectContent>
+                {VALID_POSITIONS.map((pos) => (
+                  <SelectItem key={pos} value={pos}>
+                    {t(`positions.${pos}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Description */}
+          {/* JOB TITLE (Optional) */}
           <div>
-            <Label htmlFor="description" className="text-sm font-medium">
-              {t("fields.description")}
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("fields.descriptionPlaceholder")}
+            <Label>{t("fields.title")}</Label>
+            <Input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t("fields.titlePlaceholder")}
               className="mt-2"
-              rows={3}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("fields.titleHelper")}
+            </p>
           </div>
 
-          {/* Seniority & Workers Needed */}
+          {/* 2. SENIORITY & WORKERS NEEDED - Same row, equal height */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="seniority" className="text-sm font-medium">
+              <Label>
                 {t("fields.seniority")} {t("fields.required")}
               </Label>
               <Select
@@ -681,7 +725,7 @@ export default function JobDialog({
                   setSeniority(value as "junior" | "senior")
                 }
               >
-                <SelectTrigger className="mt-2">
+                <SelectTrigger className="mt-2 h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -692,59 +736,33 @@ export default function JobDialog({
             </div>
 
             <div>
-              <Label htmlFor="workers" className="text-sm font-medium">
+              <Label>
                 {t("fields.workersNeeded")} {t("fields.required")}
               </Label>
               <Input
-                id="workers"
                 type="number"
-                min={1}
+                min="1"
                 value={workersNeeded}
                 onChange={(e) =>
                   setWorkersNeeded(parseInt(e.target.value) || 1)
                 }
-                className="mt-2"
+                className="mt-2 h-10"
               />
-              {editingJob && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("dialog.appliesToAllShifts")}
-                </p>
-              )}
             </div>
           </div>
 
-          {/* Location */}
-          <div>
-            <Label htmlFor="location" className="text-sm font-medium">
-              {t("fields.location")}
-            </Label>
-            <Select
-              value={locationId?.toString() || "none"}
-              onValueChange={(value) =>
-                setLocationId(value === "none" ? null : parseInt(value))
-              }
-            >
-              <SelectTrigger className="mt-2">
-                <SelectValue placeholder={t("fields.selectLocation")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("fields.noLocation")}</SelectItem>
-                {locations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {editingJob && (
+            <p className="text-sm text-muted-foreground">
+              {t("dialog.appliesToAllShifts")}
+            </p>
+          )}
 
-          {/* Start Date */}
+          {/* 3. START DATE */}
           <div>
-            <Label htmlFor="startDate" className="text-sm font-medium">
+            <Label>
               {t("fields.startDate")} {t("fields.required")}
             </Label>
             <Input
-              id="startDate"
               type="date"
               value={startDate}
               onChange={(e) => {
@@ -755,32 +773,35 @@ export default function JobDialog({
               className="mt-2"
             />
             {!editingJob && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {t("dialog.mustBeFutureDate")}
               </p>
             )}
           </div>
 
-          {/* Multiple Days Checkbox */}
-          <div className="flex items-center space-x-2 p-4 bg-muted rounded-lg">
-            <Checkbox
-              id="multipleDays"
-              checked={isMultipleDays}
-              onCheckedChange={(checked) => setIsMultipleDays(checked === true)}
-            />
-            <Label htmlFor="multipleDays" className="cursor-pointer">
-              {t("dialog.multipleDaysLabel")}
-            </Label>
+          {/* 4. MULTIPLE DAYS CHECKBOX - Highlighted */}
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="multipleDays"
+                checked={isMultipleDays}
+                onCheckedChange={(checked) =>
+                  setIsMultipleDays(checked === true)
+                }
+              />
+              <Label htmlFor="multipleDays" className="cursor-pointer">
+                {t("dialog.multipleDaysLabel")}
+              </Label>
+            </div>
           </div>
 
           {/* End Date (if multiple days) */}
           {isMultipleDays && (
             <div>
-              <Label htmlFor="endDate" className="text-sm font-medium">
+              <Label>
                 {t("fields.endDate")} {t("fields.required")}
               </Label>
               <Input
-                id="endDate"
                 type="date"
                 value={endDate}
                 onChange={(e) => {
@@ -793,107 +814,198 @@ export default function JobDialog({
             </div>
           )}
 
-          {/* Shift Times */}
-          {!editingJob ? (
-            <>
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium mb-3">
-                  {t("dialog.shiftTimes")}
-                </h4>
-              </div>
-
-              <TimePickerSelect
-                value={startTime}
-                onChange={setStartTime}
-                label={t("fields.startTime")}
-                required
-              />
-
-              <TimePickerSelect
-                value={endTime}
-                onChange={setEndTime}
-                label={t("fields.endTime")}
-                required
-              />
-              <p className="text-xs text-muted-foreground -mt-2">
-                {t("dialog.allShiftsNote")}
-              </p>
-            </>
-          ) : (
-            <>
-              {!loadingShiftTimes && (
-                <>
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium mb-1">
-                      {t("dialog.updateShiftTimes")}
-                    </h4>
-                    <p className="text-xs text-muted-foreground mb-4">
+          {/* 5. SHIFT TIMES */}
+          <div>
+            {!editingJob ? (
+              <>
+                <Label>{t("dialog.shiftTimes")}</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  {t("dialog.allShiftsNote")}
+                </p>
+              </>
+            ) : (
+              <>
+                {!loadingShiftTimes && (
+                  <>
+                    <Label>{t("dialog.updateShiftTimes")}</Label>
+                    <p className="text-sm text-muted-foreground mb-2">
                       {t("dialog.updateShiftTimesDescription")}
                     </p>
-                  </div>
+                  </>
+                )}
+              </>
+            )}
 
-                  <TimePickerSelect
-                    value={shiftStartTime}
-                    onChange={setShiftStartTime}
-                    label={t("fields.shiftStartTime")}
-                  />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <TimePickerSelect
+                  value={editingJob ? shiftStartTime : startTime}
+                  onChange={editingJob ? setShiftStartTime : setStartTime}
+                  label={t("fields.startTime")}
+                />
+              </div>
+              <div className="space-y-2">
+                <TimePickerSelect
+                  value={editingJob ? shiftEndTime : endTime}
+                  onChange={editingJob ? setShiftEndTime : setEndTime}
+                  label={t("fields.endTime")}
+                />
+              </div>
+            </div>
+          </div>
 
-                  <TimePickerSelect
-                    value={shiftEndTime}
-                    onChange={setShiftEndTime}
-                    label={t("fields.shiftEndTime")}
-                  />
-                </>
-              )}
-            </>
-          )}
+          {/* 6. RATES - Hourly Rate & Shift Rate */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>{t("fields.hourlyRate")}</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={hourlyRate}
+                onChange={(e) => setHourlyRate(e.target.value)}
+                placeholder="15.50"
+                className="mt-2 placeholder:opacity-30"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("fields.hourlyRateHelper")}
+              </p>
+            </div>
+
+            <div>
+              <Label>{t("fields.shiftRate")}</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={shiftRate}
+                onChange={(e) => setShiftRate(e.target.value)}
+                placeholder="120.00"
+                className="mt-2 placeholder:opacity-30"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("fields.shiftRateHelper")}
+              </p>
+            </div>
+          </div>
+
+          {/* 7. LOCATION */}
+          <div>
+            <Label>{t("fields.location")}</Label>
+            <Select
+              value={locationId?.toString() || "none"}
+              onValueChange={(value) =>
+                setLocationId(value === "none" ? null : parseInt(value))
+              }
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("fields.noLocation")}</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 8. CHECK-IN SETTINGS */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>{t("fields.checkInRadius")}</Label>
+              <Input
+                type="number"
+                min="10"
+                step="10"
+                value={checkInRadius}
+                onChange={(e) =>
+                  setCheckInRadius(parseInt(e.target.value) || 50)
+                }
+                className="mt-2"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("fields.checkInRadiusHelper")}
+              </p>
+            </div>
+
+            <div>
+              <Label>{t("fields.checkInWindow")}</Label>
+              <Input
+                type="number"
+                min="1"
+                max="60"
+                value={checkInWindow}
+                onChange={(e) =>
+                  setCheckInWindow(parseInt(e.target.value) || 5)
+                }
+                className="mt-2"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("fields.checkInWindowHelper")}
+              </p>
+            </div>
+          </div>
+
+          {/* 9. DESCRIPTION - Moved to end */}
+          <div>
+            <Label>{t("fields.description")}</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t("fields.descriptionPlaceholder")}
+              className="mt-2"
+              rows={3}
+            />
+          </div>
         </div>
 
         {/* Footer Buttons */}
-        <div className="flex gap-3 justify-between pt-6 border-t bottom-0 bg-background">
-          <div>
-            {editingJob &&
-              (() => {
-                const todayStr = new Date().toISOString().split("T")[0];
-                const jobHasStarted = editingJob.start_date <= todayStr;
+        <div className="flex justify-between mt-6">
+          {/* Left side - Delete/Cancel button */}
+          {editingJob &&
+            (() => {
+              const todayStr = new Date().toISOString().split("T")[0];
+              const jobHasStarted = editingJob.start_date <= todayStr;
+              return (
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelAllShifts}
+                  disabled={saving}
+                >
+                  {jobHasStarted
+                    ? t("dialog.cancelAllShifts")
+                    : t("dialog.deleteJob")}
+                </Button>
+              );
+            })()}
 
-                return (
-                  <Button
-                    variant="destructive"
-                    onClick={handleCancelAllShifts}
-                    disabled={saving}
-                  >
-                    {jobHasStarted
-                      ? t("dialog.cancelAllShifts")
-                      : t("dialog.deleteJob")}
-                  </Button>
-                );
-              })()}
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onCancel}>
+          {/* Right side - Action buttons */}
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" onClick={onCancel} disabled={saving}>
               {t("dialog.close")}
             </Button>
+
+            {/* HIGHLIGHTED STAFF BUTTON */}
             {editingJob && (
               <Button
-                variant="outline"
                 onClick={() => setStaffingOpen(true)}
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-red-600 to-yellow-600 hover:from-yellow-700 hover:to-purple-700 text-white font-semibold shadow-md"
               >
-                <Users className="h-4 w-4" />
+                <Users className="w-4 h-4" />
                 {t("dialog.staff")}
               </Button>
             )}
-            <Button
-              className="bg-primary hover:bg-primary/90"
-              onClick={handleSave}
-              disabled={saving}
-            >
+
+            {/* Save/Update button */}
+            <Button onClick={handleSave} disabled={saving}>
               {saving
                 ? t("dialog.saving")
                 : editingJob
-                ? t("dialog.updateButton")
-                : t("dialog.createButton")}
+                  ? t("dialog.updateButton")
+                  : t("dialog.createButton")}
             </Button>
           </div>
         </div>
@@ -903,7 +1015,7 @@ export default function JobDialog({
         <StaffingModal
           open={staffingOpen}
           onOpenChange={setStaffingOpen}
-          jobId={editingJob.id} 
+          jobId={editingJob.id}
           position={position}
           companyId={companyId}
           onSave={onSave}

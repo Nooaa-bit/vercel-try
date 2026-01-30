@@ -45,10 +45,15 @@ interface Job {
   company_id: number;
   location_id: number | null;
   position: string;
+  title: string | null; 
   seniority: "junior" | "senior";
   description: string | null;
   start_date: string;
   end_date: string;
+  hourly_rate: string | null; 
+  shift_rate: string | null; 
+  check_in_radius_job: number | null;
+  check_in_window_minutes: number; 
   created_at: string;
   created_by: number;
   deleted_at: string | null;
@@ -448,9 +453,16 @@ export function JobsClient({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <Briefcase className="w-5 h-5 text-primary flex-shrink-0" />
-                            <CardTitle className="text-lg truncate">
-                              {job.position}
-                            </CardTitle>
+                            <div className="min-w-0 flex-1">
+                              <CardTitle className="text-lg truncate">
+                                {job.title || job.position}
+                              </CardTitle>
+                              {job.title && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {t(`positions.${job.position}`)}
+                                </p>
+                              )}
+                            </div>
                           </div>
                           <span className="text-xs bg-muted px-2 py-1 rounded capitalize flex-shrink-0">
                             {t(`fields.${job.seniority}`)}
@@ -484,14 +496,32 @@ export function JobsClient({
                             </span>
                           </div>
 
+                          {/* Optional: Show rates */}
+                          {(job.hourly_rate || job.shift_rate) && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-muted-foreground">💰</span>
+                              <div className="flex gap-2 text-xs flex-wrap">
+                                {job.hourly_rate && (
+                                  <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                    €{parseFloat(job.hourly_rate).toFixed(2)}/hr
+                                  </span>
+                                )}
+                                {job.shift_rate && (
+                                  <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                    €{parseFloat(job.shift_rate).toFixed(2)}
+                                    /shift
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex items-center gap-2 text-sm">
                             <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             <div className="flex items-center gap-2 flex-1">
                               <span>
                                 {maxWorkersPerShift > 0
-                                  ? `${t("card.upTo")} ${maxWorkersPerShift} ${t(
-                                      "card.perShift",
-                                    )}`
+                                  ? `${t("card.upTo")} ${maxWorkersPerShift} ${t("card.perShift")}`
                                   : t("emptyState.title")}
                               </span>
                               {job.total_shifts !== undefined &&
