@@ -14,10 +14,15 @@ interface Job {
   company_id: number;
   location_id: number | null;
   position: string;
+  title: string | null;
   seniority: "junior" | "senior";
   description: string | null;
   start_date: string;
   end_date: string;
+  hourly_rate: string | null;
+  shift_rate: string | null;
+  check_in_radius_job: number | null;
+  check_in_window_minutes: number;
   created_at: string;
   created_by: number;
   deleted_at: string | null;
