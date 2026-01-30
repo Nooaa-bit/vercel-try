@@ -44,7 +44,7 @@ const EMA_COLORS = {
   "4h": { ema100: "#FFD700", ema200: "#FFA500" },
   "12h": { ema100: "#00BFFF", ema200: "#1E90FF" },
   own: { ema50: "#FF69B4", ema100: "#FF1493", ema200: "#C71585" },
-};
+}; //Configuration Constants Finished
 
 interface CandleData {
   time: number;
@@ -104,7 +104,7 @@ interface CachedTimeframeData {
   emaData: EMAData;
   divergences: DivergenceData[];
   timestamp: number;
-}
+} //TypeScript Interfaces Finished
 
 export default function Home() {
   const priceChartContainerRef = useRef<HTMLDivElement>(null);
@@ -138,7 +138,7 @@ export default function Home() {
   );
   const divergencePriceSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(
     new Map()
-  );
+  ); //Component Definition & Refs Finished
   const referenceLinesRef = useRef<{
     overboughtLine: ISeriesApi<"Line">;
     oversoldLine: ISeriesApi<"Line">;
@@ -162,13 +162,7 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
   const [chartsInitialized, setChartsInitialized] = useState(false);
-
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [minDate, setMinDate] = useState("");
-  const [maxDate, setMaxDate] = useState("");
 
   const [showControls, setShowControls] = useState(true);
   const [showAllEMAs, setShowAllEMAs] = useState(true);
@@ -202,6 +196,7 @@ export default function Home() {
 
   const apiCacheRef = useRef<Map<string, CachedTimeframeData>>(new Map());
   const [cacheVersion, setCacheVersion] = useState(0);
+  //State Declarations (Controls) Finished
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -321,33 +316,6 @@ export default function Home() {
     [selectedTimezone]
   );
 
-  useEffect(() => {
-    const fetchDateRange = async () => {
-      try {
-        const response = await fetch(`/api/assets/date-range/${activeSymbol}`);
-        const data = await response.json();
-
-        if (data.min_date && data.max_date) {
-          setMinDate(data.min_date);
-          setMaxDate(data.max_date);
-
-          const end = new Date(data.max_date);
-          const start = new Date(end);
-          start.setDate(start.getDate() - 30);
-
-          setStartDate(start.toISOString().split("T")[0]);
-          setEndDate(end.toISOString().split("T")[0]);
-        }
-      } catch (err) {
-        console.error("Error fetching date range:", err);
-      }
-    };
-
-    if (activeSymbol) {
-      fetchDateRange();
-    }
-  }, [activeSymbol]);
-
   const fetchRawData = useCallback(
     async (symbol: string, timeframe: string): Promise<void> => {
       const CACHE_TTL = 5 * 60 * 1000;
@@ -433,10 +401,10 @@ export default function Home() {
       return null;
     }
     return data;
-  }, [activeSymbol, activeTimeframe, cacheVersion]);
+  }, [activeSymbol, activeTimeframe, cacheVersion]); // Imports and Setup section finished
 
-  // Imports and Setup complete.
   const convertedCandles = useMemo(() => {
+    //Convert backend CandleData into the lightweight‑charts format
     const cached = getCachedData();
     if (!cached) return [];
 
@@ -447,18 +415,20 @@ export default function Home() {
       low: candle.low,
       close: candle.close,
     }));
-  }, [getCachedData, convertTimezone]);
+  }, [getCachedData, convertTimezone]); //Convert backend CandleData into the lightweight‑charts format
 
   const whitespaceData = useMemo(() => {
+    //control autoscaling and reference line ranges
     const cached = getCachedData();
     if (!cached) return [];
 
     return cached.candles.map((candle) => ({
       time: convertTimezone(candle.time) as Time,
     }));
-  }, [getCachedData, convertTimezone]);
+  }, [getCachedData, convertTimezone]); //control autoscaling and reference line ranges
 
   const convertedWT2 = useMemo(() => {
+    //indicators and candles may not align
     const cached = getCachedData();
     if (!cached) {
       console.warn(`⚠️ convertedWT2: No cache for ${activeTimeframe}`);
@@ -509,10 +479,10 @@ export default function Home() {
     }
 
     return result;
-  }, [getCachedData, convertTimezone, activeTimeframe]);
+  }, [getCachedData, convertTimezone, activeTimeframe]); //indicators and candles may not align
 
-  // FIXED: Higher timeframe 4H indicator line - only show on 30m and 1h
   const htfIndicatorLine = useMemo(() => {
+    //Higher timeframe 4H indicator line - only show on 30m and 1h
     const cached = getCachedData();
 
     // Only show 4H WT2 line on 30m and 1h timeframes
@@ -527,7 +497,6 @@ export default function Home() {
       .filter((indicator) => {
         // Must have valid 4h_wt2 data and match candle times
         if (!indicator.wt2_4h || indicator.wt2_4h === 0) return false;
-
         // For 1h: be less strict - include if indicator has the data
         if (activeTimeframe === "1h") {
           return true; // Don't filter by validCandleTimes for 1h
@@ -539,7 +508,6 @@ export default function Home() {
       .map((indicator) => {
         const wt2Value = indicator.wt2_4h ?? 0;
 
-        // Determine color: green if < -50, red if > 50, white otherwise
         let color = "#0a0808ea"; // default
         if (wt2Value < -65) {
           color = "#0b610bff"; // dark green
@@ -551,7 +519,7 @@ export default function Home() {
 
         return {
           time: convertTimezone(indicator.time) as Time,
-          value: -110, // Position below the chart
+          value: -95, // Position below the chart
           color: color,
         };
       });
@@ -560,10 +528,10 @@ export default function Home() {
       `📍 4H WT2 line: ${result.length} points for ${activeTimeframe}`
     );
     return result;
-  }, [getCachedData, convertTimezone, activeTimeframe]);
+  }, [getCachedData, convertTimezone, activeTimeframe]); //Higher timeframe 4H indicator line
 
-  // FIXED: Higher timeframe 12H indicator line - only show on 1h
   const htfIndicator12hLine = useMemo(() => {
+    //Higher timeframe 12H indicator line - only show on 1h
     const cached = getCachedData();
 
     // Only show 12H WT2 line on 1h timeframe
@@ -571,8 +539,7 @@ export default function Home() {
       return [];
     }
 
-    // For 1h timeframe, don't filter by candle times - just use the indicator data directly
-    const result = cached.indicators
+    const result = cached.indicators // For 1h timeframe, don't filter by candle times - just use the indicator data directly
       .filter((indicator) => {
         // Must have valid 12h_wt2 data
         return indicator.wt2_12h !== undefined && indicator.wt2_12h !== 0;
@@ -658,8 +625,9 @@ export default function Home() {
     );
 
     return { vwapData: vwap, vwapHigherData: vwapHigher };
-  }, [getCachedData, convertTimezone]);
+  }, [getCachedData, convertTimezone]); // VWAP data processing end
 
+  // Buy/Sell signal markers start
   const { buySignals, sellSignals } = useMemo(() => {
     const cached = getCachedData();
     if (!cached) return { buySignals: [], sellSignals: [] };
@@ -685,9 +653,9 @@ export default function Home() {
       }));
 
     return { buySignals: buy, sellSignals: sell };
-  }, [getCachedData, convertTimezone]);
+  }, [getCachedData, convertTimezone]); // Buy/Sell signal markers end
 
-  // Cross-timeframe signal markers
+  // Cross-timeframe signal markers start
   const crossTimeframeSignals = useMemo(() => {
     const cached = getCachedData();
     if (!cached) return { "4h": [], "12h": [] };
@@ -764,8 +732,9 @@ export default function Home() {
     });
 
     return { "4h": signals4h, "12h": signals12h };
-  }, [getCachedData, convertTimezone, show4hSignals, show12hSignals]);
+  }, [getCachedData, convertTimezone, show4hSignals, show12hSignals]); // Cross-timeframe signal markers end
 
+  // EMA data processing start
   const convertedEMAs = useMemo(() => {
     const cached = getCachedData();
     if (!cached) {
@@ -801,8 +770,9 @@ export default function Home() {
       ema12h100: convertEMA("12h_ema_100"),
       ema12h200: convertEMA("12h_ema_200"),
     };
-  }, [getCachedData, convertTimezone]);
+  }, [getCachedData, convertTimezone]); // Cross-timeframe signal markers end
 
+  // Divergence statistics
   const filteredDivergenceStats = useMemo(() => {
     const cached = getCachedData();
     if (!cached) return { total: 0, filtered: 0 };
@@ -872,7 +842,7 @@ export default function Home() {
         lastValueVisible: false,
         priceLineVisible: false,
       });
-      
+
       // In updateDivergenceLinesWT2
       if (refCandle.time === div.time) {
         console.warn(
@@ -901,7 +871,7 @@ export default function Home() {
     showHiddenBullish,
     showHiddenBearish,
     minDMI,
-  ]);
+  ]); //Divergence lines on WT2 chart end
 
   // Update divergence lines on Price chart
   const updateDivergenceLinesPrice = useCallback(() => {
@@ -987,12 +957,12 @@ export default function Home() {
         return;
       }
 
-       if (refCandle.time === currentCandle.time) {
-         console.warn(
-           `⚠️ Skipping self-referencing divergence at ${refCandle.time}`
-         );
-         return;
-       }
+      if (refCandle.time === currentCandle.time) {
+        console.warn(
+          `⚠️ Skipping self-referencing divergence at ${refCandle.time}`
+        );
+        return;
+      }
 
       const color = DIVERGENCE_COLORS[divInfo.type] || "#FFFFFF";
 
@@ -1056,10 +1026,11 @@ export default function Home() {
     showHiddenBullish,
     showHiddenBearish,
     minDMI,
-  ]);
-  //Data Processing and useMemo Hooks complete.
-  //Chart Updates, Initialization & JSX below...
-  // Main chart update effect
+  ]); //Update divergence lines on Price chart end
+  //Data Processing and useMemo Hooks finished
+
+  //Chart Updates, Initialization
+  // Main chart update effect. The Heart of Rendering. This is the master orchestrator - a massive useEffect that ties all the data transformations to chart updates. It runs whenever any data changes.
   useEffect(() => {
     if (
       !chartsInitialized ||
@@ -1171,18 +1142,18 @@ export default function Home() {
 
             wt2SeriesRef.current.setMarkers(wt2Markers);
 
-            const firstTime = convertedCandles[0].time;
+            const firstTime = convertedCandles[0].time; // Set overbought/oversold lines on WT2 chart
             const lastTime = convertedCandles[convertedCandles.length - 1].time;
 
             const refs = referenceLinesRef.current;
             if (refs) {
               refs.overboughtLine.setData([
-                { time: firstTime, value: 60 },
-                { time: lastTime, value: 60 },
+                { time: firstTime, value: 80 },
+                { time: lastTime, value: 80 },
               ]);
               refs.oversoldLine.setData([
-                { time: firstTime, value: -60 },
-                { time: lastTime, value: -60 },
+                { time: firstTime, value: -80 },
+                { time: lastTime, value: -80 },
               ]);
               refs.zeroLine.setData([
                 { time: firstTime, value: 0 },
@@ -1192,7 +1163,7 @@ export default function Home() {
           } else {
             console.error(`❌ No WT2 data to display for ${activeTimeframe}`);
             wt2SeriesRef.current.setData([]);
-          }
+          } // Set overbought/oversold lines on WT2 chart end
 
           // Update EMAs
           if (activeTimeframe === "1w") {
@@ -1290,6 +1261,8 @@ export default function Home() {
     updateDivergenceLinesPrice,
   ]);
 
+  //specialized useEffect hooks. handle incremental updates after main chart update. Performance optimizations that prevent re-running expensive operations unnecessarily.
+  // Markers Update Effect start
   useEffect(() => {
     if (!chartsInitialized || !candleSeriesRef.current || !wt2SeriesRef.current)
       return;
@@ -1312,7 +1285,7 @@ export default function Home() {
     console.log(
       `✓ Updated markers: ${allMarkers.length} on price, ${wt2Markers.length} on WT2`
     );
-  }, [chartsInitialized, buySignals, sellSignals, crossTimeframeSignals]);
+  }, [chartsInitialized, buySignals, sellSignals, crossTimeframeSignals]); // Markers Update Effect end
 
   // EMA visibility
   useEffect(() => {
@@ -1381,6 +1354,7 @@ export default function Home() {
     updateDivergenceLinesPrice,
   ]);
 
+  // Data Fetch Trigger
   useEffect(() => {
     if (!chartsInitialized) return;
 
@@ -1388,64 +1362,7 @@ export default function Home() {
     fetchRawData(activeSymbol, activeTimeframe);
   }, [activeSymbol, activeTimeframe, chartsInitialized, fetchRawData]);
 
-  const handleExportCSV = async () => {
-    if (!startDate || !endDate) {
-      alert("Please select both start and end dates");
-      return;
-    }
-
-    if (new Date(startDate) > new Date(endDate)) {
-      alert("Start date must be before end date");
-      return;
-    }
-
-    try {
-      setExporting(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        symbol: activeSymbol,
-        start_date: startDate,
-        end_date: endDate,
-        timezone_offset: selectedTimezone.toString(),
-      });
-
-      const url = `${API_URL}/api/export-signals?${params}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to export signals");
-      }
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-
-      const tzLabel =
-        selectedTimezone >= 0
-          ? `UTC+${selectedTimezone}`
-          : `UTC${selectedTimezone}`;
-      const symbolSafe = activeSymbol.replace("/", "_");
-      link.download = `${symbolSafe}_signals_${startDate}_${endDate}_${tzLabel}.csv`;
-
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(downloadUrl);
-
-      setExporting(false);
-      alert(
-        `CSV exported successfully! Signals from ${startDate} to ${endDate} in ${tzLabel} timezone`
-      );
-    } catch (err) {
-      console.error("Export error:", err);
-      setError(err instanceof Error ? err.message : "Export failed");
-      setExporting(false);
-    }
-  };
-
+  //Toggle All EMAs Helper
   const toggleAllEMAs = () => {
     const newState = !showAllEMAs;
     setShowAllEMAs(newState);
@@ -1468,7 +1385,7 @@ export default function Home() {
       setShow12hEMA100(true);
       setShow12hEMA200(true);
     }
-  };
+  }; //specialized useEffect hooks end
 
   // Initialize charts
   useEffect(() => {
@@ -1477,9 +1394,10 @@ export default function Home() {
 
     console.log("🎨 Initializing charts...");
 
+    // Price chart + EMAs
     const chartWidth = priceChartContainerRef.current.clientWidth;
-    const priceChartHeight = Math.floor(window.innerHeight * 0.8);
-    const indicatorChartHeight = Math.floor(window.innerHeight * 0.8);
+    const priceChartHeight = Math.floor(window.innerHeight * 0.4);
+    const indicatorChartHeight = Math.floor(window.innerHeight * 0.4);
 
     const priceChart = createChart(priceChartContainerRef.current, {
       layout: {
@@ -1503,6 +1421,15 @@ export default function Home() {
       rightPriceScale: {
         visible: true,
       },
+      localization: {
+        priceFormatter: (price: number) => {
+          // Smart formatting by price magnitude
+          if (price >= 1000) return price.toFixed(2); // BTC
+          if (price >= 1) return price.toFixed(4); // ETH
+          if (price >= 0.01) return price.toFixed(6); // Most alts
+          return price.toFixed(8); // Microcaps
+        },
+      },
     });
 
     priceChartRef.current = priceChart;
@@ -1517,6 +1444,7 @@ export default function Home() {
 
     candleSeriesRef.current = candleSeries;
 
+    // 9 EMA series (own timeframe + HTF)
     ema50SeriesRef.current = priceChart.addLineSeries({
       color: EMA_COLORS.own.ema50,
       lineWidth: 2,
@@ -1589,6 +1517,7 @@ export default function Home() {
       visible: true,
     });
 
+    // Indicator chart (WT2 + reference lines, second chart that scrolls in sync)
     const indicatorChart = createChart(indicatorChartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "#222" },
@@ -1626,9 +1555,9 @@ export default function Home() {
           maxValue: 100,
         },
       }),
-    });
+    }); //Invisible series that controls the chart's Y-axis scaling. Without it, if WT2 values are all near 0, the chart would zoom in too tight.
 
-    // HTF Indicator Line - shows 4H WT2 state
+    // HTF Indicator Line - 4H WT2
     htfIndicatorLineRef.current = indicatorChart.addLineSeries({
       lineWidth: 4,
       lastValueVisible: false,
@@ -1637,7 +1566,7 @@ export default function Home() {
       title: "4H WT2",
     });
 
-    // HTF Indicator Line - shows 12H WT2 state
+    // HTF Indicator Line - 12H WT2
     htfIndicator12hLineRef.current = indicatorChart.addLineSeries({
       lineWidth: 4,
       lastValueVisible: false,
@@ -1650,9 +1579,9 @@ export default function Home() {
     wt2SeriesRef.current = indicatorChart.addLineSeries({
       color: "#2962FF",
       lineWidth: 2,
-      lineStyle: LineStyle.Solid,
-      lastValueVisible: true,
-      priceLineVisible: false,
+      lineStyle: LineStyle.Solid, // Smooth line
+      lastValueVisible: true, // Shows current value on right
+      priceLineVisible: false, // No horizontal line
       autoscaleInfoProvider: () => ({
         priceRange: {
           minValue: -100,
@@ -1698,8 +1627,8 @@ export default function Home() {
     });
 
     const zeroLine = indicatorChart.addLineSeries({
-      color: "rgba(255, 255, 255, 0.3)",
-      lineWidth: 1,
+      color: "rgba(255, 255, 255, 0.97)",
+      lineWidth: 2,
       lineStyle: LineStyle.Dotted,
       lastValueVisible: false,
       priceLineVisible: false,
@@ -1711,6 +1640,7 @@ export default function Home() {
       zeroLine,
     };
 
+    // Bi-Directional Time Sync
     let isSyncing = false;
 
     const syncTimeScale = (sourceChart: IChartApi, targetChart: IChartApi) => {
@@ -1727,7 +1657,7 @@ export default function Home() {
         });
     };
 
-    // Sync both directions
+    // both directions
     syncTimeScale(priceChart, indicatorChart);
     syncTimeScale(indicatorChart, priceChart);
 
@@ -1742,6 +1672,7 @@ export default function Home() {
     // Store sync function for later use
     initialSync();
 
+    //Crosshair Line (Visual Connector)
     const updateCrosshairLine = (
       chartSource: "price" | "indicator",
       x: number | null
@@ -1782,6 +1713,7 @@ export default function Home() {
       updateCrosshairLine("indicator", param.point.x);
     });
 
+    //Responsive Resize Handler (Without it, charts break completely on mobile, tablets, or any window resize.)
     const handleResize = () => {
       if (
         priceChartContainerRef.current &&
@@ -1790,8 +1722,8 @@ export default function Home() {
         indicatorChartRef.current
       ) {
         const newWidth = priceChartContainerRef.current.clientWidth;
-        const newPriceHeight = Math.floor(window.innerHeight * 0.8);
-        const newIndicatorHeight = Math.floor(window.innerHeight * 0.8);
+        const newPriceHeight = Math.floor(window.innerHeight * 0.4);
+        const newIndicatorHeight = Math.floor(window.innerHeight * 0.4);
 
         priceChartRef.current.applyOptions({
           width: newWidth,
@@ -1805,16 +1737,16 @@ export default function Home() {
       }
     };
 
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", handleResize); //Responsive Resize Handler end
 
     console.log("✓ Charts initialized");
     setChartsInitialized(true);
 
+    // Cleanup. Prevents memory leaks: Removes every series, destroys charts, clears refs when component unmounts.
     return () => {
       console.log("🗑️ Cleaning up charts");
       window.removeEventListener("resize", handleResize);
 
-      // Clean up both divergence series maps
       divergenceWT2SeriesRef.current.forEach((series) => {
         indicatorChart.removeSeries(series);
       });
@@ -1854,18 +1786,16 @@ export default function Home() {
 
       setChartsInitialized(false);
     };
-  }, []);
+  }, []); //Cleanup finished
 
-  const currentTzLabel =
-    TIMEZONE_OPTIONS.find((tz) => tz.offset === selectedTimezone)?.label ||
-    `UTC${selectedTimezone >= 0 ? "+" : ""}${selectedTimezone}`;
-
+  
+  //JSX Return
   return (
     <ProtectedPage requiredRole="superadmin">
       <div className="flex flex-col min-h-screen bg-gray-900 text-white overflow-hidden mt-9">
         {/* Top Control Bar */}
         <div className=" mt-9 bg-gray-800 border-b border-gray-700 px-3 py-1.5 flex items-center gap-2 text-[10px]">
-          {/* Symbol Selector */}
+          {/* Symbol Selector start*/}
           <select
             value={activeSymbol}
             onChange={(e) => setActiveSymbol(e.target.value)}
@@ -1898,8 +1828,8 @@ export default function Home() {
                   onClick={() => setActiveTimeframe(tf)}
                   className={
                     activeTimeframe === tf
-                      ? "px-2 py-0.5 rounded text-[10px] font-bold transition bg-blue-600 text-white"
-                      : "px-2 py-0.5 rounded text-[10px] font-bold transition bg-gray-700 text-gray-400"
+                      ? "px-2 py-0.5 rounded text-[10px] font-bold transition bg-blue-600 text-white" // ACTIVE
+                      : "px-2 py-0.5 rounded text-[10px] font-bold transition bg-gray-700 text-gray-400" // INACTIVE
                   }
                 >
                   {tf.toUpperCase()}
@@ -1910,8 +1840,14 @@ export default function Home() {
           <span className="text-sm font-bold ml-2">Xen_Rok</span>
 
           {/* Loading Indicator */}
-          {loading && <span className="text-yellow-400 ml-2">⟳</span>}
-
+          {loading && (
+            <div className="ml-2 flex items-center gap-1">
+              <div className="w-5 h-5 border-2 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin"></div>
+              <span className="text-yellow-400 text-xs font-bold tracking-wider animate-pulse">
+                LOADING
+              </span>
+            </div>
+          )}
           {/* Spacer */}
           <div className="flex-1"></div>
 
@@ -1947,15 +1883,6 @@ export default function Home() {
               </option>
             ))}
           </select>
-
-          {/* CSV Export Button */}
-          <button
-            onClick={handleExportCSV}
-            disabled={exporting}
-            className="px-3 py-0.5 rounded text-[10px] font-bold bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white"
-          >
-            {exporting ? "..." : "CSV"}
-          </button>
         </div>
 
         {/* Expandable Controls Panel */}
@@ -2162,37 +2089,22 @@ export default function Home() {
               />
               <span className="text-gray-300">Div on Price</span>
             </label>
-
-            {/* Export Date Range */}
-            <span className="text-gray-400 ml-3">Export:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              min={minDate}
-              max={maxDate}
-              className="bg-gray-700 text-white text-[10px] rounded px-1 py-0 border-none"
-            />
-            <span className="text-gray-500">→</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              min={minDate}
-              max={maxDate}
-              className="bg-gray-700 text-white text-[10px] rounded px-1 py-0 border-none"
-            />
           </div>
         )}
 
         {/* Chart Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="bg-gray-900 px-2 py-1 text-xs text-gray-400 shrink-0">
-            {activeTimeframe.toUpperCase()} - {currentTzLabel}
+            {activeTimeframe.toUpperCase()} - UTC
+            {selectedTimezone >= 0 ? "+" : ""}
+            {selectedTimezone}
           </div>
 
           {/*<div ref={chartsWrapperRef} className="flex-1 relative">*/}
-          <div ref={chartsWrapperRef} className="flex-1 overflow-hidden relative">
+          <div
+            ref={chartsWrapperRef}
+            className="flex-1 overflow-hidden relative"
+          >
             <div
               ref={crosshairLineRef}
               className="absolute top-0 bottom-0 w-px bg-gray-500 pointer-events-none z-10"

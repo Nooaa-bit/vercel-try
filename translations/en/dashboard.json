@@ -1,3 +1,13 @@
 {
-  "loading": "Loading..."
+  "loading": "Loading...",
+  "myDashboard": "My Dashboard",
+  "adminDashboard": "Admin Dashboard",
+  "manageInvitations": "Manage your job invitations and upcoming shifts",
+  "manageCompany": "Manage your company operations",
+  "welcomeAdmin": "Welcome, Admin",
+  "useNavigation": "Use the navigation menu to manage jobs, calendar, and company settings.",
+  "pendingInvitations": "Pending Invitations",
+  "myShifts": "My Shifts",
+  "noInvitations": "No pending invitations",
+  "noShifts": "No upcoming shifts"
 }

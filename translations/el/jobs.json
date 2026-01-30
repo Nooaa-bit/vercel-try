@@ -40,8 +40,19 @@
     "appliesToAllShifts": "Εφαρμόζεται σε όλες τις υπόλοιπες βάρδιες",
     "mustBeFutureDate": "Πρέπει να είναι σήμερα ή μελλοντική ημερομηνία"
   },
+  "positions": {
+    "waiter": "Σερβιτόρος",
+    "runner": "Runner",
+    "chef": "Σεφ",
+    "commis_chef": "Βοηθός Σεφ",
+    "picker": "Αποθηκάριος"
+  },
   "fields": {
     "position": "Θέση",
+    "title": "Τίτλος",
+    "titlePlaceholder": "π.χ., Ομάδα Σαββατοκύριακου, Γάμος Anderson...",
+    "titleHelper": "Προαιρετικό - αφήστε κενό για χρήση ονόματος τοποθεσίας",
+    "selectPosition": "Επιλέξτε θέση...",
     "positionPlaceholder": "π.χ., Οδηγός Διανομής",
     "seniority": "Επίπεδο Εμπειρίας",
     "junior": "Junior",
@@ -58,6 +69,14 @@
     "endTime": "Ώρα Λήξης",
     "shiftStartTime": "Ώρα Έναρξης Βάρδιας",
     "shiftEndTime": "Ώρα Λήξης Βάρδιας",
+    "hourlyRate": "Ωριαίος Μισθός (€)",
+    "hourlyRateHelper": "Χρησιμοποιείται για υπολογισμό αποδοχών βάσει check-in/out",
+    "shiftRate": "Κόστος Βάρδιας (€)",
+    "shiftRateHelper": "Εκτιμώμενο συνολικό κόστος για πλήρη βάρδια",
+    "checkInRadius": "Ακτίνα Check-in (μέτρα)",
+    "checkInRadiusHelper": "Μέγιστη απόσταση για check-in από την τοποθεσία",
+    "checkInWindow": "Παράθυρο Check-in (λεπτά)",
+    "checkInWindowHelper": "Πόσο νωρίς μπορούν να κάνουν check-in πριν την έναρξη",
     "required": "*"
   },
   "validation": {

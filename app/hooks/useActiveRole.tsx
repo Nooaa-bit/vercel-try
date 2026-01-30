@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/hooks/useActiveRole.tsx
 "use client";
 
 import {
@@ -7,6 +8,7 @@ import {
   useMemo,
   useCallback,
   ReactNode,
+  useEffect,
 } from "react";
 import useSWR from "swr";
 import { createClient } from "@/lib/supabase/client";
@@ -22,70 +24,79 @@ const ROLE_WEIGHT: Record<Role, number> = {
   talent: 1,
 };
 
+//Data Transfer Object (DTO) 
 interface UserCompanyRole {
-  id: number; // user_company_role.id
-  userId: number; // ✅ NEW: Actual user.id
-  role: Role;
-  companyId: number;
-  companyName: string;
-}
+  id: number;             // user_company_role.id (the role assignment record ID)
+  userId: number;         // user.id (internal auto-increment user ID)
+  role: Role;             // Which role: "talent", "supervisor", etc.
+  companyId: number;      // company.id (which company this role is for)
+  companyName: string;    // company.name (computed from join for UI display) 
+//assignedDaysAgo: number;// Math.floor((now - createdAt) / day)
+}//What one role assignment looks like: { id: 1, role: "company_admin", companyId: 5, companyName: "Acme" }
 
 interface Company {
   id: number;
   name: string;
-}
+}//Simple company record for dropdown lists
 
 interface ActiveRoleContext {
-  availableRoles: UserCompanyRole[];
-  activeRole: UserCompanyRole;
-  activeCompanyId: number;
-  setActiveRole: (roleId: number) => void;
-  hasPermission: (requiredRole: Role) => boolean;
-  hasAnyRole: (requiredRoles: Role[]) => boolean;
-  loading: boolean;
-  availableCompanies: Company[];
-  selectedCompanyForAdmin: number | null;
-  setSelectedCompanyForAdmin: (companyId: number) => void;
-  isSuperAdmin: boolean;
+  availableRoles: UserCompanyRole[];                   // All roles this user has across all companies
+  activeRole: UserCompanyRole;                         // Currently selected role (what user is acting as right now)
+  activeCompanyId: number;                             // Shortcut to activeRole.companyId
+  setActiveRole: (roleId: number) => Promise<boolean>; // Switch to a different role
+  hasPermission: (requiredRole: Role) => boolean;      // Check if current role has permission
+  hasAnyRole: (requiredRoles: Role[]) => boolean;      // Check if current role matches any of these
+  loading: boolean;                                    // Still fetching roles/auth?
+  availableCompanies: Company[];                       // All companies (for superadmin dropdown)
+  selectedCompanyForAdmin: number | null;              // Which company superadmin is viewing
+  setSelectedCompanyForAdmin: (companyId: number) => void; // Switch company (superadmin only)
+  isSuperAdmin: boolean;                               // Quick check: is current role superadmin?
 }
+
 
 interface RoleRow {
-  id: number;
-  role: Role;
-  company_id: number;
-  user_id: number; // ✅ NEW: Added user_id
+  id: number;         // user_company_role.id
+  role: Role;         // user_company_role.role
+  company_id: number; // user_company_role.company_id
+  user_id: number;    // user_company_role.user_id
 }
 
+
 interface CompanyRow {
-  id: number;
-  name: string;
+  id: number;         // company.id
+  name: string;       // company.name
 }
 
 const ActiveRoleContext = createContext<ActiveRoleContext | undefined>(
   undefined
-);
+); // Problem: Pass activeRole to 20 components via props? Nightmare. Solution: Context = invisible pipe through component tree.
 
-async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
+
+// ============================================================================
+// DATA FETCHING FUNCTIONS
+// ============================================================================
+/*Flow: 1. Convert auth UUID → internal user ID  2. Fetch all active (non-revoked) roles for that user 3. Fetch all companies to get names 4. Join role data with company names*/
+async function fetchUserRoles(authUserId: string): Promise<UserCompanyRole[]> {
   const supabase = createClient();
-
   try {
-    const { data: profile, error: profileError } = await supabase
+    // STEP 1: Get user's internal ID from Supabase auth ID 
+    const { data: userRecord, error: userError } = await supabase
       .from("user")
       .select("id")
-      .eq("auth_user_id", userId)
-      .is("deleted_at", null)
+      .eq("auth_user_id", authUserId)
+      .is("deleted_at", null) // Only non-deleted users
       .maybeSingle();
 
-    if (profileError || !profile) {
-      console.error("Error fetching profile:", profileError);
+    if (userError || !userRecord) {
+      console.error("Error fetching user record:", userError);
       return [];
     }
 
-    // ✅ FIXED: Now selecting user_id as well
+    // STEP 2: Get all roles for this user
     const { data: roles, error: rolesError } = await supabase
       .from("user_company_role")
       .select("id, role, company_id, user_id")
-      .eq("user_id", profile.id)
+      .eq("user_id", userRecord.id)
       .is("revoked_at", null);
 
     if (rolesError || !roles) {
@@ -93,6 +104,7 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
+    // STEP 3: Get all company names
     const { data: companies, error: companiesError } = await supabase
       .from("company")
       .select("id, name")
@@ -103,23 +115,25 @@ async function fetchUserRoles(userId: string): Promise<UserCompanyRole[]> {
       return [];
     }
 
+    // STEP 4: Build lookup map (company_id → name)
     const companyMap = new Map<number, string>(
-      (companies as CompanyRow[]).map((c) => [c.id, c.name])
+      (companies as CompanyRow[]).map((c) => [c.id, c.name]),
     );
 
-    // ✅ FIXED: Now returning userId (user.id)
+    // STEP 5: Transform database rows → app format
     return (roles as RoleRow[]).map((r) => ({
-      id: r.id, // user_company_role.id
-      userId: r.user_id, // ✅ NEW: user.id (the actual user ID)
-      role: r.role,
-      companyId: r.company_id,
-      companyName: companyMap.get(r.company_id) || "Unknown Company",
+      id: r.id,                                                       // user_company_role.id
+      userId: r.user_id,                                              // user.id (internal integer)
+      role: r.role,                                                   // "talent" | "supervisor" | etc.
+      companyId: r.company_id,                                        // company.id
+      companyName: companyMap.get(r.company_id) || "Unknown Company", // Joined name
     }));
   } catch (error) {
     console.error("Unexpected error loading roles:", error);
     return [];
   }
-}
+} //  database connection to fetch user_company_role along with company names. Why 3 queries? Supabase doesn't have clean joins → Manual mapping
+
 
 async function fetchAllCompanies(): Promise<Company[]> {
   const supabase = createClient();
@@ -129,7 +143,7 @@ async function fetchAllCompanies(): Promise<Company[]> {
       .from("company")
       .select("id, name")
       .is("deleted_at", null)
-      .order("name");
+      .order("name"); // Alphabetical for dropdown
 
     if (error) {
       console.error("Error fetching companies:", error);
@@ -141,55 +155,108 @@ async function fetchAllCompanies(): Promise<Company[]> {
     console.error("Unexpected error loading companies:", error);
     return [];
   }
-}
+}//Why separate function? Superadmins need ALL companies for dropdown. Regular users only see their assigned companies.
 
+
+// ============================================================================
+// PROVIDER COMPONENT
+// ============================================================================
 export function ActiveRoleProvider({ children }: { children: ReactNode }) {
+  // Provider Setup
   const { t, ready } = useTranslation("role-access");
-  const { user, loading: authLoading } = useAuth();
-  const [activeRoleId, setActiveRoleId] = useState<number | null>(null);
+  const { user, loading: authLoading } = useAuth(); // user.id is Supabase Auth UUID (string)
+
+  // Local state
+  const [activeRoleId, setActiveRoleId] = useState<number | null>(null); // Which user_company_role.id is active
   const [selectedCompanyForAdmin, setSelectedCompanyForAdmin] = useState<
     number | null
-  >(null);
+  >(null); // For superadmin: which company are they viewing?
 
-  const { data: availableRoles = [], isLoading: rolesLoading } = useSWR(
-    user ? `roles-${user.id}` : null,
-    () => fetchUserRoles(user!.id),
+  /* SWR caches & fetches auser's roles. Cache key: unique per auth UUID
+  Fetcher: converts auth UUID → internal ID → roles */
+  const {
+    data: availableRoles = [],
+    isLoading: rolesLoading,
+    mutate: mutateRoles,
+  } = useSWR(
+    user ? `roles-${user.id}` : null, // Cache key (user.id is auth UUID string)
+    () => fetchUserRoles(user!.id), // user.id is authUserId (string)
     {
-      dedupingInterval: 600000,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      shouldRetryOnError: true,
-    }
+      dedupingInterval: 180000, // 3 minutes - don't refetch if fresh
+      refreshInterval: 180000, // Auto-refresh every 3 minutes
+      revalidateOnFocus: true, // Revalidate when tab regains focus
+      revalidateOnReconnect: true, // Revalidate when internet reconnects
+      revalidateIfStale: true, // Revalidate if data is stale
+      shouldRetryOnError: true, // Retry on network errors
+    },
   );
 
+  /* Fetch and cache all companies (for superadmin)
+   Cache key: global (same for all users)*/
   const { data: availableCompanies = [] } = useSWR(
     "all-companies",
     fetchAllCompanies,
     {
-      dedupingInterval: 600000,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      shouldRetryOnError: true,
-    }
+      dedupingInterval: 300000, // 5 minutes
+      revalidateOnFocus: false, // Don't refetch on focus (slow changing data)
+      revalidateOnReconnect: true, // Do refetch on reconnect
+      shouldRetryOnError: true, // Retry on errors
+    },
   );
 
-  useMemo(() => {
+  // Active Role from localStorage or default to first available role
+  useEffect(() => {
     if (availableRoles.length > 0 && activeRoleId === null) {
-      const stored =
+      const storedRoleId =
         typeof window !== "undefined"
           ? localStorage.getItem("activeRoleId")
           : null;
-      const storedId = stored ? parseInt(stored, 10) : null;
-      const roleExists =
-        storedId !== null && availableRoles.some((r) => r.id === storedId);
+      const parsedRoleId = storedRoleId ? parseInt(storedRoleId, 10) : null;
 
-      setActiveRoleId(roleExists ? storedId : availableRoles[0].id);
+      // Validate: Does user still have this role?
+      const roleExists =
+        parsedRoleId !== null &&
+        availableRoles.some((r) => r.id === parsedRoleId);
+
+      if (roleExists) {
+        setActiveRoleId(parsedRoleId);
+      } else {
+        // Stored role is invalid, use first available
+        const fallbackRoleId = availableRoles[0].id;
+        setActiveRoleId(fallbackRoleId);
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem("activeRoleId", fallbackRoleId.toString());
+        }
+      }
     }
   }, [availableRoles, activeRoleId]);
 
+  // When roles update, revalidate active role
+  useEffect(() => {
+    if (activeRoleId !== null && availableRoles.length > 0) {
+      const roleStillExists = availableRoles.some((r) => r.id === activeRoleId);
+
+      if (!roleStillExists) {
+        console.warn(
+          `[useActiveRole] Active role ${activeRoleId} no longer exists, resetting`,
+        );
+        const fallbackId = availableRoles[0].id;
+        setActiveRoleId(fallbackId);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("activeRoleId", fallbackId.toString());
+        }
+      }
+    }
+  }, [availableRoles, activeRoleId]);
+
+  // ============================================================================
+  // COMPUTED STATE
+  // ============================================================================
   const loading = authLoading || rolesLoading;
   const hasAttemptedLoad = !authLoading && !rolesLoading;
 
+  /* Active role object (memoized) This is the role the user is currently "acting as"*/
   const activeRole = useMemo(() => {
     if (availableRoles.length === 0) return null;
     return (
@@ -199,14 +266,41 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
 
   const isSuperAdmin = activeRole?.role === "superadmin";
 
-  const setActiveRole = useCallback((roleId: number) => {
-    setActiveRoleId(roleId);
-    setSelectedCompanyForAdmin(null);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("activeRoleId", roleId.toString());
-    }
-  }, []);
+  // Role Switching Functions. When user clicks role in dropdown, 1. Update React state 2. Clear superadmin company selection (fresh start) 3. Save to localStorage (survive refresh)
+  const setActiveRole = useCallback(
+    async (newRoleId: number): Promise<boolean> => {
+      // Security: Revalidate roles from server before switching
+      const freshRoles = await mutateRoles();
 
+      if (!freshRoles) {
+        console.error("[setActiveRole] Failed to fetch fresh roles");
+        return false;
+      }
+
+      // Validate the requested role exists and belongs to user
+      const roleExists = freshRoles.some((r) => r.id === newRoleId);
+
+      if (!roleExists) {
+        console.error(
+          `[setActiveRole] Role ${newRoleId} does not exist or was revoked`,
+        );
+        return false;
+      }
+
+      // Role is valid, proceed with switch
+      setActiveRoleId(newRoleId);
+      setSelectedCompanyForAdmin(null);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("activeRoleId", newRoleId.toString());
+      }
+
+      return true;
+    },
+    [mutateRoles],
+  );
+
+  // When superadmin selects a company to view, save it to state and localStorage
   const handleSetSelectedCompanyForAdmin = useCallback((companyId: number) => {
     setSelectedCompanyForAdmin(companyId);
     if (typeof window !== "undefined") {
@@ -214,40 +308,65 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useMemo(() => {
+  // On load, if superadmin with no selected company, set from localStorage or default to first company
+  useEffect(() => {
     if (isSuperAdmin && selectedCompanyForAdmin === null) {
-      const stored =
+      const storedCompanyId =
         typeof window !== "undefined"
           ? localStorage.getItem("selectedCompanyForAdmin")
           : null;
-      const storedId = stored ? parseInt(stored, 10) : null;
+      const parsedCompanyId = storedCompanyId
+        ? parseInt(storedCompanyId, 10)
+        : null;
 
-      if (storedId && availableCompanies.some((c) => c.id === storedId)) {
-        setSelectedCompanyForAdmin(storedId);
+      if (
+        parsedCompanyId &&
+        availableCompanies.some((c) => c.id === parsedCompanyId)
+      ) {
+        setSelectedCompanyForAdmin(parsedCompanyId);
       } else if (availableCompanies.length > 0) {
         setSelectedCompanyForAdmin(availableCompanies[0].id);
       }
     }
   }, [isSuperAdmin, availableCompanies, selectedCompanyForAdmin]);
 
+  // ============================================================================
+  // PERMISSION HELPERS
+  // ============================================================================
+  /* Check if current role has at least the required permission level
+   Example:
+   * - hasPermission("supervisor") returns true for: supervisor, company_admin, superadmin
+   * - hasPermission("supervisor") returns false for: talent
+   * @param requiredRole - Minimum role required
+   * @returns true if current role weight >= required role weight
+   */
   const hasPermission = useCallback(
     (requiredRole: Role) => {
       if (!activeRole) return false;
       return ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[requiredRole];
     },
-    [activeRole]
+    [activeRole],
   );
 
+  /* Check if current role matches ANY of the required roles (OR condition)
+   *
+   * Example:
+   * - hasAnyRole(["supervisor", "company_admin"]) returns true for either role
+   *
+   * @param requiredRoles - Array of acceptable roles
+   * @returns true if current role has permission for any of them
+   */
   const hasAnyRole = useCallback(
     (requiredRoles: Role[]) => {
       if (!activeRole) return false;
       return requiredRoles.some(
-        (role) => ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[role]
+        (role) => ROLE_WEIGHT[activeRole.role] >= ROLE_WEIGHT[role],
       );
     },
-    [activeRole]
+    [activeRole],
   );
 
+  //Bundle everything into one object. useMemo prevents re-creating on every render → Prevents child re-renders.
   const contextValue = useMemo(
     () => ({
       availableRoles,
@@ -273,9 +392,10 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
       selectedCompanyForAdmin,
       handleSetSelectedCompanyForAdmin,
       isSuperAdmin,
-    ]
+    ],
   );
 
+  //Loading State UI
   if (loading || !ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -294,6 +414,7 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  //Edge case: Auth finished but no user → Still show spinner (useAuth will redirect to login).
   if (hasAttemptedLoad && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -307,10 +428,12 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  // No roles assigned → Show help message
   if (hasAttemptedLoad && (availableRoles.length === 0 || !activeRole)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="max-w-md text-center space-y-4">
+          {/* Warning icon */}
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
             <svg
               className="w-8 h-8 text-red-600"
@@ -326,12 +449,14 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
               />
             </svg>
           </div>
+          {/* Message */}
           <div>
             <h2 className="text-xl font-semibold mb-2">
               {t("noAccess.title")}
             </h2>
             <p className="text-muted-foreground">{t("noAccess.description")}</p>
           </div>
+          {/* Help box */}
           <div className="p-4 bg-muted rounded-lg text-sm text-left">
             <p className="font-medium mb-1">{t("noAccess.whatToDo")}</p>
             <ul className="list-disc list-inside space-y-1 text-muted-foreground">
@@ -345,6 +470,7 @@ export function ActiveRoleProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  // Success: User has roles, render children with context
   return (
     <ActiveRoleContext.Provider value={contextValue}>
       {children}
@@ -359,3 +485,18 @@ export function useActiveRole() {
   }
   return context;
 }
+
+/*Hook to access active role context
+ * Must be used within <ActiveRoleProvider>
+ * 
+ * Usage:
+ * ```tsx
+ * const { activeRole, hasPermission, setActiveRole } = useActiveRole();
+ * 
+ * if (hasPermission("supervisor")) {
+ *   // Show supervisor-only UI
+ * }
+ * ```
+ * 
+ * @throws Error if used outside ActiveRoleProvider
+ */

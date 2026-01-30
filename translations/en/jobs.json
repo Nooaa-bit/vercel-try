@@ -40,8 +40,19 @@
     "appliesToAllShifts": "Applies to all remaining shifts",
     "mustBeFutureDate": "Must be today or a future date"
   },
+  "positions": {
+    "waiter": "Waiter",
+    "runner": "Runner",
+    "chef": "Chef",
+    "commis_chef": "Commis Chef",
+    "picker": "Picker"
+  },
   "fields": {
     "position": "Position",
+    "title": "Title",
+    "titlePlaceholder": "e.g., Weekend Team, Anderson's Wedding...",
+    "titleHelper": "Optional - leave blank to use location name",
+    "selectPosition": "Select position...",
     "positionPlaceholder": "e.g., Delivery Driver",
     "seniority": "Experience Level",
     "junior": "Junior",
@@ -58,6 +69,14 @@
     "endTime": "End Time",
     "shiftStartTime": "Shift Start Time",
     "shiftEndTime": "Shift End Time",
+    "hourlyRate": "Hourly Rate (€)",
+    "hourlyRateHelper": "Used to calculate worker pay based on check-in/out times",
+    "shiftRate": "Shift Rate (€)",
+    "shiftRateHelper": "Estimated total cost for a full shift",
+    "checkInRadius": "Check-in Radius (meters)",
+    "checkInRadiusHelper": "Maximum distance workers can check in from location",
+    "checkInWindow": "Check-in Window (minutes)",
+    "checkInWindowHelper": "How early workers can check in before shift starts",
     "required": "*"
   },
   "validation": {
@@ -250,7 +269,7 @@
     "toRemove": "(To remove)",
     "applyToRemaining": "Apply changes to all remaining shifts",
     "applyToRemainingDescription": "Updates times, workers needed, and staffing for {{count}} shifts",
-       "applyToRemainingNote": "Times, workers needed, and staff cancellations will apply to all remaining shifts",
+    "applyToRemainingNote": "Times, workers needed, and staff cancellations will apply to all remaining shifts",
     "cancelAllRemainingNote": "This will cancel the assignment for {{count}} remaining shifts",
     "bulkRemoveAllShiftsDescription": "Are you sure you want to remove {{count}} employees from all {{shifts}} remaining shifts?",
     "cancelShiftButton": "Cancel Shift",

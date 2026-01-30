@@ -12,7 +12,9 @@
 @layer base {
   :root {
     /* Primary palette - warm burgundy red */
-    --background: 30 25% 97%;              /* #faf7f5 */
+    --test: hsl(44, 18%, 88%);      /* #f2ebe6 - soft warm grey */      /*30 25% 97%;               #faf7f5 */
+
+    --background:44 18% 88%;      /* #f2ebe6 - soft warm grey */      /*30 25% 97%;               #faf7f5 */
     --foreground: 0 0% 10%;                /* #1a1a1a */
 
     --card: 30 25% 97%;                    /* #faf7f5 */
@@ -32,26 +34,26 @@
     --accent-foreground: 0 72% 31%;        /* #7f1d1d */
 
     /* UI components */
-    --muted: 30 23% 93%;                   /* #f0ebe8 */
-    --muted-foreground: 25 5% 35%;         /* #57534e */
+--muted: 30 15% 82%;           /* #d4c8bd - noticeably darker */
+--muted-foreground: 25 15% 35%; /* #52443b - much darker for readability */
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 23% 93%;                  /* #f0ebe8 */
-    --input: 30 23% 93%;
+  --border: 30 15% 85%;          /* #dcd1c7 - noticeably darker */
+  --input: 30 15% 90%;           /* #e8e0d9 - matches muted */
     --ring: 0 60% 39%;                     /* matches primary */
 
     --radius: 0.5rem;
 
     /* Sidebar - using primary burgundy theme */
-    --sidebar-background: 22.5 21.1% 92.5%;
+  --sidebar-background: 30 15% 96%;  /* slightly darker than old */
     --sidebar-foreground: 0 0% 10%;
     --sidebar-primary: 0 60% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 30 23% 93%;
+  --sidebar-accent: 30 15% 90%;      /* matches muted */
     --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 30 23% 93%;
+  --sidebar-border: 30 15% 88%;      /* visible */
     --sidebar-ring: 0 60% 39%;
   }
 

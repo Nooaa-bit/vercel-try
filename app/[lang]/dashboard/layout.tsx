@@ -1,3 +1,4 @@
+//hype-hire/vercel/app/[lang]/dashboard/layout.tsx
 "use client";
 
 import { useMemo } from "react";
@@ -25,7 +26,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   } = useActiveRole();
   const pathname = usePathname();
 
-  // Memoized to avoid recalculating on every render
+  // Finds which sidebar item matches current page → Shows title in header. Memoized to avoid recalculating on every render
   const currentTitle = useMemo(() => {
     const pathWithoutLang = pathname?.replace(/^\/[^/]+/, "") || "";
     const currentItem = NAV_ITEMS.find((item) => {
@@ -42,7 +43,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const displayCompanyName = useMemo(() => {
     if (isSuperAdmin && selectedCompanyForAdmin) {
       const selectedCompany = availableCompanies.find(
-        (c) => c.id === selectedCompanyForAdmin
+        (c) => c.id === selectedCompanyForAdmin,
       );
       return selectedCompany?.name || activeRole.companyName;
     }
@@ -68,26 +69,25 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div>
-      <SidebarProvider>
+      <SidebarProvider>             {/* shadcn context */}
         <div className="min-h-screen flex w-full bg-background">
-          <AppSidebar user={user} />
-          <SidebarInset className="flex-1">
-            <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-20 z-30">
+          <AppSidebar user={user} />        {/* Left sidebar with nav */}
+          <SidebarInset className="flex-1">       {/* Main content area */}
+            <header className="h-14 border-b bg-card flex items-center justify-between px-4 shadow-sm sticky top-20 z-30"> {/* Top-20 = below Navbar */}
               <div className="flex items-center gap-2">
-                <SidebarTrigger className="mr-2" />
+                <SidebarTrigger className="mr-2" /> {/* Hamburger mobile */}
                 <h1 className="text-lg font-semibold">{currentTitle}</h1>
                 <span className="text-lg text-muted-foreground hidden sm:block">
-                  {/* ✅ Shows selected company for superadmins, activeRole company for others */}
-                  {displayCompanyName}
+                  {displayCompanyName} {/* Shows selected company for superadmins, activeRole company for others */}
                 </span>
               </div>
               <div className="flex items-center gap-2 p-2">
                 <span className="text-sm font-medium hidden sm:block">
-                  {t("welcome")} {displayName}
+                  {t("welcome")} {displayName} {/* "Welcome John" */}
                 </span>
               </div>
             </header>
-            <main className="flex-1 p-6">{children}</main>
+            <main className="flex-1 p-6">{children}</main> {/* Actual page content (dashboard/page.tsx) */}
           </SidebarInset>
         </div>
       </SidebarProvider>
@@ -101,8 +101,28 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ActiveRoleProvider>
+    <ActiveRoleProvider> {/* Provides activeRole to all pages */}
       <DashboardContent>{children}</DashboardContent>
     </ActiveRoleProvider>
   );
 }
+
+/*
+DashboardLayout (wrapper)
+  └── ActiveRoleProvider (context)
+       └── DashboardContent (actual UI)
+            ├── Sidebar (collapsible menu)
+            └── Main content area (children)
+
+┌────────────────────────────────────────────┐
+│ Navbar (global, from root layout)         │ ← Fixed top-0
+├─────────┬──────────────────────────────────┤
+│ Sidebar │ Header: Calendar | Hype Hire    │ ← Sticky top-20
+│         │ Welcome John                     │
+│ - Home  ├──────────────────────────────────┤
+│ - Cal   │                                  │
+│ - Team  │ {children} ← Page content        │
+│         │                                  │
+└─────────┴──────────────────────────────────┘
+
+*/

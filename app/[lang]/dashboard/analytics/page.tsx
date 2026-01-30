@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
-import { ProtectedPage } from "@/components/ProtectedPage";
+import { ProtectedPage } from "@/components/ProtectedSection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart3,

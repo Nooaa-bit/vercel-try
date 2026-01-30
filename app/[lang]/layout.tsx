@@ -13,6 +13,8 @@ const inter = Inter({
   display: "swap",
   weight: ["400", "500", "600", "700"],
   variable: "--font-inter",
+  preload: true, // Add explicitly (default true)
+  adjustFontFallback: true, // Add: reduces CLS
 });
 
 //for localized SEO consider generateMetadata to produce per‑language titles and descriptions using the lang param.

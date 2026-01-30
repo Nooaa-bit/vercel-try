@@ -13,6 +13,7 @@ model PasswordResetToken {
   id        String    @id @default(cuid())
   email     String    @map("email")
   userId    Int       @map("user_id")
+  // ↑ Use in code           ↑ Actual DB column name
   token     String    @unique @map("token")
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
@@ -200,13 +201,22 @@ model Job {
   locationId Int? @map("location_id") // Which location is this job at?
 
   // Job Details
-  position    String    @db.VarChar(255)
+  position    String    @db.VarChar(100)
+  title       String?   @db.VarChar(255)
   seniority   Seniority
   description String?   @db.Text
 
   // Schedule
   startDate DateTime @map("start_date") @db.Date
   endDate   DateTime @map("end_date") @db.Date
+
+  // Rates
+  hourlyRate  Decimal? @map("hourly_rate") @db.Decimal(10, 2)
+  shiftRate   Decimal? @map("shift_rate") @db.Decimal(10, 2)
+
+  // Check-in Settings
+  checkInRadiusJob  Int? @map("check_in_radius_job")
+  checkInWindowMinutes Int  @default(5) @map("check_in_window_minutes")
 
   // Status & Audit
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
