@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useActiveRole } from "@/app/hooks/useActiveRole";
-import { ProtectedPage } from "@/components/ProtectedSection";
+import { ProtectedSection } from "@/components/ProtectedSection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart3,
@@ -264,8 +264,8 @@ function AnalyticsContent() {
 
 export default function AnalyticsPage() {
   return (
-    <ProtectedPage requiredRole="company_admin">
+    <ProtectedSection requiredRole="company_admin">
       <AnalyticsContent />
-    </ProtectedPage>
+    </ProtectedSection>
   );
 }
